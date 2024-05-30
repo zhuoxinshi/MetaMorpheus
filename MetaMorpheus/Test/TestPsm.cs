@@ -649,10 +649,8 @@ namespace Test
             CommonParameters commonParameters = new CommonParameters();
             fsp.Add(("SmallCalibratible_Yeast.mzML", commonParameters));
             var arrayOfSortedms2Scans = MetaMorpheusTask.GetMs2Scans(myMsDataFile, filePath, commonParameters).OrderBy(b => b.PrecursorMass).ToArray();
-            var variableModifications = new List<Modification>();
-            var fixedModifications = new List<Modification>();
-            variableModifications = GlobalVariables.AllModsKnown.OfType<Modification>().Where(b => CommonParameters.ListOfModsVariable.Contains((b.ModificationType, b.IdWithMotif))).ToList();
-            fixedModifications = GlobalVariables.AllModsKnown.OfType<Modification>().Where(b => CommonParameters.ListOfModsFixed.Contains((b.ModificationType, b.IdWithMotif))).ToList();
+            var variableModifications = GlobalVariables.AllModsKnown.OfType<Modification>().Where(b => CommonParameters.ListOfModsVariable.Contains((b.ModificationType, b.IdWithMotif))).ToList();
+            var fixedModifications = GlobalVariables.AllModsKnown.OfType<Modification>().Where(b => CommonParameters.ListOfModsFixed.Contains((b.ModificationType, b.IdWithMotif))).ToList();
             var searchModes = new SinglePpmAroundZeroSearchMode(5);
             bool writeSpectralLibrary = false;
             MassDiffAcceptor massDiffAcceptor = new DotMassDiffAcceptor("1mm", new List<double> { 0, 1.0029 }, new PpmTolerance(5));
@@ -670,6 +668,18 @@ namespace Test
             }
             SpectralMatch psmScan23 = psms.ToArray()[33];
             Assert.That(psmScan23.PrecursorScanEnvelopePeakCount, Is.EqualTo(4));
+
+            
         }
+
+        [Test]
+        public static void TestRandom()
+        {
+            var list = new List<List<(double mz, double mass)>>()
+        { new List<(double mz, double mass)>() { (2, 10), (2, 30), (2, 10) },
+            new List<(double mz, double mass)>() { (3,10), (4, 10), (5, 10) } };
+            IEnumerable<double> uniqueValues = list.SelectMany(list => list.Select(l => l.mz)).Distinct();
+            var a = list[1][1];
         }
+    }
 }

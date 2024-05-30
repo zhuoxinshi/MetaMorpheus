@@ -19,6 +19,7 @@ using Omics.Modifications;
 using TaskLayer;
 using UsefulProteomicsDatabases;
 using Omics;
+using Proteomics.AminoAcidPolymer;
 
 namespace Test
 {
@@ -694,6 +695,42 @@ namespace Test
 
             string topDownToString = "\t0\t1\t2\t3\t4\t5\t6\t8\t9\t10\t21\t22";
             Assert.AreEqual(topDownToString, pd.ToString("top-down"));
+        }
+
+        [Test]
+        public static void TestPrecursorEnvelopeScore()
+        {
+            string filePath = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\SmallCalibratible_Yeast.mzML");
+            MyFileManager myFileManager = new MyFileManager(true);
+            CommonParameters commonParameters = new CommonParameters();
+            var myMsDataFile = myFileManager.LoadFile(filePath, commonParameters);
+            SearchTask task = new SearchTask();
+            string myDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\smalldb.fasta");
+            List<Protein> proteinList = ProteinDbLoader.LoadProteinFasta(myDatabase, true, DecoyType.Reverse, false, out List<string> errors);
+            var fsp = new List<(string, CommonParameters)>();
+            fsp.Add(("SmallCalibratible_Yeast.mzML", commonParameters));
+            var arrayOfSortedms2Scans = MetaMorpheusTask.GetMs2Scans(myMsDataFile, filePath, commonParameters).OrderBy(b => b.PrecursorMass).ToArray();
+            var variableModifications = GlobalVariables.AllModsKnown.OfType<Modification>().Where(b => commonParameters.ListOfModsVariable.Contains((b.ModificationType, b.IdWithMotif))).ToList();
+            var fixedModifications = GlobalVariables.AllModsKnown.OfType<Modification>().Where(b => commonParameters.ListOfModsFixed.Contains((b.ModificationType, b.IdWithMotif))).ToList();
+            var searchModes = new SinglePpmAroundZeroSearchMode(5);
+            bool writeSpectralLibrary = false;
+            MassDiffAcceptor massDiffAcceptor = new DotMassDiffAcceptor("1mm", new List<double> { 0, 1.0029 }, new PpmTolerance(5));
+            SpectralMatch[] allPsmsArray = new SpectralMatch[arrayOfSortedms2Scans.Length];
+            new ClassicSearchEngine(allPsmsArray, arrayOfSortedms2Scans, variableModifications, fixedModifications, null, null, null,
+                proteinList, massDiffAcceptor, commonParameters, fsp, null, new List<string>(), writeSpectralLibrary).Run();
+
+            List<SpectralMatch> psms = new List<SpectralMatch>();
+            foreach (SpectralMatch psm in allPsmsArray)
+            {
+                if (psm != null)
+                {
+                    psms.Add(psm);
+                }
+            }
+            SpectralMatch psmScan23 = psms.ToArray()[33];
+            ChemicalFormula formula = new Peptide(psmScan23.FullSequence).GetChemicalFormula();
+            IsotopicDistribution theoreticalDistribution = IsotopicDistribution.GetDistribution(formula);
+            var sum = theoreticalDistribution.Intensities.Sum();
         }
     }
 }

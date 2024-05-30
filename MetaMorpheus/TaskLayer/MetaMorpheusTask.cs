@@ -20,6 +20,8 @@ using Omics.Modifications;
 using Omics.SpectrumMatch;
 using SpectralAveraging;
 using UsefulProteomicsDatabases;
+using Easy.Common.Extensions;
+using ThermoFisher.CommonCore.Data.Business;
 
 namespace TaskLayer
 {
@@ -175,6 +177,33 @@ namespace TaskLayer
                                     }
                                     precursors.Add((monoPeakMz, envelope.Charge, intensity, peakCount));
                                 }
+
+                                //Compute a score for precursor envelopes
+                                List<IsotopicEnvelope> listOfTheoreticalEnvelopes = new List<IsotopicEnvelope>();
+                                List<double> allIntensitySum = new List<double>();
+                                foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
+                                    precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
+                                {
+                                    allIntensitySum.Add(envelope.Peaks.Sum(p => p.intensity));
+                                    IsotopicEnvelope theoreticalEnvelope = new IsotopicEnvelope(envelope.Peaks, envelope.MonoisotopicMass, 
+                                        envelope.Charge, envelope.TotalIntensity, envelope.StDev, envelope.MassIndex);
+
+                                    //Find theoretical isotopic envelope peaks
+                                    //use MassIndex? where to find the theoretical intensities? do we need the chemical formula? IsotopicDistribution.GetDistribution?
+
+                                    List<(double mz, double intensity)> peaks = new List<(double mz, double intensity)>();
+                                    double mz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
+                                    double mass = envelope.MonoisotopicMass;
+                                    while (mz <= ms2scan.IsolationRange.Minimum && mz >= ms2scan.IsolationRange.Maximum)
+                                    {
+                                        double intensity = 0;
+                                        peaks.Add((mz, intensity));
+                                        mass = mass + 1;
+                                        mz = mass.ToMz(envelope.Charge);
+                                    }
+                                }
+                                double[] ratio = allIntensitySum.Select(i => i/allIntensitySum.Sum()).ToArray();
+
                             }
                         }
 

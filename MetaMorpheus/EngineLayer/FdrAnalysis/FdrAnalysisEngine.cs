@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using EngineLayer;
 using EngineLayer.FdrAnalysis;
+using MassSpectrometry;
 
 namespace EngineLayer.FdrAnalysis
 {
@@ -216,5 +217,19 @@ namespace EngineLayer.FdrAnalysis
                 }
             }
         }
+
+        /*
+        public void DoPrecursorEnvelopeAnalysis()
+        {
+            for (int spectraFileIndex = 0; spectraFileIndex < Parameters.CurrentRawFileList.Count; spectraFileIndex++)
+            {
+                CommonParameters combinedParams = SetAllFileSpecificCommonParams(CommonParameters, Parameters.FileSettingsList[spectraFileIndex]);
+
+                var origDataFile = Parameters.CurrentRawFileList[spectraFileIndex];
+                MsDataFile myMsDataFile = Parameters.MyFileManager.LoadFile(origDataFile, combinedParams);
+                new PrecursorEnvelopeAnalysis(myMsDataFile, Parameters.AllPsms).RunAnalysis();
+            }
+        }
+        */
     }
 }

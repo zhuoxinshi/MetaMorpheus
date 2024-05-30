@@ -66,7 +66,9 @@ namespace EngineLayer
         public int ScanPrecursorCharge { get; }
         public double ScanPrecursorMonoisotopicPeakMz { get; }
         public double PrecursorScanIntensity { get; }
+        public double? PrecursorScanIntensityMatch { get; set; }
         public int PrecursorScanEnvelopePeakCount { get; }
+        public double? PrecursorScanEnvelopeScore { get; set; }
         public double ScanPrecursorMass { get; }
         public string FullFilePath { get; private set; }
         public int ScanIndex { get; }
@@ -247,7 +249,6 @@ namespace EngineLayer
             FdrInfo.PEP = pep;
             FdrInfo.PEP_QValue = pepQValue;
         }
-
 
 
         #endregion
@@ -540,6 +541,5 @@ namespace EngineLayer
             }
             return otherPsm.ScanNumber.CompareTo(this.ScanNumber); //reverse the comparision so that the lower scan number comes first.
         }
-
     }
 }
