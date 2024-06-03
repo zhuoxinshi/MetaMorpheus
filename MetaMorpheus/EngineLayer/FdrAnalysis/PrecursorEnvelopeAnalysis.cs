@@ -28,6 +28,8 @@ namespace EngineLayer.FdrAnalysis
         public MsDataFile RawScans;
         public List<SpectralMatch> AllPsms;
         public double MzTolerance;
+        public int[] ChargeStates;
+        MsDataFile AllDataScans;
 
         public PrecursorEnvelopeAnalysis(MsDataFile rawScans, List<SpectralMatch> psms, double tolerance)
         {
@@ -45,13 +47,13 @@ namespace EngineLayer.FdrAnalysis
             foreach (double mass in theoreticalDistribution.Masses)
             {
                 double mz = mass.ToMz(charge);
-                if (mz >= range.Maximum && mz <= range.Maximum)
+                if (mz >= range.Minimum && mz <= range.Maximum)
                 {
                     double intensity = theoreticalDistribution.Intensities[Array.IndexOf(theoreticalDistribution.Masses, mass)];
                     theoreticalPeaks.Add(new(mz, intensity));
                 }
             }
-            return theoreticalPeaks;
+            return theoreticalPeaks.Where(p => p.intensity >= 0.0001).ToList();
         }
 
         public static List<List<(double mz, double intensity)>> FindTheoreticalMs1Peaks(List<string> sequences, int[] charges, MzRange range)
@@ -117,12 +119,11 @@ namespace EngineLayer.FdrAnalysis
         {
             var allTheoreticalPeaks = FindTheoreticalMs1Peaks(sequences, charges , range);
             double[] allTheoreticalMzs = allTheoreticalPeaks.SelectMany(peaks => peaks.Select(p => p.mz)).Distinct().OrderBy(mz => mz).ToArray();
-            List<double> matchedIndex = new List<double>();
 
             var mzPairs = MatchedMzs(precursorSpectrum.XArray, precursorSpectrum.YArray, allTheoreticalMzs, tolerance);
             var matchedMzsExperimental = mzPairs.Select(pair => pair.experimentalMz).OrderBy(mz => mz);
             List<double> matchedIntensities = new List<double>();
-
+            
             foreach(double mz in matchedMzsExperimental)
             {
                 if (mz >= 0)
@@ -156,6 +157,7 @@ namespace EngineLayer.FdrAnalysis
             double[][] features = new double[allTheoreticalMzs.Length][];
             for (int i = 0; i < allTheoreticalMzs.Length; i++)
             {
+                features[i] = new double[allTheoreticalPeaks.Count];
                 for (int j = 0; j < allTheoreticalPeaks.Count; j++)
                 {
                     if (allTheoreticalPeaks[j].Select(p => p.mz).Contains(allTheoreticalMzs[i]))
@@ -171,7 +173,7 @@ namespace EngineLayer.FdrAnalysis
             }
 
             double[] matchedIntensities = FindMatchedIntensities(sequences, charges, range, precursorSpectrum, tolerance).ToArray();
-
+            
             //make a multiple linear regression model to find the relative intensities for each peptide ion
             var coefficients = MultipleRegression.QR(features, matchedIntensities, false);
 
@@ -187,6 +189,7 @@ namespace EngineLayer.FdrAnalysis
             var matrix = Matrix<double>.Build.DenseOfArray(featureMatrix);
             var vector = Vector<double>.Build.Dense(coefficients);
             var resultIntensities = matrix.Multiply(vector).ToArray();
+            
             MzSpectrum theoreticalSpectrum = new MzSpectrum(allTheoreticalMzs, resultIntensities, true);
 
             return theoreticalSpectrum;
@@ -215,6 +218,7 @@ namespace EngineLayer.FdrAnalysis
             {
                 List<string> sequences = psmSet.Select(psm => psm.FullSequence).ToList();
                 MzRange range = psmSet.First().MsDataScan.ScanWindowRange;
+                MzSpectrum precursorSpectrum = AllDataScans.Where(scan => scan.OneBasedScanNumber == psmSet.First().PrecursorScanNumber).First().MassSpectrum;
                 //double? similarityScore = CalculateSimilarityScore(RawScans, psmList);
                 //pmList.ForEach(psm => psm.PrecursorScanSmilarityScore = similarityScore);
             }
