@@ -87,7 +87,7 @@ namespace Test
             double tolerance = 0.0001;
 
             MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
-                (sequences, charges, range, mySpectrum, tolerance);
+                (sequences, charges, range, mySpectrum, tolerance, out double[] coefficients);
             Assert.AreEqual(mySpectrum.XArray, resultSpectrum.XArray);
             for (int i = 0; i < mySpectrum.YArray.Length; i++)
             {
@@ -95,10 +95,27 @@ namespace Test
             }
 
             //Test for FindFractionOfMatchedIntensities
+            for (int i = 0; i < myRatio.Length; i++)
+                Assert.That(myRatio[i], Is.EqualTo(coefficients[i]).Within(tolerance));
+            
             double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, mySpectrum, tolerance);
             Assert.AreEqual(1, fraction);
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, mySpectrum, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, 0.01, false);
             Assert.AreEqual(1, similarityScore);
+        }
+
+        [Test]
+        public static void TestOnRealData()
+        {
+            string filePath = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\SmallCalibratible_Yeast.mzML");
+            MyFileManager myFileManager = new MyFileManager(true);
+            CommonParameters commonParameters = new CommonParameters();
+            var myMsDataFile = myFileManager.LoadFile(filePath, commonParameters);
+            SearchTask task = new SearchTask();
+            string myDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\smalldb.fasta");
+            List<Protein> proteinList = ProteinDbLoader.LoadProteinFasta(myDatabase, true, DecoyType.Reverse, false, out List<string> errors);
+            var fsp = new List<(string, CommonParameters)>();
+            fsp.Add(("SmallCalibratible_Yeast.mzML", commonParameters));
         }
     }
 }

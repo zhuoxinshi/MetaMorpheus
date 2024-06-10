@@ -4,6 +4,7 @@ using System.Linq;
 using EngineLayer;
 using EngineLayer.FdrAnalysis;
 using MassSpectrometry;
+using MzLibUtil;
 
 namespace EngineLayer.FdrAnalysis
 {
@@ -215,6 +216,30 @@ namespace EngineLayer.FdrAnalysis
                 {
                     psm.PsmCount = count;
                 }
+            }
+        }
+
+        public void DoPrecursorEnvelopeAnalysis()
+
+        /*
+        Parameters.AllPsms = Parameters.AllPsms.OrderByDescending(b => b.Score)
+                   .ThenBy(b => b.BioPolymerWithSetModsMonoisotopicMass.HasValue? Math.Abs(b.ScanPrecursorMass - b.BioPolymerWithSetModsMonoisotopicMass.Value) : double.MaxValue)
+                   .GroupBy(b => (b.FullFilePath, b.ScanNumber, b.BioPolymerWithSetModsMonoisotopicMass)).Select(b => b.First()).ToList();
+        */
+        //what is BioPolymerWithSetMods
+        //only one higest-scored PSM for each ? in AllPSMs? AllPSMs contain PSMs from different files?
+        {
+            var psmSets = AllPsms.GroupBy(p => p.ScanNumber);
+            string filePath = AllPsms[0].FullFilePath;
+
+            foreach (var psmSet in psmSets)
+            {
+                List<string> sequences = psmSet.Select(psm => psm.FullSequence).ToList();
+                MzRange range = psmSet.First().MsDataScan.ScanWindowRange;
+                //string filePath = psmSet.First().fu
+                //MzSpectrum precursorSpectrum = AllDataScans.Where(scan => scan.OneBasedScanNumber == psmSet.First().PrecursorScanNumber).First().MassSpectrum;
+                //double? similarityScore = CalculateSimilarityScore(RawScans, psmList);
+                //pmList.ForEach(psm => psm.PrecursorScanSmilarityScore = similarityScore);
             }
         }
 

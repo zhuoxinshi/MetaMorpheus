@@ -217,6 +217,9 @@ namespace TaskLayer
             // this could cause weird PSM FDR issues
 
             Status("Estimating PSM FDR...", Parameters.SearchTaskId);
+            //List<MsDataFile> fileList = Parameters.CurrentRawFileList.Select(f => Parameters.MyFileManager.LoadFile(f, CommonParameters)).ToList();
+            //Also need to pass tolerance, SpectrumNormalizationScheme and charge states to FdrAnalysisEngine()
+            //Add data fields in FdrAnalysisEngine and make a method to call all the functions in PrecursorEnvelopeAnalysis and 
             new FdrAnalysisEngine(Parameters.AllPsms, Parameters.NumNotches, CommonParameters, this.FileSpecificParameters, new List<string> { Parameters.SearchTaskId }, outputFolder: Parameters.OutputFolder).Run();
 
             // sort by q-value because of group FDR stuff
