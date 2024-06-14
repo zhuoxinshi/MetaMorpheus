@@ -25,6 +25,7 @@ using Nett;
 using NUnit.Framework.Constraints;
 using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
+using System.Text.RegularExpressions;
 
 namespace Test
 {
@@ -111,7 +112,7 @@ namespace Test
             MzSpectrum resultSpectrum2 = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
                 (sequences, new int[] {2,3}, range, mySpectrum, tolerance, out double[] coefficients2);
             var similarityScore2 = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, new int[] { 2, 3 }, range, mySpectrum, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, 0.01, false);
-            Assert.AreEqual(1, similarityScore);
+            Assert.AreEqual(1, similarityScore2);
         }
 
         [Test]
@@ -135,8 +136,10 @@ namespace Test
             MyFileManager myFileManager = new MyFileManager(true);
             MsDataFile scans = myFileManager.LoadFile(dataFilePaths[0], task.CommonParameters);
             var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 27534).First().MassSpectrum;
-            List<string> sequences = psms.Select(p => p.FullSequence).ToList();
-            int[] charges = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+            string pattern = @"\[[^\]]*\]";
+            List<string> sequences = psms.Select(p => Regex.Replace(p.FullSequence, pattern, string.Empty)).ToList();
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6};
             var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 27534).First().ScanWindowRange;
             var tolerance = task.CommonParameters.PrecursorMassTolerance;
             MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
@@ -145,10 +148,5 @@ namespace Test
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
         }
 
-        [Test]
-        public static void TestOnSimpleSpectrum2()
-        {
-
-        }
     }
 }

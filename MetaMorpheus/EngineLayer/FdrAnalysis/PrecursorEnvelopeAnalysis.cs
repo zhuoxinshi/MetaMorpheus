@@ -75,7 +75,7 @@ namespace EngineLayer.FdrAnalysis
 
         public static bool WithinTolerance(double mz1, double mz2, Tolerance tolerance)
         {
-            return (Math.Abs(mz1 - mz2)/1000000.0) < tolerance.Value;
+            return (Math.Abs(mz1 - mz2)*1000000.0) < tolerance.Value;
         }
 
         public static List<(double experimentalMz, double theoreticalMz)> MatchedMzs(double[] experimentalMzs, double[] experimentalIntensities, double[] theoreticalMzs, Tolerance tolerance)
@@ -137,6 +137,13 @@ namespace EngineLayer.FdrAnalysis
                     matchedIntensities.Add(0);
                 }
             }
+
+            var tolerance2 = new PpmTolerance(10000);
+            var mzPairs2 = MatchedMzs(experimentalSpectrum.XArray, experimentalSpectrum.YArray, allTheoreticalMzs, tolerance2);
+
+            int stop = 0;
+            int stop1 = 0;
+
 
             return matchedIntensities;
         }
