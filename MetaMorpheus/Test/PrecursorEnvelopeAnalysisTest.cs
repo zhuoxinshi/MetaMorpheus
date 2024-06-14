@@ -21,6 +21,10 @@ using Omics;
 using Proteomics.AminoAcidPolymer;
 using EngineLayer.FdrAnalysis;
 using MassSpectrometry.MzSpectra;
+using Nett;
+using NUnit.Framework.Constraints;
+using System.Runtime.InteropServices;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 
 namespace Test
 {
@@ -65,7 +69,7 @@ namespace Test
         [Test]
         public static void TestOnSimpleSpectrum()
         {
-            List<string> sequences = new List<string>() 
+            List<string> sequences = new List<string>()
             {"KYDNSLKIISNASCTTNCLAPLA", "QYDNSLKIISNASCTTNCLAPLA", "KYDNSLKIISNASCTTNCLAPNA" };
             MzRange range = new MzRange(0, 1500);
             double[] myRatio = new double[] { 1, 2, 3 };
@@ -84,7 +88,7 @@ namespace Test
             double[] allMzs = sortedPeaks.Select(p => p.mz).ToArray();
             double[] allIntensities = sortedPeaks.Select(p => p.intensity).ToArray();
             MzSpectrum mySpectrum = new MzSpectrum(allMzs, allIntensities, true);
-            double tolerance = 0.0001;
+            var tolerance = new PpmTolerance(5);
 
             MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
                 (sequences, charges, range, mySpectrum, tolerance, out double[] coefficients);
@@ -97,25 +101,54 @@ namespace Test
             //Test for FindFractionOfMatchedIntensities
             for (int i = 0; i < myRatio.Length; i++)
                 Assert.That(myRatio[i], Is.EqualTo(coefficients[i]).Within(tolerance));
-            
+
             double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, mySpectrum, tolerance);
             Assert.AreEqual(1, fraction);
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, mySpectrum, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, 0.01, false);
+            Assert.AreEqual(1, similarityScore);
+
+            //Test for charge states that do not exist
+            MzSpectrum resultSpectrum2 = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
+                (sequences, new int[] {2,3}, range, mySpectrum, tolerance, out double[] coefficients2);
+            var similarityScore2 = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, new int[] { 2, 3 }, range, mySpectrum, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, 0.01, false);
             Assert.AreEqual(1, similarityScore);
         }
 
         [Test]
         public static void TestOnRealData()
         {
-            string filePath = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\SmallCalibratible_Yeast.mzML");
+            string tomlFilePath = @"\\bison.chem.wisc.edu\share\Users\Nic\Chimeras\Mann_11cell_analysis\Jurkat\SearchResults\MetaMorpheusWithLibrary\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFilePath, MetaMorpheusTask.tomlConfig);
+            string outputPath = @"E:\Test Data";
+            task.SearchParameters.DoLabelFreeQuantification = true;
+            string myDatabase = @"\\bison.chem.wisc.edu\share\Users\Nic\Chimeras\Mann_11cell_analysis\Jurkat\human_UP000005640_reviewedGPTMD.xml";
+            //List<Protein> proteinList = ProteinDbLoader.LoadProteinFasta(myDatabase, true, DecoyType.Reverse, false, out List<string> errors);
+            List<string> dataFilePaths = new List<string>
+                {
+                @"E:\Test Data\20100614_Velos1_TaGe_SA_Jurkat_1-calib-averaged.mzML"
+                };
+            task.RunTask(outputPath, new List<DbForTask> { new DbForTask(myDatabase, false) }, dataFilePaths, "testOnRealData");
+            var allPsms = PsmTsvReader.ReadTsv(Path.Combine(outputPath, @"AllPSMs.psmtsv"), out var warnings);
+
+            //27534
+            var psms = allPsms.GroupBy(p => new { p.PrecursorScanNum, p.FileNameWithoutExtension }).Where(g => g.ToList().First().PrecursorScanNum == 27534).SelectMany(p => p).ToList();
             MyFileManager myFileManager = new MyFileManager(true);
-            CommonParameters commonParameters = new CommonParameters();
-            var myMsDataFile = myFileManager.LoadFile(filePath, commonParameters);
-            SearchTask task = new SearchTask();
-            string myDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\smalldb.fasta");
-            List<Protein> proteinList = ProteinDbLoader.LoadProteinFasta(myDatabase, true, DecoyType.Reverse, false, out List<string> errors);
-            var fsp = new List<(string, CommonParameters)>();
-            fsp.Add(("SmallCalibratible_Yeast.mzML", commonParameters));
+            MsDataFile scans = myFileManager.LoadFile(dataFilePaths[0], task.CommonParameters);
+            var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 27534).First().MassSpectrum;
+            List<string> sequences = psms.Select(p => p.FullSequence).ToList();
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+            var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 27534).First().ScanWindowRange;
+            var tolerance = task.CommonParameters.PrecursorMassTolerance;
+            MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
+            (sequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
+            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance);
+            var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
+        }
+
+        [Test]
+        public static void TestOnSimpleSpectrum2()
+        {
+
         }
     }
 }

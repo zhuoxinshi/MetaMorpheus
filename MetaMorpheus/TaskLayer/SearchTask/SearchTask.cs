@@ -339,7 +339,7 @@ namespace TaskLayer
                        SearchParameters.StartTurnoverLabel, SearchParameters.EndTurnoverLabel, proteinList, massDiffAcceptor, combinedParams, this.FileSpecificParameters, spectralLibrary, thisId,SearchParameters.WriteSpectralLibrary);
                     newClassicSearchEngine.Run();
 
-                    ReportProgress(new ProgressEventArgs(100, "Done with search!", thisId));
+                   ReportProgress(new ProgressEventArgs(100, "Done with search!", thisId));
                 }
 
                 //look for internal fragments
