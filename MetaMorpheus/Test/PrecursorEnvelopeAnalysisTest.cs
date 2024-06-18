@@ -26,6 +26,7 @@ using NUnit.Framework.Constraints;
 using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.RegularExpressions;
+using Proteomics.ProteolyticDigestion;
 
 namespace Test
 {
@@ -135,10 +136,9 @@ namespace Test
             var psms = allPsms.GroupBy(p => new { p.PrecursorScanNum, p.FileNameWithoutExtension }).Where(g => g.ToList().First().PrecursorScanNum == 27534).SelectMany(p => p).ToList();
             MyFileManager myFileManager = new MyFileManager(true);
             MsDataFile scans = myFileManager.LoadFile(dataFilePaths[0], task.CommonParameters);
-            var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 27534).First().MassSpectrum;
+            var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedScanNumber == 27534).First().MassSpectrum;
 
-            string pattern = @"\[[^\]]*\]";
-            List<string> sequences = psms.Select(p => Regex.Replace(p.FullSequence, pattern, string.Empty)).ToList();
+            List<string> sequences = psms.Select(p => p.FullSequence).ToList();
             int[] charges = new int[] { 1, 2, 3, 4, 5, 6};
             var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 27534).First().ScanWindowRange;
             var tolerance = task.CommonParameters.PrecursorMassTolerance;
@@ -148,5 +148,14 @@ namespace Test
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
         }
 
+        [Test]
+        public static void sequenceParse()
+        {
+            string seq = "DGNASGTTLLEALDC[Common Fixed:Carbamidomethyl on C]ILPPTRPTDK";
+            var p = new PeptideWithSetModifications(seq, GlobalVariables.AllModsKnownDictionary);
+            var chemFormula = p.FullChemicalFormula;
+            var formula = new Peptide("DGNASGTTLLEALDCILPPTRPTDK").GetChemicalFormula();
+            var formula2 = new PeptideWithSetModifications("DGNASGTTLLEALDCILPPTRPTDK", GlobalVariables.AllModsKnownDictionary).FullChemicalFormula;
+        }
     }
 }
