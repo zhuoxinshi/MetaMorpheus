@@ -75,11 +75,6 @@ namespace EngineLayer.FdrAnalysis
             return allTheoreticalPeaks;
         }
 
-        public static bool WithinTolerance(double mz1, double mz2, Tolerance tolerance)
-        {
-            return (Math.Abs(mz1 - mz2)*100.0) < tolerance.Value;
-        }
-
         public static List<(double experimentalMz, double theoreticalMz)> MatchedMzs(double[] experimentalMzs, double[] experimentalIntensities, double[] theoreticalMzs, Tolerance tolerance)
         {
             List<(double, double)> mzPairs = new List<(double, double)>();
@@ -95,7 +90,7 @@ namespace EngineLayer.FdrAnalysis
                 int index = 0;
                 while (experimental.Count > 0 && index < experimental.Count)
                 {
-                    if (WithinTolerance(experimental[index].mz, theoreticalMz, tolerance))
+                    if (tolerance.Within(experimental[index].mz, theoreticalMz))
                     {
                         mzPairs.Add((experimental[index].mz, theoreticalMz));
                         experimental.RemoveAt(index);

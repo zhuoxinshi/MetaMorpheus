@@ -1109,7 +1109,7 @@ namespace TaskLayer
             // changes the name of the analytes from "peptide" to "proteoform" if the protease is set to top-down
 
             // TODO: note that this will not function well if the user is using file-specific settings, but it's assumed
-            // that bottom-up and top-down data is not being searched in the same task
+            // that bottjom-up and top-down data is not being searched in the same task
 
             if (commonParameters != null
                 && commonParameters.DigestionParams != null

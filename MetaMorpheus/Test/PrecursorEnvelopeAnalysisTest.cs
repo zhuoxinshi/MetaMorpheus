@@ -149,13 +149,100 @@ namespace Test
         }
 
         [Test]
-        public static void sequenceParse()
+        public static void TestOnSimpleExperimentalData()
         {
-            string seq = "DGNASGTTLLEALDC[Common Fixed:Carbamidomethyl on C]ILPPTRPTDK";
-            var p = new PeptideWithSetModifications(seq, GlobalVariables.AllModsKnownDictionary);
-            var chemFormula = p.FullChemicalFormula;
-            var formula = new Peptide("DGNASGTTLLEALDCILPPTRPTDK").GetChemicalFormula();
-            var formula2 = new PeptideWithSetModifications("DGNASGTTLLEALDCILPPTRPTDK", GlobalVariables.AllModsKnownDictionary).FullChemicalFormula;
+            string myTomlPath = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\Task1-SearchTaskconfig.toml");
+            SearchTask searchTaskLoaded = Toml.ReadFile<SearchTask>(myTomlPath, MetaMorpheusTask.tomlConfig);
+            string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\PostSearchAnalysisTaskTest");
+            string myFile1 = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\TaGe_SA_A549_3_snip.mzML");
+            string myFile2 = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\TaGe_SA_A549_3_snip_2.mzML");
+            string myDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\TaGe_SA_A549_3_snip.fasta");
+            EverythingRunnerEngine engineToml = new(new List<(string, MetaMorpheusTask)> { ("postSearchAnalysisTaskTestOutput", searchTaskLoaded) }, new List<string> { myFile1, myFile2}, new List<DbForTask> { new DbForTask(myDatabase, false) }, outputFolder);
+            engineToml.Run();
+            string resultPath = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\PostSearchAnalysisTaskTest\postSearchAnalysisTaskTestOutput");
+            var allPsms = PsmTsvReader.ReadTsv(Path.Combine(resultPath, @"AllPSMs.psmtsv"), out var warnings);
+            var psmsRank = allPsms.GroupBy(p => new { p.PrecursorScanNum, p.FileNameWithoutExtension }).OrderBy(p => p.Count()).ToList();
+            var ms1Rank = allPsms.OrderByDescending(p => p.PrecursorIntensity).ToList();
+            var psmsScoreRank = allPsms.OrderByDescending(p => p.Score).ToList();
+            var psms = allPsms.GroupBy(p => new { p.PrecursorScanNum, p.FileNameWithoutExtension }).Where(g => g.ToList().First().PrecursorScanNum == 104).SelectMany(p => p).Where(p => p.FileNameWithoutExtension == "TaGe_SA_A549_3_snip").ToList();
+            var groups = allPsms.GroupBy(p => new { p.PrecursorScanNum, p.FileNameWithoutExtension }).Select(g => (g.First().PrecursorScanNum, g.First().FileNameWithoutExtension)).Where(g => g.PrecursorScanNum != 0).ToList();
+
+            var results = new List<(string file, int PrecursorScanNum, double fraction, double score)>();
+            foreach (var group in groups)
+            {
+                MyFileManager myFileManager = new MyFileManager(true);
+                string filePath = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\" + group.FileNameWithoutExtension +".mzML");
+                MsDataFile scans = myFileManager.LoadFile(filePath, searchTaskLoaded.CommonParameters);
+                var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedScanNumber == group.PrecursorScanNum).First().MassSpectrum;
+                List<string> sequences = psms.Select(p => p.FullSequence).ToList();
+                int[] charges = new int[] { 1, 2, 3, 4, 5, 6 };
+                var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == group.PrecursorScanNum).First().ScanWindowRange;
+                var tolerance = searchTaskLoaded.CommonParameters.PrecursorMassTolerance;
+                MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum(sequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
+                double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance);
+                var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
+                results.Add(new (group.FileNameWithoutExtension, group.PrecursorScanNum, fraction, similarityScore.HasValue? (double)similarityScore:-1));
+            }
         }
+
+        [Test]
+        public static void TestTest()
+        {
+            var variableModifications = new List<Modification>();
+            var fixedModifications = new List<Modification>();
+            var origDataFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\TaGe_SA_HeLa_04_subset_longestSeq.mzML");
+            MyFileManager myFileManager = new MyFileManager(true);
+            CommonParameters CommonParameters = new CommonParameters(digestionParams: new DigestionParams());
+            SearchParameters SearchParameters = new SearchParameters();
+            var fsp = new List<(string fileName, CommonParameters fileSpecificParameters)>();
+            fsp.Add(("TaGe_SA_HeLa_04_subset_longestSeq.mzML", CommonParameters));
+
+            var myMsDataFile = myFileManager.LoadFile(origDataFile, CommonParameters);
+            var searchModes = new SinglePpmAroundZeroSearchMode(5);
+            List<Protein> proteinList = ProteinDbLoader.LoadProteinFasta(Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta"), true, DecoyType.Reverse, false, out var dbErrors, ProteinDbLoader.UniprotAccessionRegex, ProteinDbLoader.UniprotFullNameRegex, ProteinDbLoader.UniprotFullNameRegex, ProteinDbLoader.UniprotGeneNameRegex,
+                    ProteinDbLoader.UniprotOrganismRegex, -1);
+            var listOfSortedms2Scans = MetaMorpheusTask.GetMs2Scans(myMsDataFile, @"TestData\TaGe_SA_HeLa_04_subset_longestSeq.mzML", CommonParameters).OrderBy(b => b.PrecursorMass).ToArray();
+            SpectralMatch[] allPsmsArray = new PeptideSpectralMatch[listOfSortedms2Scans.Length];
+            new ClassicSearchEngine(allPsmsArray, listOfSortedms2Scans, variableModifications, fixedModifications, null, null, null,
+                proteinList, searchModes, CommonParameters, fsp, null, new List<string>(), SearchParameters.WriteSpectralLibrary).Run();
+            FdrAnalysisResults fdrResultsClassicDelta = (FdrAnalysisResults)(new FdrAnalysisEngine(allPsmsArray.Where(p => p != null).ToList(), 1,
+                CommonParameters, fsp, new List<string>()).Run());
+
+            var nonNullPsms = allPsmsArray.Where(p => p != null).ToList();
+            var psmsRank = nonNullPsms.GroupBy(p => p.PrecursorScanNumber).OrderBy(g => g.Count()).ToList();
+        }
+
+        [Test]
+        public static void TestAnother()
+        {
+            string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"MetaDraw_SearchTaskTest");
+            string proteinDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta");
+            string spectraFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\TaGe_SA_HeLa_04_subset_longestSeq.mzML");
+            Regex illegalInFileName = new Regex(@"[\\/:*?""<>|]");
+            Directory.CreateDirectory(outputFolder);
+
+            // run search task
+            var searchtask = new SearchTask()
+            {
+                SearchParameters = new SearchParameters() { MinAllowedInternalFragmentLength = 4 },
+            };
+            searchtask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(proteinDatabase, false) }, new List<string> { spectraFile }, "");
+            var psmFile = Path.Combine(outputFolder, @"AllPSMs.psmtsv");
+            var allPsms = PsmTsvReader.ReadTsv(psmFile, out var warnings);
+            var Ms1Rank = allPsms.GroupBy(p => p.PrecursorScanNum).OrderBy(p => p.Count()).ToList();
+            var psmRank = allPsms.OrderByDescending(p => p.Score).ToList();
+            var psms = allPsms.Where(p => p.PrecursorScanNum == 44).ToList();
+
+            MyFileManager myFileManager = new MyFileManager(true);
+            MsDataFile scans = myFileManager.LoadFile(spectraFile, searchtask.CommonParameters);
+            var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedScanNumber == 44).First().MassSpectrum;
+            List<string> sequences = psms.Select(p => p.FullSequence).ToList();
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6 };
+            var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 44).First().ScanWindowRange;
+            var tolerance = searchtask.CommonParameters.PrecursorMassTolerance;
+            MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum(sequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
+            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance);
+            var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
     }
+}
 }
