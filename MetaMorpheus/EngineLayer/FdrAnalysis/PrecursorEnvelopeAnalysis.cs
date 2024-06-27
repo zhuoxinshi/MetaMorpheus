@@ -22,6 +22,7 @@ using static MassSpectrometry.MzSpectra.SpectralSimilarity;
 using TopDownProteomics.MassSpectrometry;
 using MathNet.Numerics.LinearAlgebra.Complex;
 using Proteomics.ProteolyticDigestion;
+using System.Runtime.InteropServices;
 
 namespace EngineLayer.FdrAnalysis
 {
@@ -42,6 +43,10 @@ namespace EngineLayer.FdrAnalysis
 
         public static List<(double mz, double intensity)> FindTheoreticalIsotopicPeaks(string sequence, int charge, MzRange range)
         {
+            if(sequence.Contains("|"))
+            {
+                return null;
+            }
             var peptide = new PeptideWithSetModifications(sequence, GlobalVariables.AllModsKnownDictionary);
             ChemicalFormula formula = peptide.FullChemicalFormula;
             var theoreticalDistribution = Chemistry.IsotopicDistribution.GetDistribution(formula);
@@ -69,7 +74,10 @@ namespace EngineLayer.FdrAnalysis
                 foreach (int charge in charges)
                 {
                     var theoreticalPeaks = FindTheoreticalIsotopicPeaks(sequence, charge, range);
-                    allTheoreticalPeaks.Add(theoreticalPeaks);
+                    if (theoreticalPeaks != null)
+                    {
+                        allTheoreticalPeaks.Add(theoreticalPeaks);
+                    }
                 }
             }
             return allTheoreticalPeaks;
@@ -111,9 +119,11 @@ namespace EngineLayer.FdrAnalysis
             }
             return mzPairs;
         }
-        public static List<double> FindMatchedIntensities (List<string> sequences, int[] charges, MzRange range, MzSpectrum experimentalSpectrum, Tolerance tolerance)
+        public static List<double> FindMatchedIntensities (List<string> sequences, int[] charges, MzRange range, MzSpectrum experimentalSpectrum, Tolerance tolerance, out List<string> matchedSequences)
         {
             var allTheoreticalPeaks = FindTheoreticalMs1Peaks(sequences, charges , range);
+            matchedSequences = new List<string>();
+            var allseq = sequences.SelectMany(s => Enumerable.Repeat(s, charges.Length)).ToList();  
             List<int> indicesToRemove = new List<int>();
             for (int i = allTheoreticalPeaks.Count - 1; i >= 0; i--) 
             {
@@ -121,6 +131,10 @@ namespace EngineLayer.FdrAnalysis
                 if (match.All(m => m.experimentalMz == -1))
                 {
                     allTheoreticalPeaks.RemoveAt(i);
+                }
+                else
+                {
+                    matchedSequences.Add(allseq[i]);
                 }
             }
             double[] allTheoreticalMzs = allTheoreticalPeaks.SelectMany(peaks => peaks.Select(p => p.mz)).Distinct().OrderBy(mz => mz).ToArray();
@@ -146,10 +160,11 @@ namespace EngineLayer.FdrAnalysis
             return matchedIntensities;
         }
 
-        public static double FindFractionOfMatchedIntensities(List<string> sequences, int[] charges, MzRange range, MzSpectrum experimentalSpectrum, Tolerance tolerance)
+        public static double FindFractionOfMatchedIntensities(List<string> sequences, int[] charges, MzRange range, MzSpectrum experimentalSpectrum, Tolerance tolerance, out List<string> matchedSequences)
         {
-            var matchedIntensities = FindMatchedIntensities(sequences, charges, range, experimentalSpectrum, tolerance);
+            var matchedIntensities = FindMatchedIntensities(sequences, charges, range, experimentalSpectrum, tolerance, out List<string> PSMsequences);
             double fractionMatched = matchedIntensities.Sum() / experimentalSpectrum.SumOfAllY;
+            matchedSequences = PSMsequences;
 
             return fractionMatched;
         }
@@ -187,7 +202,7 @@ namespace EngineLayer.FdrAnalysis
                 }
             }
 
-            double[] matchedIntensities = FindMatchedIntensities(sequences, charges, range, experimentalSpectrum, tolerance).ToArray();
+            double[] matchedIntensities = FindMatchedIntensities(sequences, charges, range, experimentalSpectrum, tolerance, out List<string> matchedSequences).ToArray();
             double[] matchedIntensities_normalized = matchedIntensities.Select(m => m/matchedIntensities.Sum()).ToArray();
             //make a multiple linear regression model to find the relative intensities for each peptide ion
             coefficients = MultipleRegression.QR(features, matchedIntensities, false).Select(c => Math.Round(c, 2)).ToArray();
@@ -219,7 +234,7 @@ namespace EngineLayer.FdrAnalysis
             var allTheoreticalMzs = theoreticalSpectrum.XArray;
             var mzPairs = MatchedMzs(precursorSpectrum.XArray, precursorSpectrum.YArray, allTheoreticalMzs, tolerance);
             var matchedMzsExperimental = mzPairs.Where(pair => pair.experimentalMz >= 0).Select(pair => pair.experimentalMz).OrderBy(mz => mz).ToArray();
-            var matchedIntensitiesExperimental = FindMatchedIntensities(sequences, charges, range, precursorSpectrum, tolerance).Where(i => i > 0).ToArray();
+            var matchedIntensitiesExperimental = FindMatchedIntensities(sequences, charges, range, precursorSpectrum, tolerance, out List<string> matchedSequences).Where(i => i > 0).ToArray();
             MzSpectrum experimentalSpectrum = new MzSpectrum(matchedMzsExperimental, matchedIntensitiesExperimental, true);
 
             SpectralSimilarity similarity = new SpectralSimilarity(experimentalSpectrum, theoreticalSpectrum, scheme, toleranceInPpm, allPeaks);
@@ -227,7 +242,22 @@ namespace EngineLayer.FdrAnalysis
             return similarity.CosineSimilarity();
         }
 
+        public static List<double> FindMzsForPrecursors(double precursorMz, int precursorCharge, int[] charges, MzRange range)
+        {
+            var theoreticalMzs = new List<double>();
+            double precursorMass = precursorMz.ToMass(precursorCharge);
+            foreach (int charge in charges)
+            {
+                double mz = precursorMass.ToMz(charge);
+                if (mz >= range.Minimum && mz <= range.Maximum)
+                {
+                    theoreticalMzs.Add(mz);
+                }
+            }
+            return theoreticalMzs;
+            ;
+        }
 
-        
+
     }
 }

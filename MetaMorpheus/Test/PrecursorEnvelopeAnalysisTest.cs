@@ -27,6 +27,7 @@ using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.RegularExpressions;
 using Proteomics.ProteolyticDigestion;
+using System.Collections.Concurrent;
 
 namespace Test
 {
@@ -104,7 +105,7 @@ namespace Test
             for (int i = 0; i < myRatio.Length; i++)
                 Assert.That(myRatio[i], Is.EqualTo(coefficients[i]).Within(tolerance));
 
-            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, mySpectrum, tolerance);
+            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, mySpectrum, tolerance, out List<string> matchedSequences);
             Assert.AreEqual(1, fraction);
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, mySpectrum, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, 0.01, false);
             Assert.AreEqual(1, similarityScore);
@@ -144,7 +145,7 @@ namespace Test
             var tolerance = task.CommonParameters.PrecursorMassTolerance;
             MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum
             (sequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
-            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance);
+            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance, out List<string> matchedSequences);
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
         }
 
@@ -179,7 +180,7 @@ namespace Test
                 var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == group.PrecursorScanNum).First().ScanWindowRange;
                 var tolerance = searchTaskLoaded.CommonParameters.PrecursorMassTolerance;
                 MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum(sequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
-                double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance);
+                double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance, out List<string> matchedSequences);
                 var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
                 results.Add(new (group.FileNameWithoutExtension, group.PrecursorScanNum, fraction, similarityScore.HasValue? (double)similarityScore:-1));
             }
@@ -217,7 +218,7 @@ namespace Test
         {
             string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"MetaDraw_SearchTaskTest");
             string proteinDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta");
-            string spectraFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\TaGe_SA_HeLa_04_subset_longestSeq.mzML");
+            string spectraFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\20101224_Velos1_TaGe_SA_HeLa_04_subset.mzML");
             Regex illegalInFileName = new Regex(@"[\\/:*?""<>|]");
             Directory.CreateDirectory(outputFolder);
 
@@ -241,8 +242,184 @@ namespace Test
             var range = scans.Scans.Where(scan => scan.OneBasedPrecursorScanNumber == 44).First().ScanWindowRange;
             var tolerance = searchtask.CommonParameters.PrecursorMassTolerance;
             MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum(sequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
-            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance);
+            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequences, charges, range, experimentalMs1, tolerance, out List<string> matchedSequences);
             var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(sequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
     }
-}
+
+        [Test]
+        public static void TestHelaSubset()
+        {
+            string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"MetaDraw_SearchTaskTest");
+            string proteinDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta");
+            string spectraFile = @"E:\Test Data\20101224_Velos1_TaGe_SA_HeLa_04_snip.mzML";
+            var searchtask = new SearchTask()
+            {
+                SearchParameters = new SearchParameters() { MinAllowedInternalFragmentLength = 4 },
+            };
+            searchtask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(proteinDatabase, false) }, new List<string> { spectraFile }, "");
+            var psmFile = Path.Combine(outputFolder, @"AllPSMs.psmtsv");
+            var allPsms = PsmTsvReader.ReadTsv(psmFile, out var warnings);
+
+            MyFileManager myFileManager = new MyFileManager(true);
+            MsDataFile scans = myFileManager.LoadFile(spectraFile, searchtask.CommonParameters);
+            var experimentalMs1 = scans.Scans.Where(scan => scan.OneBasedScanNumber == 104).First().MassSpectrum;
+            var allSequences = allPsms.Select(p => p.FullSequence).ToList();
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6 };
+            var range = scans.Scans.First().ScanWindowRange;
+            var tolerance = searchtask.CommonParameters.PrecursorMassTolerance;
+            MzSpectrum resultSpectrum = PrecursorEnvelopeAnalysis.GetTheoreticalMs1Spectrum(allSequences, charges, range, experimentalMs1, tolerance, out double[] coefficients);
+            double fraction = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(allSequences, charges, range, experimentalMs1, tolerance, out List<string> matchedSequences);
+
+            //get the sequences having at least one peak matched to the MS1 and get the PSMs they are from
+            var uniqueSeq = matchedSequences.Distinct();
+            var matchedPSMs = allPsms.Where(psm => uniqueSeq.Contains(psm.FullSequence)).ToList();
+            var similarityScore = PrecursorEnvelopeAnalysis.CalculateSimilarityScore(allSequences, charges, range, experimentalMs1, tolerance, SpectralSimilarity.SpectrumNormalizationScheme.spectrumSum, tolerance.Value, false);
+
+            //search the full file to locate where the highest intensity peak at 592.32 is identified
+            //string fullFile = @"E:\Test Data\20101224_Velos1_TaGe_SA_HeLa_04.raw";
+            //searchtask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(proteinDatabase, false) }, new List<string> { fullFile }, "");
+            //var allPsmsFull = PsmTsvReader.ReadTsv(psmFile, out var warnings2);
+            //var Psms592 = allPsmsFull.Where(psm => Math.Abs(psm.PrecursorMz - 592.32) <= 0.01).ToList();
+
+            //Find what fraction of ions fragmented
+            var allMs2 = MetaMorpheusTask._GetMs2Scans(scans, spectraFile, searchtask.CommonParameters);
+
+        }
+
+        [Test]
+        public static void TestFractionFragment()
+        {
+            string fullFile = @"E:\Test Data\20101224_Velos1_TaGe_SA_HeLa_04.raw";
+            var searchtask = new SearchTask()
+            {
+                SearchParameters = new SearchParameters() { MinAllowedInternalFragmentLength = 4 },
+            };
+            MyFileManager myFileManager = new MyFileManager(true);
+            MsDataFile scans = myFileManager.LoadFile(fullFile, searchtask.CommonParameters);
+            List<Ms2ScanWithSpecificMass>[] allMs2 = MetaMorpheusTask._GetMs2Scans(scans, fullFile, searchtask.CommonParameters);
+
+            string proteinDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta");
+            string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"MetaDraw_SearchTaskTest");
+            searchtask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(proteinDatabase, false) }, new List<string> { fullFile }, "");
+            var psmFile = Path.Combine(outputFolder, @"AllPSMs.psmtsv");
+            var allpsms = PsmTsvReader.ReadTsv(psmFile, out var warnings);
+
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6 };
+            var tolerance = searchtask.CommonParameters.PrecursorMassTolerance;
+            List<double> fractionIntensityIdentified = new List<double>();
+            List<double> fractionMz = new List<double>();
+            List<double> fractionIntensity = new List<double>();
+            var allMs1 = scans.Scans.Where(s => s.MsnOrder == 1).ToList();
+            foreach(var ms1 in allMs1)
+            {
+                var ms2InRange = allMs2.SelectMany(ms2 => ms2).ToList().Where(m => m.RetentionTime >= ms1.RetentionTime - 1 && m.RetentionTime <= ms1.RetentionTime + 1);
+                var envelopes = ms2InRange.Select(m => m.DeconvolutedEnvelope);
+
+                List<double> allMasses = new List<double>();
+                foreach(var envelope in envelopes)
+                {
+                    if(envelope != null)
+                    {
+                        var masses = envelope.Peaks.Select(p => p.mz.ToMass(envelope.Charge));
+                        allMasses.AddRange(masses);
+                    }
+                }
+
+                List<double> allMzs = new List<double>();
+                foreach(int charge in charges)
+                {
+                    var mzs = allMasses.Select(m => m.ToMz(charge));   
+                    allMzs.AddRange(mzs);
+                }
+
+                var mzPairs = PrecursorEnvelopeAnalysis.MatchedMzs(ms1.MassSpectrum.XArray, ms1.MassSpectrum.YArray, allMzs.ToArray(), searchtask.CommonParameters.PrecursorMassTolerance);
+                var matchedMzs = mzPairs.Select(pair => pair.experimentalMz).Where(m => m >= 0);
+                fractionMz.Add(matchedMzs.Count()/ms1.MassSpectrum.XArray.Length);
+                List<double> matchedIntensities = new List<double>();
+                foreach (double mz in matchedMzs)
+                {
+                    int index = Array.IndexOf(ms1.MassSpectrum.XArray, mz);
+                    matchedIntensities.Add(ms1.MassSpectrum.YArray[index]);
+                }
+                fractionIntensity.Add(matchedIntensities.Sum() / ms1.MassSpectrum.SumOfAllY);
+
+                //identified
+                MzRange range = ms1.ScanWindowRange;
+                var sequencesIdentified = allpsms.Where(m => m.RetentionTime >= ms1.RetentionTime - 1 && m.RetentionTime <= ms1.RetentionTime + 1).Select(p => p.FullSequence).ToList();
+                double fractionIdentified = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequencesIdentified, charges, range, ms1.MassSpectrum, tolerance, out List<string> matchedSequences);
+                fractionIntensityIdentified.Add(fractionIdentified);
+            }
+        }
+
+        [Test]
+        public static void TestParallel()
+        {
+            string fullFile = @"E:\Test Data\20101224_Velos1_TaGe_SA_HeLa_04.raw";
+            var searchtask = new SearchTask()
+            {
+                SearchParameters = new SearchParameters() { MinAllowedInternalFragmentLength = 4 },
+            };
+            MyFileManager myFileManager = new MyFileManager(true);
+            MsDataFile scans = myFileManager.LoadFile(fullFile, searchtask.CommonParameters);
+            List<Ms2ScanWithSpecificMass>[] allMs2 = MetaMorpheusTask._GetMs2Scans(scans, fullFile, searchtask.CommonParameters);
+            string proteinDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta");
+            string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"MetaDraw_SearchTaskTest");
+            searchtask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(proteinDatabase, false) }, new List<string> { fullFile }, "");
+            var psmFile = Path.Combine(outputFolder, @"AllPSMs.psmtsv");
+            var allpsms = PsmTsvReader.ReadTsv(psmFile, out var warnings);
+
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6 };
+            var tolerance = searchtask.CommonParameters.PrecursorMassTolerance;
+            var fractionIntensityIdentified = new List<(double, double)>();
+            var fractionMz = new List<(double, double)>();
+            var fractionIntensity = new List<(double, double)>();
+            var allMs1 = scans.Scans.Where(s => s.MsnOrder == 1).ToList();
+
+            Parallel.ForEach(Partitioner.Create(0, allMs1.Count), new ParallelOptions { MaxDegreeOfParallelism = 18 },
+                (partitionRange, loopState) =>
+            {
+                for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                {
+                    var ms1 = allMs1[i];
+                    var ms2InRange = allMs2.SelectMany(ms2 => ms2).ToList().Where(m => m.RetentionTime >= ms1.RetentionTime - 1 && m.RetentionTime <= ms1.RetentionTime + 1);
+                    var envelopes = ms2InRange.Select(m => m.DeconvolutedEnvelope);
+                    List<double> allMasses = new List<double>();
+                    foreach (var envelope in envelopes)
+                    {
+                        if (envelope != null)
+                        {
+                            var masses = envelope.Peaks.Select(p => p.mz.ToMass(envelope.Charge));
+                            allMasses.AddRange(masses);
+                        }
+                    }
+
+                    List<double> allMzs = new List<double>();
+                    foreach (int charge in charges)
+                    {
+                        var mzs = allMasses.Select(m => m.ToMz(charge));
+                        allMzs.AddRange(mzs);
+                    }
+
+                    var mzPairs = PrecursorEnvelopeAnalysis.MatchedMzs(ms1.MassSpectrum.XArray, ms1.MassSpectrum.YArray, allMzs.ToArray(), searchtask.CommonParameters.PrecursorMassTolerance);
+                    var matchedMzs = mzPairs.Select(pair => pair.experimentalMz).Where(m => m >= 0);
+                    double rt = ms1.RetentionTime;
+                    fractionMz.Add((rt, matchedMzs.Count() / ms1.MassSpectrum.XArray.Length));
+                    List<double> matchedIntensities = new List<double>();
+                    foreach (double mz in matchedMzs)
+                    {
+                        int index = Array.IndexOf(ms1.MassSpectrum.XArray, mz);
+                        matchedIntensities.Add(ms1.MassSpectrum.YArray[index]);
+                    }
+                    fractionIntensity.Add((rt, matchedIntensities.Sum() / ms1.MassSpectrum.SumOfAllY));
+
+                    //identified
+                    MzRange range = ms1.ScanWindowRange;
+                    var sequencesIdentified = allpsms.Where(m => m.RetentionTime >= ms1.RetentionTime - 1 && m.RetentionTime <= ms1.RetentionTime + 1).Select(p => p.FullSequence).ToList();
+                    double fractionIdentified = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequencesIdentified, charges, range, ms1.MassSpectrum, tolerance, out List<string> matchedSequences);
+                    fractionIntensityIdentified.Add((rt, fractionIdentified));
+                }
+            });
+            
+        }
+    }
 }

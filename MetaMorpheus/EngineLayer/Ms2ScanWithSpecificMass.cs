@@ -9,12 +9,13 @@ namespace EngineLayer
     public class Ms2ScanWithSpecificMass
     {
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, string fullFilePath, CommonParameters commonParam, 
-            IsotopicEnvelope[] neutralExperimentalFragments = null, double? precursorIntensity = null, int? envelopePeakCount = null, double? precursorEnvelopeScore = null)
+            IsotopicEnvelope[] neutralExperimentalFragments = null, double? precursorIntensity = null, int? envelopePeakCount = null, double? precursorEnvelopeScore = null, IsotopicEnvelope? deconvolutedEnvelope = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
             PrecursorMass = PrecursorMonoisotopicPeakMz.ToMass(precursorCharge);
             PrecursorIntensity = precursorIntensity ?? 1;
+            DeconvolutedEnvelope = deconvolutedEnvelope ?? null;
             PrecursorEnvelopePeakCount = envelopePeakCount ?? 1;
             PrecursorEnvelopeScore = precursorEnvelopeScore ?? 0;
             FullFilePath = fullFilePath;
@@ -43,15 +44,15 @@ namespace EngineLayer
         public double PrecursorMass { get; }
         public int PrecursorCharge { get; }
         public double PrecursorIntensity { get; }
-
+        
         public double PrecursorEnvelopeScore { get; }
         public int PrecursorEnvelopePeakCount { get; }
         public string FullFilePath { get; }
         public IsotopicEnvelope[] ExperimentalFragments { get; private set; }
         public List<Ms2ScanWithSpecificMass> ChildScans { get; set; } // MS2/MS3 scans that are children of this MS2 scan
         private double[] DeconvolutedMonoisotopicMasses;
-        public string NativeId { get; } 
-
+        public string NativeId { get; }
+        public IsotopicEnvelope DeconvolutedEnvelope { get; set; }
         public int OneBasedScanNumber => TheScan.OneBasedScanNumber;
 
         public int? OneBasedPrecursorScanNumber => TheScan.OneBasedPrecursorScanNumber;
