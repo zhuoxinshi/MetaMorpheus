@@ -28,6 +28,9 @@ using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.RegularExpressions;
 using Proteomics.ProteolyticDigestion;
 using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using Readers;
+using static Nett.TomlObjectFactory;
 
 namespace Test
 {
@@ -309,6 +312,10 @@ namespace Test
             List<double> fractionIntensityIdentified = new List<double>();
             List<double> fractionMz = new List<double>();
             List<double> fractionIntensity = new List<double>();
+            List<MsDataScan> matched = new List<MsDataScan>();
+            List<MsDataScan> unmatched = new List<MsDataScan>();
+            List<MsDataScan> fragmented = new List<MsDataScan>();
+            List<MsDataScan> unfragmented = new List<MsDataScan>();
             var allMs1 = scans.Scans.Where(s => s.MsnOrder == 1).ToList();
             foreach(var ms1 in allMs1)
             {
@@ -333,7 +340,7 @@ namespace Test
                 }
 
                 var mzPairs = PrecursorEnvelopeAnalysis.MatchedMzs(ms1.MassSpectrum.XArray, ms1.MassSpectrum.YArray, allMzs.ToArray(), searchtask.CommonParameters.PrecursorMassTolerance);
-                var matchedMzs = mzPairs.Select(pair => pair.experimentalMz).Where(m => m >= 0);
+                var matchedMzs = mzPairs.Select(pair => pair.experimentalMz).Where(m => m >= 0).OrderBy(m => m);
                 fractionMz.Add(matchedMzs.Count()/ms1.MassSpectrum.XArray.Length);
                 List<double> matchedIntensities = new List<double>();
                 foreach (double mz in matchedMzs)
@@ -343,12 +350,39 @@ namespace Test
                 }
                 fractionIntensity.Add(matchedIntensities.Sum() / ms1.MassSpectrum.SumOfAllY);
 
+                //make MsDataScan on fragmentation
+                MzSpectrum fragmentedMs1 = new MzSpectrum(matchedMzs.ToArray(), matchedIntensities.ToArray(), false);
+                MsDataScan fragmentedScan = new MsDataScan(fragmentedMs1, ms1.OneBasedScanNumber, ms1.MsnOrder, ms1.IsCentroid, ms1.Polarity,
+                    ms1.RetentionTime, ms1.ScanWindowRange, ms1.ScanFilter, ms1.MzAnalyzer, ms1.TotalIonCurrent, ms1.InjectionTime, ms1.NoiseData, ms1.NativeId);
+                var unmatchedMzs = ms1.MassSpectrum.XArray.Where(x => !matchedMzs.Contains(x)).OrderBy(x => x).ToArray();
+                var unmatchedIntensities = new List<double>();
+                foreach (double mz in unmatchedMzs)
+                {
+                    int index = Array.IndexOf(ms1.MassSpectrum.XArray, mz);
+                    unmatchedIntensities.Add(ms1.MassSpectrum.YArray[index]);
+                }
+                MzSpectrum unfragmentedMs1 = new MzSpectrum(unmatchedMzs, unmatchedIntensities.ToArray(), false);
+                MsDataScan unfragmentedScan = new MsDataScan(unfragmentedMs1, ms1.OneBasedScanNumber, ms1.MsnOrder, ms1.IsCentroid, ms1.Polarity,
+                    ms1.RetentionTime, ms1.ScanWindowRange, ms1.ScanFilter, ms1.MzAnalyzer, ms1.TotalIonCurrent, ms1.InjectionTime, ms1.NoiseData, ms1.NativeId);
+                fragmented.Add(fragmentedScan);
+                unfragmented.Add(unfragmentedScan);
+
                 //identified
                 MzRange range = ms1.ScanWindowRange;
                 var sequencesIdentified = allpsms.Where(m => m.RetentionTime >= ms1.RetentionTime - 1 && m.RetentionTime <= ms1.RetentionTime + 1).Select(p => p.FullSequence).ToList();
                 double fractionIdentified = PrecursorEnvelopeAnalysis.FindFractionOfMatchedIntensities(sequencesIdentified, charges, range, ms1.MassSpectrum, tolerance, out List<string> matchedSequences);
                 fractionIntensityIdentified.Add(fractionIdentified);
             }
+            string outputPath1 = @"E:\Test Data\fragmented.mzML";
+            string outputPath2 = @"E:\Test Data\unfragmented.mzML";
+            SourceFile genericSourceFile1 = new SourceFile("no nativeID format", "mzML format",
+                    null, null, null);
+            GenericMsDataFile msFile1 = new GenericMsDataFile(fragmented.ToArray(), genericSourceFile1);
+            msFile1.ExportAsMzML(outputPath1, false);
+            SourceFile genericSourceFile2 = new SourceFile("no nativeID format", "mzML format",
+                    null, null, null);
+            GenericMsDataFile msFile2 = new GenericMsDataFile(unfragmented.ToArray(), genericSourceFile2);
+            msFile2.ExportAsMzML(outputPath2, false);
         }
 
         [Test]
@@ -421,5 +455,89 @@ namespace Test
             });
             
         }
+
+        [Test]
+        public static void TestSpectrumReading()
+        {
+            string fullFile = @"E:\Test Data\20101224_Velos1_TaGe_SA_HeLa_04.raw";
+            MyFileManager myFileManager = new MyFileManager(true);
+            var searchtask = new SearchTask()
+            {
+                SearchParameters = new SearchParameters() { MinAllowedInternalFragmentLength = 4 },
+            };
+            MsDataFile scans = myFileManager.LoadFile(fullFile, searchtask.CommonParameters);
+            var allMs1 = scans.Scans.Where(s => s.MsnOrder == 1).ToList();
+            var ms1 = allMs1.Where(p => p.OneBasedScanNumber == 28664).First();
+        }
+
+        [Test]
+        public static void TestFractionIdentified()
+        {
+            string fullFile = @"E:\Test Data\20101224_Velos1_TaGe_SA_HeLa_04.raw";
+            var searchtask = new SearchTask()
+            {
+                SearchParameters = new SearchParameters() { MinAllowedInternalFragmentLength = 4 },
+            };
+            MyFileManager myFileManager = new MyFileManager(true);
+            MsDataFile scans = myFileManager.LoadFile(fullFile, searchtask.CommonParameters);
+            List<Ms2ScanWithSpecificMass>[] allMs2 = MetaMorpheusTask._GetMs2Scans(scans, fullFile, searchtask.CommonParameters);
+
+            string proteinDatabase = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\hela_snip_for_unitTest.fasta");
+            string outputFolder = Path.Combine(TestContext.CurrentContext.TestDirectory, @"MetaDraw_SearchTaskTest");
+            searchtask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(proteinDatabase, false) }, new List<string> { fullFile }, "");
+            var psmFile = Path.Combine(outputFolder, @"AllPSMs.psmtsv");
+            var allpsms = PsmTsvReader.ReadTsv(psmFile, out var warnings);
+
+            int[] charges = new int[] { 1, 2, 3, 4, 5, 6 };
+            var tolerance = searchtask.CommonParameters.PrecursorMassTolerance;
+            List<double> fractionIntensityIdentified = new List<double>();
+            List<MsDataScan> identified = new List<MsDataScan>();
+            List<MsDataScan> notIdentified = new List<MsDataScan>();
+            var allMs1 = scans.Scans.Where(s => s.MsnOrder == 1).ToList();
+            foreach (var ms1 in allMs1)
+            {
+                MzRange range = ms1.ScanWindowRange;
+                var sequencesIdentified = allpsms.Where(m => m.RetentionTime >= ms1.RetentionTime - 1 && m.RetentionTime <= ms1.RetentionTime + 1).Select(p => p.FullSequence).ToList();
+                List<double> matchedIntensities = new List<double>();
+                var match = PrecursorEnvelopeAnalysis.FindMatchedIntensities2(sequencesIdentified, charges, range, ms1.MassSpectrum, tolerance, out List<string> matchedSequences, 
+                    out List<(double experimentalMz, double theoreticalMz)> mzPairs);
+                
+                var matchedMzs = mzPairs.Select(pair => pair.experimentalMz).Where(m => m >= 0).OrderBy(m => m);
+                foreach (double mz in matchedMzs)
+                {
+                    int index = Array.IndexOf(ms1.MassSpectrum.XArray, mz);
+                    matchedIntensities.Add(ms1.MassSpectrum.YArray[index]);
+                }
+                fractionIntensityIdentified.Add(matchedIntensities.Sum() / ms1.MassSpectrum.SumOfAllY);
+
+                MzSpectrum identifiedMs1 = new MzSpectrum(matchedMzs.ToArray(), matchedIntensities.ToArray(), false);
+                MsDataScan identifiedScan = new MsDataScan(identifiedMs1, ms1.OneBasedScanNumber, ms1.MsnOrder, ms1.IsCentroid, ms1.Polarity,
+                    ms1.RetentionTime, ms1.ScanWindowRange, ms1.ScanFilter, ms1.MzAnalyzer, ms1.TotalIonCurrent, ms1.InjectionTime, ms1.NoiseData, ms1.NativeId);
+                var unmatchedMzs = ms1.MassSpectrum.XArray.Where(x => !matchedMzs.Contains(x)).OrderBy(x => x).ToArray();
+                var unmatchedIntensities = new List<double>();
+                foreach (double mz in unmatchedMzs)
+                {
+                    int index = Array.IndexOf(ms1.MassSpectrum.XArray, mz);
+                    unmatchedIntensities.Add(ms1.MassSpectrum.YArray[index]);
+                }
+                MzSpectrum notIdentifiedMs1 = new MzSpectrum(unmatchedMzs, unmatchedIntensities.ToArray(), false);
+                MsDataScan notIdentifiedScan = new MsDataScan(notIdentifiedMs1, ms1.OneBasedScanNumber, ms1.MsnOrder, ms1.IsCentroid, ms1.Polarity,
+                    ms1.RetentionTime, ms1.ScanWindowRange, ms1.ScanFilter, ms1.MzAnalyzer, ms1.TotalIonCurrent, ms1.InjectionTime, ms1.NoiseData, ms1.NativeId);
+                identified.Add(identifiedScan);
+                notIdentified.Add(notIdentifiedScan);
+            }
+            string outputPath1 = @"E:\Test Data\identified.mzML";
+            string outputPath2 = @"E:\Test Data\notIdentified.mzML";
+            SourceFile genericSourceFile1 = new SourceFile("no nativeID format", "mzML format",
+                    null, null, null);
+            GenericMsDataFile msFile1 = new GenericMsDataFile(identified.ToArray(), genericSourceFile1);
+            msFile1.ExportAsMzML(outputPath1, false);
+            SourceFile genericSourceFile2 = new SourceFile("no nativeID format", "mzML format",
+                    null, null, null);
+            GenericMsDataFile msFile2 = new GenericMsDataFile(notIdentified.ToArray(), genericSourceFile2);
+            msFile2.ExportAsMzML(outputPath2, false);
+        }
+
+        
     }
 }

@@ -23,6 +23,7 @@ using TopDownProteomics.MassSpectrometry;
 using MathNet.Numerics.LinearAlgebra.Complex;
 using Proteomics.ProteolyticDigestion;
 using System.Runtime.InteropServices;
+using 
 
 namespace EngineLayer.FdrAnalysis
 {
@@ -256,6 +257,48 @@ namespace EngineLayer.FdrAnalysis
             }
             return theoreticalMzs;
             ;
+        }
+
+        public static List<double> FindMatchedIntensities2(List<string> sequences, int[] charges, MzRange range, MzSpectrum experimentalSpectrum, Tolerance tolerance, out List<string> matchedSequences, 
+            out List<(double experimentalMz, double theoreticalMz)> mzPairs)
+        {
+            var allTheoreticalPeaks = FindTheoreticalMs1Peaks(sequences, charges, range);
+            matchedSequences = new List<string>();
+            var allseq = sequences.SelectMany(s => Enumerable.Repeat(s, charges.Length)).ToList();
+            List<int> indicesToRemove = new List<int>();
+            for (int i = allTheoreticalPeaks.Count - 1; i >= 0; i--)
+            {
+                var match = MatchedMzs(experimentalSpectrum.XArray, experimentalSpectrum.YArray, allTheoreticalPeaks[i].Select(p => p.mz).ToArray(), tolerance);
+                if (match.All(m => m.experimentalMz == -1))
+                {
+                    allTheoreticalPeaks.RemoveAt(i);
+                }
+                else
+                {
+                    matchedSequences.Add(allseq[i]);
+                }
+            }
+            double[] allTheoreticalMzs = allTheoreticalPeaks.SelectMany(peaks => peaks.Select(p => p.mz)).Distinct().OrderBy(mz => mz).ToArray();
+
+            mzPairs = MatchedMzs(experimentalSpectrum.XArray, experimentalSpectrum.YArray, allTheoreticalMzs, tolerance);
+            var matchedMzs = mzPairs.OrderBy(pair => pair.theoreticalMz).Select(pair => pair.experimentalMz);
+
+            List<double> matchedIntensities = new List<double>();
+
+            foreach (double mz in matchedMzs)
+            {
+                if (mz >= 0)
+                {
+                    int index = experimentalSpectrum.XArray.IndexOf(mz);
+                    matchedIntensities.Add(experimentalSpectrum.YArray[index]);
+                }
+                else
+                {
+                    matchedIntensities.Add(0);
+                }
+            }
+
+            return matchedIntensities;
         }
 
 
