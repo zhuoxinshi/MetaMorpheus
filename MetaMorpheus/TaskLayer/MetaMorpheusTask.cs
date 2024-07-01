@@ -119,6 +119,7 @@ namespace TaskLayer
         public static List<Ms2ScanWithSpecificMass>[] _GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
             var msNScans = myMSDataFile.GetAllScansList().Where(x => x.MsnOrder > 1).ToArray();
+            var ms1Scans = myMSDataFile.GetAllScansList().Where(x => x.MsnOrder == 1).ToArray();
             var ms2Scans = msNScans.Where(p => p.MsnOrder == 2).ToArray();
             var ms3Scans = msNScans.Where(p => p.MsnOrder == 3).ToArray();
             List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
@@ -131,7 +132,7 @@ namespace TaskLayer
             Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                 (partitionRange, loopState) =>
                 {
-                    List<(double, int)> precursors = new List<(double, int)>();
+                    List<(double, int, double, PeakCurve)> precursors = new List<(double, int, double, PeakCurve)>();
 
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
@@ -165,7 +166,9 @@ namespace TaskLayer
                                     precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
                                 {
                                     double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
-                                    precursors.Add((monoPeakMz, envelope.Charge));
+                                    var monoPeak = envelope.Peaks.OrderByDescending(p => p.intensity).First();
+                                    PeakCurve precursorPeakCurve = PeakCurve.GetPeakCurve(ms1Scans, precursorSpectrum, monoPeak.mz, commonParameters);
+                                    precursors.Add((monoPeakMz, envelope.Charge, precursorSpectrum.RetentionTime, precursorPeakCurve));
                                 }
                             }
                         }
@@ -182,7 +185,7 @@ namespace TaskLayer
                                     commonParameters.DeconvolutionMassTolerance.Within(
                                         precursorMZ.ToMass(precursorCharge), b.Item1.ToMass(b.Item2))))
                                 {
-                                    precursors.Add((precursorMZ, precursorCharge));
+                                    precursors.Add((precursorMZ, precursorCharge, double.NaN, null));
                                 }
                             }
                             else
@@ -192,7 +195,7 @@ namespace TaskLayer
                                     commonParameters.DeconvolutionMassTolerance.Within(
                                         precursorMZ.ToMass(precursorCharge), b.Item1.ToMass(b.Item2))))
                                 {
-                                    precursors.Add((precursorMZ, precursorCharge));
+                                    precursors.Add((precursorMZ, precursorCharge, double.NaN, null));
                                 }
                             }
                         }
@@ -222,7 +225,7 @@ namespace TaskLayer
                         {
                             // assign precursor for this MS2 scan
                             var scan = new Ms2ScanWithSpecificMass(ms2scan, precursor.Item1,
-                                precursor.Item2, fullFilePath, commonParameters, neutralExperimentalFragments);
+                                precursor.Item2, fullFilePath, commonParameters, neutralExperimentalFragments, precursor.Item3, precursor.Item4);
 
                             // assign precursors for MS2 child scans
                             if (ms2ChildScans != null)
@@ -290,6 +293,7 @@ namespace TaskLayer
                     }
                 });
 
+            scansWithPrecursors = PeakCurve.GroupPrecursorPeaksAndFragmentIonsForDIA(scansWithPrecursors, commonParameters);
             return scansWithPrecursors;
         }
 

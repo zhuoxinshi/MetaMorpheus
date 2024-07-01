@@ -8,7 +8,9 @@ namespace EngineLayer
 {
     public class Ms2ScanWithSpecificMass
     {
-        public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, string fullFilePath, CommonParameters commonParam, IsotopicEnvelope[] neutralExperimentalFragments = null)
+        public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, 
+            string fullFilePath, CommonParameters commonParam, IsotopicEnvelope[] neutralExperimentalFragments = null,
+            double pre_RT = double.NaN, PeakCurve precursurPeak = null, List<Peak> dIAGroupingPeaks = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
@@ -18,6 +20,9 @@ namespace EngineLayer
             NativeId = mzLibScan.NativeId;
 
             TheScan = mzLibScan;
+            DIAGroupingPeaks = dIAGroupingPeaks;
+            PrecursurPeak = precursurPeak;
+            Pre_RT = pre_RT;
 
             if (commonParam.DissociationType != DissociationType.LowCID)
             {
@@ -53,6 +58,48 @@ namespace EngineLayer
         public int NumPeaks => TheScan.MassSpectrum.Size;
 
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
+        public double Pre_RT { get; set; }
+        public List<Peak> DIAGroupingPeaks { get; set; }
+        public PeakCurve PrecursurPeak { get; set; }
+
+        public MzSpectrum DIA_spectrum { get; set; }
+
+        public static MzSpectrum GetDIA_spectrum(List<Peak> DIAGroupingPeaks)
+        {
+            DIAGroupingPeaks.OrderBy(P => P.Mz).ToList();
+            MzSpectrum Dia_mzSpectrum = new MzSpectrum(DIAGroupingPeaks.Select(p => p.Mz).ToArray(), DIAGroupingPeaks.Select(p => p.Intensity).ToArray(), false);
+
+            return Dia_mzSpectrum;
+        }
+        public static IsotopicEnvelope[] DIA_GetNeutralExperimentalFragments(CommonParameters commonParam, MzSpectrum Dia_mzSpectrum)
+        {
+            int minZ = 1;
+            int maxZ = 10;
+
+            var neutralExperimentalFragmentMasses = Dia_mzSpectrum.Deconvolute(Dia_mzSpectrum.Range,
+                minZ, maxZ, commonParam.DeconvolutionMassTolerance.Value, commonParam.DeconvolutionIntensityRatio).ToList();
+
+            if (commonParam.AssumeOrphanPeaksAreZ1Fragments)
+            {
+                HashSet<double> alreadyClaimedMzs = new HashSet<double>(neutralExperimentalFragmentMasses
+                    .SelectMany(p => p.Peaks.Select(v => ClassExtensions.RoundedDouble(v.mz).Value)));
+
+                for (int i = 0; i < Dia_mzSpectrum.XArray.Length; i++)
+                {
+                    double mz = Dia_mzSpectrum.XArray[i];
+                    double intensity = Dia_mzSpectrum.YArray[i];
+
+                    if (!alreadyClaimedMzs.Contains(ClassExtensions.RoundedDouble(mz).Value))
+                    {
+                        neutralExperimentalFragmentMasses.Add(new IsotopicEnvelope(
+                            new List<(double mz, double intensity)> { (mz, intensity) },
+                            mz.ToMass(1), 1, intensity, 0, 0));
+                    }
+                }
+            }
+
+            return neutralExperimentalFragmentMasses.OrderBy(p => p.MonoisotopicMass).ToArray();
+        }
 
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {

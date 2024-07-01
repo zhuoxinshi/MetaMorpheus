@@ -124,7 +124,7 @@ namespace EngineLayer
             return list;
         }
 
-        public static PeakCurve GetPeakCurve(MsDataScan[] scans, MsDataScan targetScan, double mz, double monomz, int index, CommonParameters commonParameters)
+        public static PeakCurve GetPeakCurve(MsDataScan[] scans, MsDataScan targetScan, double mz, CommonParameters commonParameters)
         {
             //EngineLayer.Peak newPeak = new EngineLayer.Peak(mz, targetScan.RetentionTime, targetScan.MassSpectrum.YArray[index]);
             PeakCurve newPeakCurve = new PeakCurve(mz, new List<EngineLayer.Peak> { }, targetScan.MsnOrder);
@@ -156,82 +156,132 @@ namespace EngineLayer
             }
             return newPeakCurve;
         }
+
+        public static Ms2ScanWithSpecificMass GroupPrecursorPeakAndFragmentIons(Ms2ScanWithSpecificMass targetScan, List<Ms2ScanWithSpecificMass> scans, CommonParameters commonParameters)
+        {
+            List<EngineLayer.Peak> DIA_peaks = new List<EngineLayer.Peak> { };
+            PeakCurve prePeakCurve = targetScan.PrecursurPeak;
+            //PeakCurve prePeakCurve = new PeakCurve(scans.Select(p => p.PrecursorMonoisotopicPeakMz).ToList().Average(), scans.Select(p => p.PrecursurPeak).ToList(), 1);
+            List<PeakCurve> ms2PeakCurves = new List<PeakCurve>();
+            for (int i = 0; i < targetScan.TheScan.MassSpectrum.XArray.Length; i++)
+            {
+                double RT = targetScan.Pre_RT;
+                EngineLayer.Peak targetPeak = new EngineLayer.Peak(targetScan.TheScan.MassSpectrum.XArray[i], RT, targetScan.TheScan.MassSpectrum.YArray[i]);
+                PeakCurve newPeakCurve = new PeakCurve(targetScan.TheScan.MassSpectrum.XArray[i], new List<EngineLayer.Peak> { }, 2, targetScan.TheScan.IsolationRange);
+
+                foreach (var ms2scan in scans)
+                {
+                    int index = ms2scan.TheScan.MassSpectrum.XArray.ToList().BinarySearch(targetPeak.Mz);
+                    if (index < 0)
+                    {
+                        index = ~index;
+                    }
+                    try
+                    {
+                        if (index > 0)
+                        {
+                            if (Math.Abs(ms2scan.TheScan.MassSpectrum.XArray[index] - targetPeak.Mz) > Math.Abs(targetPeak.Mz - ms2scan.TheScan.MassSpectrum.XArray[index - 1]))
+                            {
+                                index = index - 1;
+                            }
+                        }
+                        if (commonParameters.ProductMassTolerance.Within(ms2scan.TheScan.MassSpectrum.XArray[index], targetPeak.Mz))
+                        {
+                            EngineLayer.Peak newPeak = new EngineLayer.Peak(ms2scan.TheScan.MassSpectrum.XArray[index], ms2scan.Pre_RT, ms2scan.TheScan.MassSpectrum.YArray[i]);
+                            newPeakCurve.Peaks.Add(newPeak);
+                        }
+                    }
+                    catch
+                    {
+
+                    }
+
+
+                }
+
+                double score = PeakCurve.CalPeakCorr(prePeakCurve, newPeakCurve);
+                if (score > 0.5)
+                {
+                    DIA_peaks.Add(targetPeak);
+                }
+            }
+            targetScan = new Ms2ScanWithSpecificMass(targetScan.TheScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath, 
+                commonParameters, null, targetScan.Pre_RT, targetScan.PrecursurPeak, DIA_peaks);
+            return targetScan;
+        }
+
+        public static List<Ms2ScanWithSpecificMass>[] GroupPrecursorPeaksAndFragmentIonsForDIA(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, CommonParameters commonParameters)
+        {
+            for (int i = 0; i < scansWithPrecursors.Length; i++)
+            {
+                if (scansWithPrecursors[i].Count > 0)
+                {
+                    for (int j = 0; j < scansWithPrecursors[i].Count; j++)
+                    {
+                        var target_scan = scansWithPrecursors[i][j];
+                        var allPossibleScans = scansWithPrecursors.Where(p => p.Count > 0 && p.First().TheScan.IsolationRange.Contains(target_scan.PrecursorMonoisotopicPeakMz)).ToList();
+                        List<Ms2ScanWithSpecificMass> Ms2ScanWithSpecificMz = new List<Ms2ScanWithSpecificMass>();
+                        if (allPossibleScans.Count > 4)
+                        {
+                            //var ms2ScanWithSpecificMass = scansWithPrecursors[i];
+
+                            foreach (var scan in allPossibleScans.Where(p => p.Count > 0))
+                            {
+                                var sortedList = scan.OrderBy(p => p.PrecursorMonoisotopicPeakMz).ToList();
+                                int indexByMz = sortedList.Select(p => p.PrecursorMonoisotopicPeakMz).ToList().BinarySearch(target_scan.PrecursorMonoisotopicPeakMz);
+                                if (indexByMz < 0)
+                                {
+                                    indexByMz = ~indexByMz;
+                                    if (indexByMz == sortedList.Count)
+                                    {
+                                        indexByMz = indexByMz - 1;
+                                    }
+
+                                }
+                                //if (indexByMz == 0)
+                                //{
+
+                                //}
+                                //else
+                                //{
+                                try
+                                {
+                                    if (Math.Abs(sortedList[indexByMz].PrecursorMonoisotopicPeakMz - target_scan.PrecursorMonoisotopicPeakMz) > Math.Abs(target_scan.PrecursorMonoisotopicPeakMz - sortedList[indexByMz - 1].PrecursorMonoisotopicPeakMz))
+                                    {
+                                        indexByMz = indexByMz - 1;
+                                    }
+                                }
+                                catch
+                                {
+
+                                }
+
+                                //}
+                                try
+                                {
+                                    if (commonParameters.PrecursorMassTolerance.Within(sortedList[indexByMz].PrecursorMonoisotopicPeakMz, target_scan.PrecursorMonoisotopicPeakMz))
+                                    {
+                                        Ms2ScanWithSpecificMz.Add(sortedList[indexByMz]);
+                                    }
+                                }
+                                catch
+                                {
+
+                                }
+
+                            }
+                        }
+
+                        if (Ms2ScanWithSpecificMz.Count >= 5)
+                        {
+                            Ms2ScanWithSpecificMass newList = GroupPrecursorPeakAndFragmentIons(target_scan, Ms2ScanWithSpecificMz, commonParameters);
+                            scansWithPrecursors[i][j] = newList;
+                        }
+
+                    }
+                }
+            }
+            return scansWithPrecursors;
+        }
     }
 }
-
-        //public static Ms2ScanWithSpecificMass GroupPrecursorPeakAndFragmentIons(Ms2ScanWithSpecificMass targetScan, List<Ms2ScanWithSpecificMass> scans, CommonParameters commonParameters)
-        //{
-        //    List<EngineLayer.Peak> DIA_peaks = new List<EngineLayer.Peak> { };
-        //    PeakCurve prePeakCurve = targetScan.PrecursurPeak;
-        //    //PeakCurve prePeakCurve = new PeakCurve(scans.Select(p => p.PrecursorMonoisotopicPeakMz).ToList().Average(), scans.Select(p => p.PrecursurPeak).ToList(), 1);
-        //    List<PeakCurve> ms2PeakCurves = new List<PeakCurve>();
-        //    for (int i = 0; i < targetScan.TheScan.MassSpectrum.XArray.Length; i++)
-        //    {
-        //        double RT = targetScan.Pre_RT;
-        //        EngineLayer.Peak targetPeak = new EngineLayer.Peak(targetScan.TheScan.MassSpectrum.XArray[i], RT, targetScan.TheScan.MassSpectrum.YArray[i]);
-        //        PeakCurve newPeakCurve = new PeakCurve(targetScan.TheScan.MassSpectrum.XArray[i], new List<EngineLayer.Peak> { }, 2, targetScan.TheScan.IsolationRange);
-
-        //        foreach (var ms2scan in scans)
-        //        {
-        //            int index = ms2scan.TheScan.MassSpectrum.XArray.ToList().BinarySearch(targetPeak.Mz);
-        //            if (index < 0)
-        //            {
-        //                index = ~index;
-        //            }
-        //            try
-        //            {
-        //                if (index > 0)
-        //                {
-        //                    if (Math.Abs(ms2scan.TheScan.MassSpectrum.XArray[index] - targetPeak.Mz) > Math.Abs(targetPeak.Mz - ms2scan.TheScan.MassSpectrum.XArray[index - 1]))
-        //                    {
-        //                        index = index - 1;
-        //                    }
-        //                }
-        //                if (commonParameters.ProductMassTolerance.Within(ms2scan.TheScan.MassSpectrum.XArray[index], targetPeak.Mz))
-        //                {
-        //                    EngineLayer.Peak newPeak = new EngineLayer.Peak(ms2scan.TheScan.MassSpectrum.XArray[index], ms2scan.Pre_RT, ms2scan.TheScan.MassSpectrum.YArray[i]);
-        //                    newPeakCurve.Peaks.Add(newPeak);
-        //                }
-        //            }
-        //            catch
-        //            {
-
-        //            }
-
-
-        //        }
-
-        //        double score = PeakCurve.CalPeakCorr(prePeakCurve, newPeakCurve);
-        //        if (score > 0.5)
-        //        {
-        //            DIA_peaks.Add(targetPeak);
-        //        }
-        //    }
-        //    targetScan = new Ms2ScanWithSpecificMass(targetScan.TheScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath, commonParameters, null, targetScan.Pre_RT, targetScan.PrecursurPeak, DIA_peaks);
-        //    return targetScan;
-        //}
-
-        //public static List<Ms2ScanWithSpecificMass> GroupPrecursorPeaksAndFragmentIonsForDIA(Dictionary<MzRange, List<List<Ms2ScanWithSpecificMass>>> dic, List<Ms2ScanWithSpecificMass> scansWithPrecursors, CommonParameters commonParameters)
-        //{
-        //    var allScanIntheRange = dic[scansWithPrecursors.First().TheScan.IsolationRange];
-
-        //    for (int i = 0; i < scansWithPrecursors.Count; i++)
-        //    {
-        //        var ms2ScanWithSpecificMass = scansWithPrecursors[i];
-        //        List<Ms2ScanWithSpecificMass> Ms2ScanWithSpecificMz = new List<Ms2ScanWithSpecificMass>();
-        //        foreach (var list in allScanIntheRange)
-        //        {
-        //            var sortedList = list.OrderByDescending(p => p.PrecursorMonoisotopicPeakMz).ToList();
-        //            int indexByMz = sortedList.Select(p => p.PrecursorMonoisotopicPeakMz).ToList().BinarySearch(ms2ScanWithSpecificMass.PrecursorMonoisotopicPeakMz);
-        //            if (indexByMz < 0)
-        //            {
-        //                indexByMz = ~indexByMz;
-        //            }
-        //            if (Math.Abs(sortedList[indexByMz].PrecursorMonoisotopicPeakMz - ms2ScanWithSpecificMass.PrecursorMonoisotopicPeakMz) > Math.Abs(ms2ScanWithSpecificMass.PrecursorMonoisotopicPeakMz - sortedList[indexByMz].PrecursorMonoisotopicPeakMz))
-        //            {
-        //                indexByMz = indexByMz - 1;
-        //            }
-
-
-        //        }
-        //    }
