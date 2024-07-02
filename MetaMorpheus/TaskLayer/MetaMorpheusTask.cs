@@ -129,7 +129,7 @@ namespace TaskLayer
                 return scansWithPrecursors;
             }
 
-            Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
+            Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
                 (partitionRange, loopState) =>
                 {
                     List<(double, int, double, PeakCurve)> precursors = new List<(double, int, double, PeakCurve)>();

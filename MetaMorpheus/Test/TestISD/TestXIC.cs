@@ -20,6 +20,7 @@ using TaskLayer;
 using Nett;
 using System.IO;
 using static System.Net.WebRequestMethods;
+using System.Text.RegularExpressions;
 
 namespace Test.TestISD
 {
@@ -51,8 +52,6 @@ namespace Test.TestISD
                 double[] intensities = p.Peaks.Select(p =>p.Intensity).ToArray();
                 XICs.Add((rt, intensities));
             }
-        
-        
         }
 
         [Test]
@@ -66,8 +65,58 @@ namespace Test.TestISD
             string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis";
             string myDatabase = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             DbForTask db = new DbForTask(myDatabase, false);
+            var ms2list = MetaMorpheusTask._GetMs2Scans(myMsDataFile, filePath, task.CommonParameters);
             task.RunTask(outputFolder, new List<DbForTask> { db }, new List<string> { filePath }, "normal");
 
+        }
+
+        [Test]
+        public static void TestConvertingAllMs2Peaks()
+        {
+            string filePath = @"E:\ISD Project\ISD_240606\06-07-24_mix_1pmol_5uL_ISD.mzML";
+            MyFileManager myFileManager = new MyFileManager(true);
+            var digestionParam = new DigestionParams(protease: "top-down");
+            CommonParameters isdCommonParameters = new CommonParameters(digestionParams: digestionParam, trimMsMsPeaks: false);
+            var myMsDataFile = myFileManager.LoadFile(filePath, isdCommonParameters);
+            var allMs2Scans = myMsDataFile.Scans.Where(s => s.MsnOrder == 2).ToList();
+            var allPeaks = new List<Peak>();
+            int index = 0;
+            foreach(var scan in allMs2Scans)
+            {
+                var spectrum = scan.MassSpectrum;
+                for(int i = 0; i < spectrum.XArray.Length; i++)
+                {
+                    Peak newPeak = new Peak(spectrum.XArray[i], scan.RetentionTime, spectrum.YArray[i], scan.MsnOrder, scan.OneBasedScanNumber, index);
+                    allPeaks.Add(newPeak);
+                    index++;
+                }
+            }
+            var peakList = allPeaks.Where(p => p.ScanNumber == 136).ToList();
+            var group = allPeaks.GroupBy(p => p.ScanNumber);
+            var peakList2 = allPeaks.Where(p => p.ScanNumber == 2).ToList();
+        }
+
+        [Test]
+        public static void CreateXICsForAllMs2Peaks()
+        {
+            string filePath = @"E:\ISD Project\ISD_240606\06-07-24_mix_1pmol_5uL_ISD.mzML";
+            MyFileManager myFileManager = new MyFileManager(true);
+            var digestionParam = new DigestionParams(protease: "top-down");
+            CommonParameters isdCommonParameters = new CommonParameters(digestionParams: digestionParam);
+            var myMsDataFile = myFileManager.LoadFile(filePath, isdCommonParameters);
+            var allMs2Scans = myMsDataFile.Scans.Where(s => s.MsnOrder == 2).ToList();
+            var allPeaks = new List<Peak>();
+            int index = 0;
+            foreach (var scan in allMs2Scans)
+            {
+                var spectrum = scan.MassSpectrum;
+                for (int i = 0; i < spectrum.XArray.Length; i++)
+                {
+                    Peak newPeak = new Peak(spectrum.XArray[i], scan.RetentionTime, spectrum.YArray[i], scan.OneBasedScanNumber, index);
+                    allPeaks.Add(newPeak);
+                    index++;
+                }
+            }
         }
     }
 }
