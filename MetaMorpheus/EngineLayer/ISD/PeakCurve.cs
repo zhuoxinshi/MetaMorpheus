@@ -1,4 +1,5 @@
-﻿using MassSpectrometry;
+﻿using Easy.Common.Extensions;
+using MassSpectrometry;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.RootFinding;
 using MathNet.Numerics.Statistics;
@@ -12,6 +13,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ThermoFisher.CommonCore.Data.Business;
 
@@ -167,48 +169,7 @@ namespace EngineLayer
             return newPeakCurve;
         }
 
-        public static List<PeakCurve> GetXICForAll(CommonParameters commonParameters, List<Peak> peaks, int msnOrder)
-        {
-            //EngineLayer.Peak newPeak = new EngineLayer.Peak(mz, targetScan.RetentionTime, targetScan.MassSpectrum.YArray[index]);
-            List<PeakCurve> allXICs = new List<PeakCurve> ();
-            peaks.OrderBy(p => p.Index);
-            List<int> indices = peaks.Select(p => p.Index).ToList();
-
-            foreach (int i in indices)
-            {
-                if (peaks[i].XIC != null)
-                {
-                    continue;
-                }
-
-                PeakCurve newPeakCurve = new PeakCurve(new List<Peak> { }, msnOrder);
-                var listOfMzs = peaks.Where(p => indices.Contains(p.Index)).Select(p => p.Mz).ToList();
-                try
-                {
-                    int indexByMz = listOfMzs.BinarySearch(peaks[i].Mz);
-                    if (indexByMz < 0)
-                    {
-                        indexByMz = ~indexByMz;
-                    }
-                    if (indexByMz > 0 && Math.Abs(listOfMzs[indexByMz] - peaks[i].Mz) > Math.Abs(peaks[i].Mz - listOfMzs[indexByMz - 1]))
-                    {
-                        indexByMz = indexByMz - 1;
-                    }
-                    if (commonParameters.PrecursorMassTolerance.Within(listOfMzs[indexByMz], peaks[i].Mz))
-                    {
-                        newPeakCurve.Peaks.Add(peaks[indexByMz]);
-                        indices.Remove(peaks[indexByMz].Index);
-                    }
-                }
-                catch
-                {
-
-                }
-
-
-            }
-            return allXICs;
-        }
+        
         //For a given target Ms2WithSpecificMass Scan, extract all the peaks that come from the precursor ion by scoring the correlation
         //between the XIC of all the fragment ions in the scan and the XIC of the precursor ion
         public static Ms2ScanWithSpecificMass GroupPrecursorPeakAndFragmentIons(Ms2ScanWithSpecificMass targetScan, List<Ms2ScanWithSpecificMass> scans, CommonParameters commonParameters)
@@ -266,6 +227,7 @@ namespace EngineLayer
 
         //For each Ms2ScanWithSpecificMass, find the subset of Ms2ScanWithSpecificMass where the precursor associated with that scan is in the 
         //isolation window, create XICs based on the range and group the precursor ion with fragment ions
+        //This method searches all copies of MS2 Scans in all MS2WithSpecificMass, which needs to be fixed
         public static List<Ms2ScanWithSpecificMass>[] GroupPrecursorPeaksAndFragmentIonsForDIA(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, CommonParameters commonParameters)
         {
             for (int i = 0; i < scansWithPrecursors.Length; i++)
@@ -328,8 +290,8 @@ namespace EngineLayer
             return scansWithPrecursors;
         }
 
-
-        public static List<Ms2ScanWithSpecificMass>[] GroupPrecursorPeaksAndFragmentIonsISD(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, CommonParameters commonParameters)
+        
+        public static List<Ms2ScanWithSpecificMass>[] GroupPrecursorPeaksAndFragmentIonsISD(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, List<Peak> ms2Peaks, CommonParameters commonParameters)
         {
             for (int i = 0; i < scansWithPrecursors.Length; i++)
             {
@@ -337,53 +299,29 @@ namespace EngineLayer
                 {
                     for (int j = 0; j < scansWithPrecursors[i].Count; j++)
                     {
-                        var target_scan = scansWithPrecursors[i][j];
+                        var targetScan = scansWithPrecursors[i][j];
+                        List<EngineLayer.Peak> DIA_peaks = new List<EngineLayer.Peak> { };
+                        var ms2PeaksToMatch = ms2Peaks.Where(p => p.ScanNumber == targetScan.OneBasedScanNumber).ToList();
                         List<Ms2ScanWithSpecificMass> Ms2ScanWithSpecificMz = new List<Ms2ScanWithSpecificMass>();
-                        foreach (var scan in scansWithPrecursors.Where(p => p.Count > 0))
+
+                        foreach(Peak peak in ms2PeaksToMatch)
                         {
-                            var sortedList = scan.OrderBy(p => p.PrecursorMonoisotopicPeakMz).ToList();
-                            int indexByMz = sortedList.Select(p => p.PrecursorMonoisotopicPeakMz).ToList().BinarySearch(target_scan.PrecursorMonoisotopicPeakMz);
-                            if (indexByMz < 0)
+                            if(peak.XIC != null)
                             {
-                                indexByMz = ~indexByMz;
-                                if (indexByMz == sortedList.Count)
+                                double score = PeakCurve.CalPeakCorr(targetScan.PrecursurPeak, peak.XIC);
+                                if (score > 0.5)
                                 {
-                                    indexByMz = indexByMz - 1;
+                                    DIA_peaks.Add(peak);
                                 }
                             }
-                            try
-                            {
-                                if (Math.Abs(sortedList[indexByMz].PrecursorMonoisotopicPeakMz - target_scan.PrecursorMonoisotopicPeakMz) > Math.Abs(target_scan.PrecursorMonoisotopicPeakMz - sortedList[indexByMz - 1].PrecursorMonoisotopicPeakMz))
-                                {
-                                    indexByMz = indexByMz - 1;
-                                }
-                            }
-                            catch
-                            {
-
-                            }
-
-                            //}
-                            try
-                            {
-                                if (commonParameters.PrecursorMassTolerance.Within(sortedList[indexByMz].PrecursorMonoisotopicPeakMz, target_scan.PrecursorMonoisotopicPeakMz))
-                                {
-                                    Ms2ScanWithSpecificMz.Add(sortedList[indexByMz]);
-                                }
-                            }
-                            catch
-                            {
-
-                            }
-
                         }
-
-                        if (Ms2ScanWithSpecificMz.Count >= 5)
-                        {
-                            Ms2ScanWithSpecificMass newList = GroupPrecursorPeakAndFragmentIons(target_scan, Ms2ScanWithSpecificMz, commonParameters);
-                            scansWithPrecursors[i][j] = newList;
-                        }
-
+                        DIA_peaks = DIA_peaks.OrderBy(p => p.Mz).ToList();
+                        MzSpectrum diaSpectrum = new MzSpectrum(DIA_peaks.Select(p => p.Mz).ToArray(), DIA_peaks.Select(p => p.Intensity).ToArray(), false);
+                        MsDataScan newScan = new MsDataScan(diaSpectrum, targetScan.OneBasedScanNumber, targetScan.TheScan.MsnOrder, targetScan.TheScan.IsCentroid,
+                            targetScan.TheScan.Polarity, targetScan.TheScan.RetentionTime, targetScan.TheScan.ScanWindowRange, targetScan.TheScan.ScanFilter, targetScan.TheScan.MzAnalyzer,
+                            targetScan.TheScan.TotalIonCurrent, targetScan.TheScan.InjectionTime, targetScan.TheScan.NoiseData, targetScan.TheScan.NativeId);
+                        scansWithPrecursors[i][j] = new Ms2ScanWithSpecificMass(newScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath,
+                commonParameters, null, targetScan.Pre_RT, targetScan.PrecursurPeak, DIA_peaks);
                     }
                 }
             }
@@ -423,31 +361,104 @@ namespace EngineLayer
         //    }
         //    return peakCurve;
         //}
+        public static int Match(double mz, List<double> list, Tolerance tolerance)
+        {
+            int index = list.BinarySearch(mz);
+            if (index < 0)
+            {
+                index = ~index;
+                if (index == list.Count)
+                {
+                    index = index - 1;
+                }
+                if (index != 0)
+                {
+                    if (Math.Abs(list[index] - mz) > Math.Abs(mz - list[index - 1]))
+                    {
+                        index = index - 1;
+                    }
+                }
+            }
+            if (tolerance.Within(mz, list[index]))
+            {
+                return index;
+            }
+            else
+            {
+                return -1;
+            }
+        }
 
-        //public static PeakCurve GetXIC(Peak targetPeak, List<Peak> allPeaks, CommonParameters commonParameters)
+        public static PeakCurve GetXIC(Peak targetPeak, List<Peak> allPeaks, CommonParameters commonParameters)
+        {
+            if (targetPeak.XIC != null) 
+            { 
+                return targetPeak.XIC; 
+            }
+            PeakCurve peakCurve = new PeakCurve(new List<Peak> { }, targetPeak.MsLevel);
+            var groups = allPeaks.GroupBy(peak => peak.ScanNumber);
+            foreach (var group in groups)
+            {
+                List<Peak> sortedList = group.ToList().OrderBy(p => p.Mz).ToList();
+                List<double> sortedMzs = sortedList.Select(p => p.Mz).ToList();
+                int index = PeakCurve.Match(targetPeak.Mz, sortedMzs, commonParameters.PrecursorMassTolerance);
+                if (index > 0)
+                {
+                    peakCurve.Peaks.Add(sortedList[index]);
+                    sortedList[index].XIC = peakCurve;
+                }
+            }
+            return peakCurve;
+        }
+
+        public static PeakCurve GetXIC_noRemove(Peak targetPeak, List<Peak> allPeaks, CommonParameters commonParameters)
+        {
+            PeakCurve peakCurve = new PeakCurve(new List<Peak> { }, targetPeak.MsLevel);
+            var groups = allPeaks.GroupBy(peak => peak.ScanNumber);
+            foreach (var group in groups)
+            {
+                List<Peak> sortedList = group.ToList().OrderBy(p => p.Mz).ToList();
+                List<double> sortedMzs = sortedList.Select(p => p.Mz).ToList();
+                int index = PeakCurve.Match(targetPeak.Mz, sortedMzs, commonParameters.PrecursorMassTolerance);
+                if (index > 0)
+                {
+                    peakCurve.Peaks.Add(sortedList[index]);
+                }
+            }
+            return peakCurve;
+        }
+
+        //public static List<PeakCurve> GetXICForAll(CommonParameters commonParameters, List<Peak> peaks, int msnOrder)
         //{
-        //    PeakCurve peakCurve = new PeakCurve(new List<Peak> { }, targetPeak.MsLevel);
-        //    var group = allPeaks.GroupBy(peak => peak.ScanNumber);
-        //    foreach (MsDataScan scan in scans)
+        //    //EngineLayer.Peak newPeak = new EngineLayer.Peak(mz, targetScan.RetentionTime, targetScan.MassSpectrum.YArray[index]);
+        //    List<PeakCurve> allXICs = new List<PeakCurve>();
+        //    peaks.OrderBy(p => p.Index);
+        //    List<int> indices = peaks.Select(p => p.Index).ToList();
+
+        //    foreach (int i in indices)
         //    {
-        //        int index = scan.MassSpectrum.XArray.ToList().BinarySearch(targetPeak.Mz);
-        //        if (index < 0)
+        //        if (peaks[i].XIC != null)
         //        {
-        //            index = ~index;
+        //            continue;
         //        }
+
+        //        PeakCurve newPeakCurve = new PeakCurve(new List<Peak> { }, msnOrder);
+        //        var listOfMzs = peaks.Where(p => indices.Contains(p.Index)).Select(p => p.Mz).ToList();
         //        try
         //        {
-        //            if (index > 0)
+        //            int indexByMz = listOfMzs.BinarySearch(peaks[i].Mz);
+        //            if (indexByMz < 0)
         //            {
-        //                if (Math.Abs(scan.MassSpectrum.XArray[index] - targetPeak.Mz) > Math.Abs(targetPeak.Mz - scan.MassSpectrum.XArray[index - 1]))
-        //                {
-        //                    index = index - 1;
-        //                }
+        //                indexByMz = ~indexByMz;
         //            }
-        //            if (commonParameters.ProductMassTolerance.Within(scan.MassSpectrum.XArray[index], targetPeak.Mz))
+        //            if (indexByMz > 0 && Math.Abs(listOfMzs[indexByMz] - peaks[i].Mz) > Math.Abs(peaks[i].Mz - listOfMzs[indexByMz - 1]))
         //            {
-        //                Peak newPeak = new Peak(scan.MassSpectrum.XArray[index], scan.RetentionTime, scan.MassSpectrum.YArray[index]);
-        //                peakCurve.Peaks.Add(newPeak);
+        //                indexByMz = indexByMz - 1;
+        //            }
+        //            if (commonParameters.PrecursorMassTolerance.Within(listOfMzs[indexByMz], peaks[i].Mz))
+        //            {
+        //                newPeakCurve.Peaks.Add(peaks[indexByMz]);
+        //                indices.Remove(peaks[indexByMz].Index);
         //            }
         //        }
         //        catch
@@ -455,8 +466,9 @@ namespace EngineLayer
 
         //        }
 
+
         //    }
-        //    return peakCurve;
+        //    return allXICs;
         //}
     }
 }

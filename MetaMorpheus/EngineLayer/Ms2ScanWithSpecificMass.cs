@@ -10,7 +10,7 @@ namespace EngineLayer
     {
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, 
             string fullFilePath, CommonParameters commonParam, IsotopicEnvelope[] neutralExperimentalFragments = null,
-            double pre_RT = double.NaN, PeakCurve precursurPeak = null, List<Peak> dIAGroupingPeaks = null)
+            double pre_RT = double.NaN, PeakCurve precursorPeak = null, List<Peak> dIAGroupingPeaks = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
@@ -21,12 +21,16 @@ namespace EngineLayer
 
             TheScan = mzLibScan;
             DIAGroupingPeaks = dIAGroupingPeaks;
-            PrecursurPeak = precursurPeak;
+            PrecursurPeak = precursorPeak;
             Pre_RT = pre_RT;
 
-            if (commonParam.DissociationType != DissociationType.LowCID)
+            if (commonParam.DissociationType != DissociationType.LowCID && commonParam.DoDIA == false)
             {
                 ExperimentalFragments = neutralExperimentalFragments ?? GetNeutralExperimentalFragments(mzLibScan, commonParam);
+            }
+            if (commonParam.DissociationType != DissociationType.LowCID && commonParam.DoDIA == true)
+            {
+                ExperimentalFragments = neutralExperimentalFragments ?? DIA_GetNeutralExperimentalFragments(commonParam, GetDIA_spectrum(DIAGroupingPeaks));
             }
 
             if (ExperimentalFragments != null && ExperimentalFragments.Any())

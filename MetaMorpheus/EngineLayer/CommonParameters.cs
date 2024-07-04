@@ -54,13 +54,15 @@ namespace EngineLayer
             int minVariantDepth = 1, 
             bool addTruncations = false,
             DeconvolutionParameters precursorDeconParams = null,
-            DeconvolutionParameters productDeconParams = null)
+            DeconvolutionParameters productDeconParams = null,
+            bool doDIA = false)
 
         {
             TaskDescriptor = taskDescriptor;
             DoPrecursorDeconvolution = doPrecursorDeconvolution;
             UseProvidedPrecursorInfo = useProvidedPrecursorInfo;
             DeconvolutionIntensityRatio = deconvolutionIntensityRatio;
+            DoDIA = doDIA;
             ReportAllAmbiguity = reportAllAmbiguity;
             AddCompIons = addCompIons;
             TotalPartitions = totalPartitions;
@@ -129,6 +131,7 @@ namespace EngineLayer
         public IEnumerable<(string, string)> ListOfModsVariable { get; private set; }
         public bool DoPrecursorDeconvolution { get; private set; }
         public bool UseProvidedPrecursorInfo { get; private set; }
+        public bool DoDIA {  get; set; }
         [TomlIgnore] public double DeconvolutionIntensityRatio { get; private set; }
         public int DeconvolutionMaxAssumedChargeState
         {

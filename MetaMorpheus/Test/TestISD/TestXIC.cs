@@ -21,6 +21,7 @@ using Nett;
 using System.IO;
 using static System.Net.WebRequestMethods;
 using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 
 namespace Test.TestISD
 {
@@ -61,6 +62,7 @@ namespace Test.TestISD
             string tomlFile = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
             MyFileManager myFileManager = new MyFileManager(true);
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            task.CommonParameters.DoDIA = true;
             var myMsDataFile = myFileManager.LoadFile(filePath, task.CommonParameters);
             string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis";
             string myDatabase = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
@@ -73,7 +75,7 @@ namespace Test.TestISD
         [Test]
         public static void TestConvertingAllMs2Peaks()
         {
-            string filePath = @"E:\ISD Project\ISD_240606\06-07-24_mix_1pmol_5uL_ISD.mzML";
+            string filePath = @"E:\ISD Project\ISD_240606\06-07-24_mix_1pmol_5uL_ISD_RT32.16-35.59.mzML";
             MyFileManager myFileManager = new MyFileManager(true);
             var digestionParam = new DigestionParams(protease: "top-down");
             CommonParameters isdCommonParameters = new CommonParameters(digestionParams: digestionParam, trimMsMsPeaks: false);
@@ -91,32 +93,21 @@ namespace Test.TestISD
                     index++;
                 }
             }
-            var peakList = allPeaks.Where(p => p.ScanNumber == 136).ToList();
-            var group = allPeaks.GroupBy(p => p.ScanNumber);
-            var peakList2 = allPeaks.Where(p => p.ScanNumber == 2).ToList();
+
+            Parallel.ForEach(Partitioner.Create(0, allPeaks.Count), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
+                (partitionRange, loopState) =>
+                {
+                    for(int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        allPeaks[i].XIC = PeakCurve.GetXIC(allPeaks[i], allPeaks, isdCommonParameters);
+                    }
+                } );
+            var sorted = allPeaks.OrderByDescending(p => p.XIC.Peaks.Count()).ToList();
+            var count = sorted.Select(p => p.XIC.Peaks.Count).ToList();
+
+            int k = 0;
         }
 
-        [Test]
-        public static void CreateXICsForAllMs2Peaks()
-        {
-            string filePath = @"E:\ISD Project\ISD_240606\06-07-24_mix_1pmol_5uL_ISD.mzML";
-            MyFileManager myFileManager = new MyFileManager(true);
-            var digestionParam = new DigestionParams(protease: "top-down");
-            CommonParameters isdCommonParameters = new CommonParameters(digestionParams: digestionParam);
-            var myMsDataFile = myFileManager.LoadFile(filePath, isdCommonParameters);
-            var allMs2Scans = myMsDataFile.Scans.Where(s => s.MsnOrder == 2).ToList();
-            var allPeaks = new List<Peak>();
-            int index = 0;
-            foreach (var scan in allMs2Scans)
-            {
-                var spectrum = scan.MassSpectrum;
-                for (int i = 0; i < spectrum.XArray.Length; i++)
-                {
-                    Peak newPeak = new Peak(spectrum.XArray[i], scan.RetentionTime, spectrum.YArray[i], scan.OneBasedScanNumber, index);
-                    allPeaks.Add(newPeak);
-                    index++;
-                }
-            }
-        }
+       
     }
 }
