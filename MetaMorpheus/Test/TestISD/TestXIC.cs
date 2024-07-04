@@ -67,7 +67,7 @@ namespace Test.TestISD
             string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis";
             string myDatabase = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             DbForTask db = new DbForTask(myDatabase, false);
-            var ms2list = MetaMorpheusTask._GetMs2Scans(myMsDataFile, filePath, task.CommonParameters);
+            var ms2list = MetaMorpheusTask._GetMs2ScansForDIA(myMsDataFile, filePath, task.CommonParameters);
             task.RunTask(outputFolder, new List<DbForTask> { db }, new List<string> { filePath }, "normal");
 
         }
