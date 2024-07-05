@@ -1,4 +1,5 @@
 ﻿using Chemistry;
+using Easy.Common.Extensions;
 using MassSpectrometry;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,8 @@ namespace EngineLayer
     {
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, 
             string fullFilePath, CommonParameters commonParam, IsotopicEnvelope[] neutralExperimentalFragments = null,
-            double pre_RT = double.NaN, PeakCurve precursorPeak = null, List<Peak> dIAGroupingPeaks = null)
+            double pre_RT = double.NaN, PeakCurve precursorPeak = null, List<Peak> dIAGroupingPeaks = null, 
+            double mostAbundantPrePeak = double.NaN)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
@@ -23,14 +25,11 @@ namespace EngineLayer
             DIAGroupingPeaks = dIAGroupingPeaks;
             PrecursurPeak = precursorPeak;
             Pre_RT = pre_RT;
+            MostAbundantPrePeak = mostAbundantPrePeak;
 
-            if (commonParam.DissociationType != DissociationType.LowCID && commonParam.DoDIA == false)
+            if (commonParam.DissociationType != DissociationType.LowCID)
             {
                 ExperimentalFragments = neutralExperimentalFragments ?? GetNeutralExperimentalFragments(mzLibScan, commonParam);
-            }
-            if (commonParam.DissociationType != DissociationType.LowCID && commonParam.DoDIA == true)
-            {
-                ExperimentalFragments = neutralExperimentalFragments ?? DIA_GetNeutralExperimentalFragments(commonParam, GetDIA_spectrum(DIAGroupingPeaks));
             }
 
             if (ExperimentalFragments != null && ExperimentalFragments.Any())
@@ -67,6 +66,7 @@ namespace EngineLayer
         public PeakCurve PrecursurPeak { get; set; }
 
         public MzSpectrum DIA_spectrum { get; set; }
+        public double MostAbundantPrePeak {  get; set; }
 
         public static MzSpectrum GetDIA_spectrum(List<Peak> DIAGroupingPeaks)
         {

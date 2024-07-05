@@ -27,17 +27,19 @@ namespace EngineLayer
         public int Index { get; set; }
         public PeakCurve XIC { get; set; }   
         public int MsLevel { get; set; }
+        public List<Peak> otherPeaks {  get; set; }
 
-        public static List<Peak> GetAllPeaks(List<MsDataScan> scans)
+        public static List<Peak> GetAllPeaks(MsDataScan[] scans)
         {
             var allPeaks = new List<Peak>();
             int index = 0;
-            foreach (var scan in scans)
+            for(int i = 0; i < scans.Length; i++)
             {
-                var spectrum = scan.MassSpectrum;
-                for (int i = 0; i < spectrum.XArray.Length; i++)
+                var spectrum = scans[i].MassSpectrum;
+                for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
-                    Peak newPeak = new Peak(spectrum.XArray[i], scan.RetentionTime, spectrum.YArray[i], scan.MsnOrder, scan.OneBasedScanNumber, index);
+                    Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder, 
+                        scans[i].OneBasedScanNumber, index);
                     allPeaks.Add(newPeak);
                     index++;
                 }
