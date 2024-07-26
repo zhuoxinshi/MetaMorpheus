@@ -863,7 +863,7 @@ namespace TaskLayer
         {
             if (Parameters.SearchParameters.DoParsimony)
             {
-                string fileName = "AllProteinGroups.tsv";
+                string fileName = "iinGroups.tsv";
 
                 if (Parameters.SearchParameters.DoLabelFreeQuantification)
                 {

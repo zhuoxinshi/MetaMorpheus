@@ -12,7 +12,7 @@ namespace EngineLayer
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, 
             string fullFilePath, CommonParameters commonParam, IsotopicEnvelope[] neutralExperimentalFragments = null,
             double pre_RT = double.NaN, PeakCurve precursorPeak = null, List<Peak> dIAGroupingPeaks = null, 
-            double mostAbundantPrePeak = double.NaN)
+            double mostAbundantPrePeak = double.NaN, IsotopicEnvelope precursorEnvelope = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
@@ -26,6 +26,7 @@ namespace EngineLayer
             PrecursurPeak = precursorPeak;
             Pre_RT = pre_RT;
             MostAbundantPrePeak = mostAbundantPrePeak;
+            PrecursorEnvelope = precursorEnvelope;
 
             if (commonParam.DissociationType != DissociationType.LowCID)
             {
@@ -46,6 +47,7 @@ namespace EngineLayer
         public double PrecursorMonoisotopicPeakMz { get; }
         public double PrecursorMass { get; }
         public int PrecursorCharge { get; }
+        public IsotopicEnvelope PrecursorEnvelope { get; }
         public string FullFilePath { get; }
         public IsotopicEnvelope[] ExperimentalFragments { get; private set; }
         public List<Ms2ScanWithSpecificMass> ChildScans { get; set; } // MS2/MS3 scans that are children of this MS2 scan

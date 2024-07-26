@@ -133,6 +133,12 @@ namespace EngineLayer
                 return MatchFragmentIonsOfAllCharges(scan, theoreticalProducts, commonParameters);
             }
 
+            //debug
+            if (scan.OneBasedScanNumber == 50 && Math.Abs(scan.PrecursorMass - 8559.5) < 0.1)
+            {
+                bool stop = true;
+            }
+
             var matchedFragmentIons = new List<MatchedFragmentIon>();
 
             if (scan.TheScan.MassSpectrum.XcorrProcessed && scan.TheScan.MassSpectrum.XArray.Length != 0)

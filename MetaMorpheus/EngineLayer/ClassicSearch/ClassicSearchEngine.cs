@@ -54,7 +54,7 @@ namespace EngineLayer.ClassicSearch
         }
 
         protected override MetaMorpheusEngineResults RunSpecific()
-        {
+        {        
             Status("Getting ms2 scans...");
 
             double proteinsSearched = 0;
@@ -141,6 +141,11 @@ namespace EngineLayer.ClassicSearch
                                 // calculate the peptide's score
                                 double thisScore = CalculatePeptideScore(scan.TheScan.TheScan, matchedIons, fragmentsCanHaveDifferentCharges: WriteSpectralLibrary);
 
+                                if (scan.TheScan.OneBasedScanNumber == 114 && Math.Abs(scan.TheScan.PrecursorMass - 8560.5) < 0.1)
+                                {
+                                    int stop2 = 0;
+                                }
+
                                 AddPeptideCandidateToPsm(scan, myLocks, thisScore, peptide, matchedIons);
 
                                 if (SpectralLibrary != null)
@@ -163,6 +168,8 @@ namespace EngineLayer.ClassicSearch
                 });
             }
 
+            //check
+            var psms = PeptideSpectralMatches.Where(p => p!= null).ToList();
             foreach (SpectralMatch psm in PeptideSpectralMatches.Where(p => p != null))
             {
                 psm.ResolveAllAmbiguities();

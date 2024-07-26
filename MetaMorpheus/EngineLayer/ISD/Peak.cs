@@ -3,21 +3,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using EngineLayer.ISD;
 using MassSpectrometry;
 
 namespace EngineLayer
 {
     public class Peak
     {
-        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber = 0, int index = 0, PeakCurve curve = null)
+        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber = 0, int index = 0, string label = null)
         {
             Mz = mz;
             Intensity = intensity;
             RT = rt;
             ScanNumber = scanNumber;
             Index = index;
-            XIC = curve;
             MsLevel = msLevel;
+            Label = label;
         }
 
         public double Mz { get; set; }
@@ -25,9 +26,12 @@ namespace EngineLayer
         public double RT { get; set; }
         public int ScanNumber { get; set; }
         public int Index { get; set; }
-        public PeakCurve XIC { get; set; }   
+        public PeakCurve XICforDIA { get; set; }   
         public int MsLevel { get; set; }
-        public List<Peak> otherPeaks {  get; set; }
+        public List<Peak> XICpeaks {  get; set; }
+        public double ApexRT {  get; set; }
+        public string Label {  get; set; }
+        public XIC XIC {  get; set; }
 
         public static List<Peak> GetAllPeaks(MsDataScan[] scans)
         {

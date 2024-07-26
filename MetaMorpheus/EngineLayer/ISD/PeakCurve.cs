@@ -290,7 +290,7 @@ namespace EngineLayer
             return scansWithPrecursors;
         }
 
-        
+
         public static List<Ms2ScanWithSpecificMass>[] GroupPrecursorPeaksAndFragmentIonsISD(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, List<Peak> ms2Peaks, CommonParameters commonParameters)
         {
             for (int i = 0; i < scansWithPrecursors.Length; i++)
@@ -304,11 +304,11 @@ namespace EngineLayer
                         var ms2PeaksToMatch = ms2Peaks.Where(p => p.ScanNumber == targetScan.OneBasedScanNumber).ToList();
                         List<Ms2ScanWithSpecificMass> Ms2ScanWithSpecificMz = new List<Ms2ScanWithSpecificMass>();
 
-                        foreach(Peak peak in ms2PeaksToMatch)
+                        foreach (Peak peak in ms2PeaksToMatch)
                         {
-                            if(peak.XIC != null)
+                            if (peak.XICforDIA != null)
                             {
-                                double score = PeakCurve.CalPeakCorr(targetScan.PrecursurPeak, peak.XIC);
+                                double score = PeakCurve.CalPeakCorr(targetScan.PrecursurPeak, peak.XICforDIA);
                                 if (score > 0.5)
                                 {
                                     DIA_peaks.Add(peak);
@@ -391,9 +391,9 @@ namespace EngineLayer
 
         public static PeakCurve GetXIC(Peak targetPeak, List<Peak> allPeaks, CommonParameters commonParameters)
         {
-            if (targetPeak.XIC != null) 
+            if (targetPeak.XICforDIA != null) 
             { 
-                return targetPeak.XIC; 
+                return targetPeak.XICforDIA; 
             }
             PeakCurve peakCurve = new PeakCurve(new List<Peak> { }, targetPeak.MsLevel);
             var groups = allPeaks.GroupBy(peak => peak.ScanNumber);
@@ -405,7 +405,7 @@ namespace EngineLayer
                 if (index > 0)
                 {
                     peakCurve.Peaks.Add(sortedList[index]);
-                    sortedList[index].XIC = peakCurve;
+                    sortedList[index].XICforDIA = peakCurve;
                 }
             }
             return peakCurve;
