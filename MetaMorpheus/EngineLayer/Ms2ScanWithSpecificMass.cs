@@ -4,6 +4,8 @@ using MassSpectrometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
+using ThermoFisher.CommonCore.Data.Business;
 
 namespace EngineLayer
 {
@@ -77,6 +79,7 @@ namespace EngineLayer
 
             return Dia_mzSpectrum;
         }
+
         public static IsotopicEnvelope[] DIA_GetNeutralExperimentalFragments(CommonParameters commonParam, MzSpectrum Dia_mzSpectrum)
         {
             int minZ = 1;

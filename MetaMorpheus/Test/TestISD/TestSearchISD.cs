@@ -39,6 +39,7 @@ namespace Test.TestISD
             task.CommonParameters.DoDIA = true;
             task.SearchParameters.WriteSpectralLibrary = true;
             var myMsDataFile = myFileManager.LoadFile(filePath, task.CommonParameters);
+            var testScans = MetaMorpheusTask._GetMs2Scans_DeconvoluteMs2(myMsDataFile, filePath, task.CommonParameters);
             string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis\Search results\sample1_2uL_ISD_RT45.01-48.09_GroupXIC";
             string myDatabase = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             //string library = @"E:\ISD Project\TestIsdDataAnalysis\SpectralLibraryDDA\Task1-SearchTask\SpectralLibrary_2024-07-09-17-24-30.msp";

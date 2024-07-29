@@ -346,7 +346,36 @@ namespace EngineLayer.ISD
             return meanRTdiff;
         }
 
+        public static List<Peak> GetDeconvolutedPeaks(MsDataScan scan, CommonParameters commonParam)
+        {
+            var neutralExperimentalFragmentMasses =
+            Deconvoluter.Deconvolute(scan, commonParam.ProductDeconvolutionParameters, scan.MassSpectrum.Range).ToArray();
+
+            var newPeaks = new Dictionary<double, double>();
+            foreach (var envelope in neutralExperimentalFragmentMasses)
+            {
+                double newMz = envelope.MonoisotopicMass.ToMz(1);
+                double newIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).First().intensity;
+                if (!newPeaks.ContainsKey(newMz))
+                {
+                    newPeaks.Add(newMz, newIntensity);
+                }
+                else
+                {
+                    newPeaks[newMz] = newPeaks[newMz] + newIntensity;
+                }
+            }
+            newPeaks.OrderBy(p => p.Key);
+            var allPeaks = new List<Peak>();
+            foreach (var peak in newPeaks)
+            {
+                allPeaks.Add(new Peak(peak.Key, peak.Value, 2, scan.OneBasedScanNumber));
+            }
+
+            return allPeaks;
         }
+
+    }
               
     }
 
