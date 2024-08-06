@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ThermoFisher.CommonCore.Data.Business;
 using MathNet.Numerics.Statistics;
+using Easy.Common.Extensions;
 namespace EngineLayer.ISD
 {
     public class XIC
@@ -91,9 +92,12 @@ namespace EngineLayer.ISD
                 {
                     continue;
                 }
-                var peaks = new List<Peak>();
                 var XIC = new XIC(peakTable[i], i);
                 allXICs.Add(XIC);
+                foreach(var peak in peakTable[i])
+                {
+                    peak.XIC = XIC;
+                }
             }
             return allXICs;
         }
@@ -274,6 +278,56 @@ namespace EngineLayer.ISD
                 }
             }
             return bestPeak;
+        }
+
+        public static List<Ms2ScanWithSpecificMass>[] GroupFragmentIons_allXICs(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, MsDataScan[] ms1scans, MsDataScan[] ms2scans, CommonParameters commonParameters, int binSize, double rtShift, double corrCutOff)
+        {
+            var ms1Peaks = Peak.GetAllPeaks(ms1scans);
+            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
+            var ms2PeaksByScans = Peak.GetAllPeaksByScan(ms2scans);
+            var ms2Peaks = ms2PeaksByScans.Where(s => s != null).SelectMany(s => s).ToList();
+            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
+
+            //var allMs2XICs = GetAllXICs_LFQ(ms2Peaks, ms2scans, ms2Table, commonParameters.ProductMassTolerance, binSize);
+            var allMs2XICs = GetAllXICs(ms2Table);
+
+            for (int i = 0; i < scansWithPrecursors.Length; i++)
+            {
+                if (scansWithPrecursors[i].Count > 0)
+                {
+                    for (int j = 0; j < scansWithPrecursors[i].Count; j++)
+                    {
+                        var targetScan = scansWithPrecursors[i][j];
+                        var preXIC = GetXICwithMz(ms1Table, targetScan.MostAbundantPrePeak, binSize);
+                        if(preXIC == null)
+                        {
+                            continue;
+                        }
+                        var peaks = new List<(double mz, double intensity)>();
+                        var ms2PeakCandidates = ms2PeaksByScans[targetScan.OneBasedScanNumber].ToArray();
+                        for(int k = 0; k < ms2PeakCandidates.Length; k++)
+                        {
+                            var ms2XIC = ms2PeakCandidates[k].XIC;
+                            double corr = XICfromLFQ.CalculatePearsonCorr(preXIC.XICpeaks, ms2XIC.XICpeaks, rtShift);
+                            if (corr > corrCutOff)
+                            {
+                                peaks.Add((ms2PeakCandidates[k].Mz, ms2PeakCandidates[k].Intensity));
+                            }
+                        }
+                        MzSpectrum diaSpectrum = new MzSpectrum(peaks.Select(p => p.mz).ToArray(), peaks.Select(p => p.intensity).ToArray(), false);
+                        MsDataScan newScan = new MsDataScan(diaSpectrum, targetScan.TheScan.OneBasedScanNumber, targetScan.TheScan.MsnOrder, targetScan.TheScan.IsCentroid,
+                            targetScan.TheScan.Polarity, targetScan.TheScan.RetentionTime, targetScan.TheScan.ScanWindowRange, targetScan.TheScan.ScanFilter, targetScan.TheScan.MzAnalyzer,
+                            targetScan.TheScan.TotalIonCurrent, targetScan.TheScan.InjectionTime, targetScan.TheScan.NoiseData, targetScan.TheScan.NativeId,
+                            targetScan.TheScan.SelectedIonMZ, targetScan.TheScan.SelectedIonChargeStateGuess, targetScan.TheScan.SelectedIonIntensity,
+                            targetScan.TheScan.IsolationMz, targetScan.TheScan.IsolationWidth, targetScan.TheScan.DissociationType, null,
+                            targetScan.TheScan.SelectedIonMonoisotopicGuessMz, targetScan.TheScan.HcdEnergy, targetScan.TheScan.ScanDescription);
+                        var scanWithPrecursor = new Ms2ScanWithSpecificMass(newScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath,
+                commonParameters, null, targetScan.Pre_RT, mostAbundantPrePeak: targetScan.MostAbundantPrePeak);
+                        scansWithPrecursors[i][j] = scanWithPrecursor;
+                    }
+                }
+            }
+            return scansWithPrecursors;
         }
 
     }

@@ -1,7 +1,6 @@
 ﻿using Chemistry;
 using Easy.Common.Extensions;
 using EngineLayer.HistogramAnalysis;
-using FlashLFQ;
 using MassSpectrometry;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.RootFinding;
@@ -10,6 +9,7 @@ using Microsoft.ML;
 using MzLibUtil;
 using Newtonsoft.Json.Linq;
 using Proteomics.ProteolyticDigestion;
+using Readers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,6 +18,7 @@ using System.Data;
 using System.IO;
 using System.Linq;
 using System.Reflection.Metadata.Ecma335;
+using System.Threading.Tasks;
 using ThermoFisher.CommonCore.Data;
 using ThermoFisher.CommonCore.Data.Business;
 using static System.Formats.Asn1.AsnWriter;
@@ -148,6 +149,24 @@ namespace EngineLayer.ISD
             return scansWithPrecursors;
         }
 
+        public static List<Ms2ScanWithSpecificMass>[] GroupFragmentIonsXIC_Parallel(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, MsDataScan[] ms1scans, MsDataScan[] ms2scans, List<Peak>[] ms1Table,
+            List<Peak>[] ms2Table, CommonParameters commonParameters, int binSize, double rtShift)
+        {
+            Parallel.For(0, scansWithPrecursors.Length, i =>
+            {
+                if (scansWithPrecursors[i].Count > 0)
+                {
+                    for (int j = 0; j < scansWithPrecursors[i].Count; j++)
+                    {
+                        var targetScan = scansWithPrecursors[i][j];
+                        scansWithPrecursors[i][j] = GroupFragmentIonsForOneScan(targetScan, ms1scans, ms2scans, ms1Table, ms2Table, commonParameters, binSize, rtShift);
+                    }
+                }
+            });
+
+            return scansWithPrecursors;
+        }
+
         public static Ms2ScanWithSpecificMass GroupFragmentIonsForOneScan(Ms2ScanWithSpecificMass targetScan, MsDataScan[] ms1scans, MsDataScan[] ms2scans, List<Peak>[] ms1Table,
             List<Peak>[] ms2Table, CommonParameters commonParameters, int binSize, double rtShift)
         {
@@ -157,7 +176,7 @@ namespace EngineLayer.ISD
             var ms1Peaks = GetXIC(targetScan.MostAbundantPrePeak, ms1scans, ms1Table, commonParameters.PrecursorMassTolerance, binSize);
             for (int k = 0; k < allMzs.Length; k++)
             {
-                var ms2Peaks = GetXIC(allMzs[k], ms2scans, ms2Table, commonParameters.PrecursorMassTolerance, binSize);
+                var ms2Peaks = GetXIC(allMzs[k], ms2scans, ms2Table, commonParameters.ProductMassTolerance, binSize);
                 double correlation = CalculatePearsonCorr(ms1Peaks, ms2Peaks, rtShift);
                 if (correlation > 0.8)
                 {
@@ -178,6 +197,7 @@ namespace EngineLayer.ISD
             return scanWithPrecursor;
         }
 
+
         public static double CalculateCorrelation(List<Peak> ms1Peaks, List<Peak> ms2Peaks, double rtShift)
         {
             var matchedPeaks = MatchRTs(ms1Peaks, ms2Peaks, rtShift);
@@ -197,6 +217,10 @@ namespace EngineLayer.ISD
 
         public static bool ApexFilter(List<Peak> ms1Peaks, List<Peak> ms2Peaks, double threshold)
         {
+            if (ms1Peaks == null && ms2Peaks == null)
+            {
+                return true;
+            }
             double ms1Apex = ms1Peaks.OrderByDescending(p => p.Intensity).First().RT;
             double ms2Apex = ms2Peaks.OrderByDescending(p => p.Intensity).First().RT;
             if (Math.Abs(ms1Apex - ms2Apex) < threshold)
@@ -346,33 +370,120 @@ namespace EngineLayer.ISD
             return meanRTdiff;
         }
 
-        public static List<Peak> GetDeconvolutedPeaks(MsDataScan scan, CommonParameters commonParam)
+        public static List<Peak> GetDeconvolutedPeaks(MsDataScan scan, CommonParameters commonParam, string type)
         {
             var neutralExperimentalFragmentMasses =
-            Deconvoluter.Deconvolute(scan, commonParam.ProductDeconvolutionParameters, scan.MassSpectrum.Range).ToArray();
+                Deconvoluter.Deconvolute(scan, commonParam.ProductDeconvolutionParameters, scan.MassSpectrum.Range).ToList();
+
+            if (commonParam.AssumeOrphanPeaksAreZ1Fragments)
+            {
+                HashSet<double> alreadyClaimedMzs = new HashSet<double>(neutralExperimentalFragmentMasses
+                    .SelectMany(p => p.Peaks.Select(v => Chemistry.ClassExtensions.RoundedDouble(v.mz).Value)));
+
+                for (int i = 0; i < scan.MassSpectrum.XArray.Length; i++)
+                {
+                    double mz = scan.MassSpectrum.XArray[i];
+                    double intensity = scan.MassSpectrum.YArray[i];
+
+                    if (!alreadyClaimedMzs.Contains(Chemistry.ClassExtensions.RoundedDouble(mz).Value))
+                    {
+                        neutralExperimentalFragmentMasses.Add(new IsotopicEnvelope(
+                            new List<(double mz, double intensity)> { (mz, intensity) },
+                            mz.ToMass(1), 1, intensity, 0, 0));
+                    }
+                }
+            }
 
             var newPeaks = new Dictionary<double, double>();
-            foreach (var envelope in neutralExperimentalFragmentMasses)
-            {
-                double newMz = envelope.MonoisotopicMass.ToMz(1);
-                double newIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).First().intensity;
-                if (!newPeaks.ContainsKey(newMz))
-                {
-                    newPeaks.Add(newMz, newIntensity);
-                }
-                else
-                {
-                    newPeaks[newMz] = newPeaks[newMz] + newIntensity;
-                }
-            }
-            newPeaks.OrderBy(p => p.Key);
             var allPeaks = new List<Peak>();
+
+            switch (type)
+            {
+                case "mono":
+                    foreach (var envelope in neutralExperimentalFragmentMasses)
+                    {
+                        double newMz = envelope.MonoisotopicMass.ToMz(1);
+                        double newIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).First().intensity;
+                        if (!newPeaks.ContainsKey(newMz))
+                        {
+                            newPeaks.Add(newMz, newIntensity);
+                        }
+                        else
+                        {
+                            newPeaks[newMz] = newPeaks[newMz] + newIntensity;
+                        }
+                    }
+                    break;
+
+                case "cs":
+                    foreach (var envelope in neutralExperimentalFragmentMasses)
+                    {
+                        var peaks = envelope.Peaks;
+                        foreach (var peak in peaks)
+                        {
+                            double newMz = peak.mz.ToMass(envelope.Charge).ToMz(1);
+                            double newIntensity = peak.intensity;
+                            if (!newPeaks.ContainsKey(newMz))
+                            {
+                                newPeaks.Add(newMz, newIntensity);
+                            }
+                            else
+                            {
+                                newPeaks[newMz] = newPeaks[newMz] + newIntensity;
+                            }
+                        }
+
+                    }
+                    break;
+
+                case "withCharge":
+                    foreach (var envelope in neutralExperimentalFragmentMasses)
+                    {
+                        var peaks = envelope.Peaks;
+                        foreach (var peak in peaks)
+                        {
+                            newPeaks.Add(peak.mz, peak.intensity);
+                        }
+                    }
+                    break;
+
+            }
             foreach (var peak in newPeaks)
             {
-                allPeaks.Add(new Peak(peak.Key, peak.Value, 2, scan.OneBasedScanNumber));
+                allPeaks.Add(new Peak(peak.Key, scan.RetentionTime, peak.Value, 2, scan.OneBasedScanNumber));
             }
-
             return allPeaks;
+        }
+
+
+        public static MsDataScan GetDeconvolutedScan(MsDataScan scan, CommonParameters commonParameters, string type)
+        {
+            var peaks = GetDeconvolutedPeaks(scan, commonParameters, type).OrderBy(p => p.Mz).ToList();
+            var spectrum = new MzSpectrum(peaks.Select(p => p.Mz).ToArray(), peaks.Select(p => p.Intensity).ToArray(), false);
+            MsDataScan newScan = new MsDataScan(spectrum, scan.OneBasedScanNumber, scan.MsnOrder, scan.IsCentroid,
+                scan.Polarity, scan.RetentionTime, scan.ScanWindowRange, scan.ScanFilter, scan.MzAnalyzer,
+                scan.TotalIonCurrent, scan.InjectionTime, scan.NoiseData, scan.NativeId,
+                scan.SelectedIonMZ, scan.SelectedIonChargeStateGuess, scan.SelectedIonIntensity,
+                scan.IsolationMz, scan.IsolationWidth, scan.DissociationType, scan.OneBasedPrecursorScanNumber,
+                scan.SelectedIonMonoisotopicGuessMz, scan.HcdEnergy, scan.ScanDescription);
+            return newScan;
+        }
+
+        public static void VisualizeDeconvolutedMs2Scans(MsDataScan[] scans, CommonParameters commonParameters, string outputFile, string type)
+        {
+            var newScans = new List<MsDataScan>();
+            foreach(var scan in scans)
+            {
+                var newScan = GetDeconvolutedScan(scan, commonParameters, type);
+                newScans.Add(newScan);
+            }
+            var scanArray = newScans.ToArray();
+            string outDir = @"E:\ISD Project\TestIsdDataAnalysis\DeconvolutedSpectra";
+            string outPath = Path.Combine(outDir, outputFile);
+            SourceFile genericSourceFile = new SourceFile("no nativeID format", "mzML format",
+                null, null, null);
+            GenericMsDataFile msFile = new GenericMsDataFile(scanArray, genericSourceFile);
+            msFile.ExportAsMzML(outPath, false);
         }
 
     }

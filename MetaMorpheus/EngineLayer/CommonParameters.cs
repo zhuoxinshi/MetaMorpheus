@@ -55,14 +55,15 @@ namespace EngineLayer
             bool addTruncations = false,
             DeconvolutionParameters precursorDeconParams = null,
             DeconvolutionParameters productDeconParams = null,
-            bool doDIA = false)
+            bool doDIA = false,
+            string deconvoluteMs2Type = "none")
 
         {
             TaskDescriptor = taskDescriptor;
             DoPrecursorDeconvolution = doPrecursorDeconvolution;
             UseProvidedPrecursorInfo = useProvidedPrecursorInfo;
             DeconvolutionIntensityRatio = deconvolutionIntensityRatio;
-            DoDIA = doDIA;
+            
             ReportAllAmbiguity = reportAllAmbiguity;
             AddCompIons = addCompIons;
             TotalPartitions = totalPartitions;
@@ -115,6 +116,8 @@ namespace EngineLayer
                 ProductDeconvolutionParameters = productDeconParams ?? new ClassicDeconvolutionParameters(-10,
                     -1, DeconvolutionMassTolerance.Value, deconvolutionIntensityRatio, Polarity.Negative);
             }
+            DoDIA = doDIA;
+            DeconvoluteMs2Type = deconvoluteMs2Type;
         }
 
         // Notes:
@@ -131,7 +134,6 @@ namespace EngineLayer
         public IEnumerable<(string, string)> ListOfModsVariable { get; private set; }
         public bool DoPrecursorDeconvolution { get; private set; }
         public bool UseProvidedPrecursorInfo { get; private set; }
-        public bool DoDIA {  get; set; }
         [TomlIgnore] public double DeconvolutionIntensityRatio { get; private set; }
         public int DeconvolutionMaxAssumedChargeState
         {
@@ -177,7 +179,8 @@ namespace EngineLayer
 
         public DissociationType MS2ChildScanDissociationType { get; private set; }
         public DissociationType MS3ChildScanDissociationType { get; private set; }
-        
+        public bool DoDIA { get; set; }
+        public string DeconvoluteMs2Type {  get; set; }
         public CommonParameters Clone()
         {
             CommonParameters c = new CommonParameters();

@@ -43,6 +43,12 @@ namespace EngineLayer
             {
                 DeconvolutedMonoisotopicMasses = new double[0];
             }
+            
+            //for deconvoluted MS2
+            if (commonParam.DeconvoluteMs2Type == "mono")
+            {
+                DeconvolutedMonoisotopicMasses = TheScan.MassSpectrum.XArray.Select(x => x.ToMass(1)).ToArray();
+            }
         }
 
         public MsDataScan TheScan { get; }

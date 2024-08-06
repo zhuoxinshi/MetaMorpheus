@@ -50,5 +50,33 @@ namespace EngineLayer
             }
             return allPeaks;
         }
+
+        public static List<Peak>[] GetAllPeaksByScan(MsDataScan[] scans)
+        {
+            var allPeaks = new List<Peak>[scans.Max(s => s.OneBasedScanNumber) + 1];
+            int index = 0;
+            foreach (var scan in scans)
+            {
+                try
+                {
+                    allPeaks[scan.OneBasedScanNumber] = new List<Peak>();
+                    var spectrum = scan.MassSpectrum;
+                    for (int j = 0; j < spectrum.XArray.Length; j++)
+                    {
+                        Peak newPeak = new Peak(spectrum.XArray[j], scan.RetentionTime, spectrum.YArray[j], scan.MsnOrder,
+                            scan.OneBasedScanNumber, index);
+                        allPeaks[scan.OneBasedScanNumber].Add(newPeak);
+                        index++;
+                    }
+                }
+                catch
+                {
+                    var scanToLook = scan.MassSpectrum;
+                    bool stop = true;
+                }
+                
+            }
+            return allPeaks;
+        }
     }
 }

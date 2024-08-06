@@ -419,5 +419,69 @@ namespace Test.TestISD
             string output2 = @"E:\ISD Project\TestIsdDataAnalysis\XIC_visualization\TestMS1Group_NoTol.csv";
             XICfromLFQ.VisualizeXICs(allXICs, output2);
         }
+
+        [Test]
+        public static void TestDeconvolutedMs2Scans()
+        {
+            string filePath = @"E:\ISD Project\TestIsdDataAnalysis\data\06-11-24_mix_sample1_2uL_ISD_RT45.01-48.09.mzML";
+            string tomlFile = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
+            MyFileManager myFileManager = new MyFileManager(true);
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            task.CommonParameters.DoDIA = true;
+            //task.SearchParameters.WriteSpectralLibrary = true;
+            var myMsDataFile = myFileManager.LoadFile(filePath, task.CommonParameters);
+            var ms2scans = myMsDataFile.GetMsDataScans().Where(scan => scan.MsnOrder == 2).ToArray();
+            var rawEnvelopes = new List<IsotopicEnvelope>[ms2scans.Length];
+            var deconEnvelopes = new List<IsotopicEnvelope>[ms2scans.Length];
+            for(int i = 0; i < ms2scans.Length; i++)
+            {
+                rawEnvelopes[i] = new List<IsotopicEnvelope>();
+                var fragmentEnvelopes = Deconvoluter.Deconvolute(ms2scans[i], task.CommonParameters.PrecursorDeconvolutionParameters).ToList();
+                rawEnvelopes[i] = fragmentEnvelopes;
+                var deconvolutedMs2 = XICfromLFQ.GetDeconvolutedScan(ms2scans[i], task.CommonParameters, "withCharge");
+                deconEnvelopes[i] = new List<IsotopicEnvelope>();
+                var deconFragmentEnvelopes = Deconvoluter.Deconvolute(deconvolutedMs2, task.CommonParameters.PrecursorDeconvolutionParameters).ToList();
+                deconEnvelopes[i] = deconFragmentEnvelopes;
+            }
+
+            //looking at a specific scan
+            var theScan = ms2scans[16];
+            var originalEnvelopes = Deconvoluter.Deconvolute(theScan, task.CommonParameters.PrecursorDeconvolutionParameters).ToList();
+            var deconTheScan = XICfromLFQ.GetDeconvolutedScan(theScan, task.CommonParameters, "mono");
+            var deconedEnvelopes = Deconvoluter.Deconvolute(deconTheScan, task.CommonParameters.PrecursorDeconvolutionParameters).ToList();
+            var decon_cs = MetaMorpheusTask._GetMs2Scans_DeconvoluteMs2(myMsDataFile, filePath, task.CommonParameters);
+
+            var rawMs2WithPre = MetaMorpheusTask._GetMs2ScansForDIA_XIC(myMsDataFile, filePath, task.CommonParameters);
+            var deconMs2WithPre = MetaMorpheusTask._GetMs2Scans_DeconvoluteMs2(myMsDataFile, filePath, task.CommonParameters);
+
+            string outFile_cs = "sample1_2uL_ISD_RT45.01-48.09_ms2_cs.mzML";
+            XICfromLFQ.VisualizeDeconvolutedMs2Scans(ms2scans, task.CommonParameters, outFile_cs, "cs");
+            string outFile_mono = "sample1_2uL_ISD_RT45.01-48.09_ms2_mono.mzML";
+            XICfromLFQ.VisualizeDeconvolutedMs2Scans(ms2scans, task.CommonParameters, outFile_mono, "mono");
+        }
+
+        [Test]
+        public static void TestXICadjustedVsOriginal()
+        {
+            //use averaged mz and intensity for xics, compare with original mz and intensity
+        }
+
+        [Test]
+        public static void TestRunTimeForAllXICs()
+        {
+            string filePath1 = @"E:\ISD Project\ISD_240606\06-07-24_mix_1pmol_5uL_ISD.mzML";
+            string tomlFile = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
+            MyFileManager myFileManager = new MyFileManager(true);
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            task.CommonParameters.DoDIA = true;
+            var myMsDataFile = myFileManager.LoadFile(filePath1, task.CommonParameters);
+            var ms2scans = myMsDataFile.GetMsDataScans().Where(scan => scan.MsnOrder == 2).ToArray();
+            var ms2Peaks = Peak.GetAllPeaks(ms2scans);
+            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, 100);
+            //var allXICs = XIC.GetAllXICs_LFQ(ms2Peaks, ms2scans, ms2Table, new PpmTolerance(10), 100);
+            var allXICs2 = XIC.GetAllXICs(ms2Table);
+        }
+
+        //xic
     }
 }
