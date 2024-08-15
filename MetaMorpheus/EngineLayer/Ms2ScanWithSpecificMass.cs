@@ -38,7 +38,11 @@ namespace EngineLayer
             if (ExperimentalFragments != null && ExperimentalFragments.Any())
             {
                 DeconvolutedMonoisotopicMasses = ExperimentalFragments.Select(p => p.MonoisotopicMass).ToArray();
-            }
+            } 
+            //else if (ExperimentalFragments != null && ExperimentalFragments.Any() && commonParam.DoDIA == true)
+            //{
+            //    DeconvolutedMonoisotopicMasses = DIA_GetNeutralExperimentalFragments(commonParam, DIA_spectrum).Select(p => p.MonoisotopicMass).ToArray();
+            //}
             else
             {
                 DeconvolutedMonoisotopicMasses = new double[0];
@@ -59,6 +63,7 @@ namespace EngineLayer
         public string FullFilePath { get; }
         public IsotopicEnvelope[] ExperimentalFragments { get; private set; }
         public List<Ms2ScanWithSpecificMass> ChildScans { get; set; } // MS2/MS3 scans that are children of this MS2 scan
+
         private double[] DeconvolutedMonoisotopicMasses;
         public string NativeId { get; } 
 
@@ -80,10 +85,17 @@ namespace EngineLayer
 
         public static MzSpectrum GetDIA_spectrum(List<Peak> DIAGroupingPeaks)
         {
-            DIAGroupingPeaks.OrderBy(P => P.Mz).ToList();
-            MzSpectrum Dia_mzSpectrum = new MzSpectrum(DIAGroupingPeaks.Select(p => p.Mz).ToArray(), DIAGroupingPeaks.Select(p => p.Intensity).ToArray(), false);
+            if (DIAGroupingPeaks.Any())
+            {
+                DIAGroupingPeaks.OrderBy(P => P.Mz).ToList();
+                MzSpectrum Dia_mzSpectrum = new MzSpectrum(DIAGroupingPeaks.Select(p => p.Mz).ToArray(), DIAGroupingPeaks.Select(p => p.Intensity).ToArray(), false);
 
-            return Dia_mzSpectrum;
+                return Dia_mzSpectrum;
+            }
+            else
+            {
+                return null;
+            }
         }
 
         public static IsotopicEnvelope[] DIA_GetNeutralExperimentalFragments(CommonParameters commonParam, MzSpectrum Dia_mzSpectrum)

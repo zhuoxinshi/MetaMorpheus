@@ -178,7 +178,7 @@ namespace EngineLayer.ISD
             {
                 var ms2Peaks = GetXIC(allMzs[k], ms2scans, ms2Table, commonParameters.ProductMassTolerance, binSize);
                 double correlation = CalculatePearsonCorr(ms1Peaks, ms2Peaks, rtShift);
-                if (correlation > 0.8)
+                if (correlation > 0.5)
                 {
                     diaMzs.Add(allMzs[k]);
                     diaIntensities.Add(targetScan.TheScan.MassSpectrum.YArray[k]);

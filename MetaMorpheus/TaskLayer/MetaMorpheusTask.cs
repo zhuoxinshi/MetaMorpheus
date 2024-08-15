@@ -456,8 +456,8 @@ namespace TaskLayer
             }
             else
             {
-                var scansWithPre = _GetMs2Scans_FilterPrecursors_NormalMS2GroupingPeaks(myMSDataFile, fullFilePath, commonParameters);
-                return scansWithPre.OrderBy(s => s.OneBasedScanNumber).ToArray();
+                var scansWithPre = _GetMs2ScansForDIA_XIC(myMSDataFile, fullFilePath, commonParameters);
+                return scansWithPre.Where(n => n!= null).SelectMany(s => s).OrderBy(s => s.OneBasedScanNumber).ToArray();
             }
         }
 
@@ -469,8 +469,8 @@ namespace TaskLayer
             var ms2Scans = allScans.Where(x => x.MsnOrder == 2).ToArray();
             double rtShift = XICfromLFQ.GetRTshift(allScans);
             bool averageMs1 = false;
-            bool averageMs2 = false;
-            bool deconvoluteMs2 = true;
+            bool averageMs2 = true;
+            bool deconvoluteMs2 = false;
 
             //average ms2
             if (averageMs2 == true)
@@ -524,19 +524,19 @@ namespace TaskLayer
                 }
             }
 
-            var ms1Peaks = Peak.GetAllPeaks(ms1Scans);
-            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
-            var ms2Peaks = Peak.GetAllPeaks(ms2Scans);
-            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
-
             //deconvoluteMs2
             if (deconvoluteMs2)
             {
                 for (int i = 0; i < ms2Scans.Length; i++)
                 {
-                    ms2Scans[i] = XICfromLFQ.GetDeconvolutedScan(ms2Scans[i], commonParameters, "withCharge");
+                    ms2Scans[i] = XICfromLFQ.GetDeconvolutedScan(ms2Scans[i], commonParameters, commonParameters.DeconvoluteMs2Type);
                 }
             }
+
+            var ms1Peaks = Peak.GetAllPeaks(ms1Scans);
+            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
+            var ms2Peaks = Peak.GetAllPeaks(ms2Scans);
+            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
 
             List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
 
@@ -583,7 +583,7 @@ namespace TaskLayer
                                 foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
                                     precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
                                 {
-                                    if (envelope.Charge <= 3 || envelope.MonoisotopicMass < 5000)
+                                    if (envelope.Charge == 1 || envelope.MonoisotopicMass < 3000)
                                     {
                                         continue;
                                     }
@@ -614,7 +614,7 @@ namespace TaskLayer
                     }
                 });
 
-            scansWithPrecursors = XICfromLFQ.GroupFragmentIonsXIC(scansWithPrecursors, ms1Scans, ms2Scans, ms1Table, ms2Table, commonParameters, binSize, rtShift);
+            scansWithPrecursors = XIC.GroupFragmentIons_allXICs(scansWithPrecursors, ms1Scans, ms2Scans, commonParameters, binSize, rtShift, 0.5);
 
             return scansWithPrecursors;
         }
