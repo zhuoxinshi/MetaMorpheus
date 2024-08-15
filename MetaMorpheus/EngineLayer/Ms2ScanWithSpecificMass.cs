@@ -13,7 +13,7 @@ namespace EngineLayer
     {
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, 
             string fullFilePath, CommonParameters commonParam, IsotopicEnvelope[] neutralExperimentalFragments = null,
-            double pre_RT = double.NaN, PeakCurve precursorPeak = null, List<Peak> dIAGroupingPeaks = null, 
+            double pre_RT = double.NaN, List<Peak> dIAGroupingPeaks = null, 
             double mostAbundantPrePeak = double.NaN, IsotopicEnvelope precursorEnvelope = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
@@ -25,7 +25,6 @@ namespace EngineLayer
 
             TheScan = mzLibScan;
             DIAGroupingPeaks = dIAGroupingPeaks;
-            PrecursurPeak = precursorPeak;
             Pre_RT = pre_RT;
             MostAbundantPrePeak = mostAbundantPrePeak;
             PrecursorEnvelope = precursorEnvelope;
@@ -39,10 +38,6 @@ namespace EngineLayer
             {
                 DeconvolutedMonoisotopicMasses = ExperimentalFragments.Select(p => p.MonoisotopicMass).ToArray();
             } 
-            //else if (ExperimentalFragments != null && ExperimentalFragments.Any() && commonParam.DoDIA == true)
-            //{
-            //    DeconvolutedMonoisotopicMasses = DIA_GetNeutralExperimentalFragments(commonParam, DIA_spectrum).Select(p => p.MonoisotopicMass).ToArray();
-            //}
             else
             {
                 DeconvolutedMonoisotopicMasses = new double[0];
@@ -78,56 +73,9 @@ namespace EngineLayer
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
         public double Pre_RT { get; set; }
         public List<Peak> DIAGroupingPeaks { get; set; }
-        public PeakCurve PrecursurPeak { get; set; }
-
-        public MzSpectrum DIA_spectrum { get; set; }
         public double MostAbundantPrePeak {  get; set; }
 
-        public static MzSpectrum GetDIA_spectrum(List<Peak> DIAGroupingPeaks)
-        {
-            if (DIAGroupingPeaks.Any())
-            {
-                DIAGroupingPeaks.OrderBy(P => P.Mz).ToList();
-                MzSpectrum Dia_mzSpectrum = new MzSpectrum(DIAGroupingPeaks.Select(p => p.Mz).ToArray(), DIAGroupingPeaks.Select(p => p.Intensity).ToArray(), false);
-
-                return Dia_mzSpectrum;
-            }
-            else
-            {
-                return null;
-            }
-        }
-
-        public static IsotopicEnvelope[] DIA_GetNeutralExperimentalFragments(CommonParameters commonParam, MzSpectrum Dia_mzSpectrum)
-        {
-            int minZ = 1;
-            int maxZ = 10;
-
-            var neutralExperimentalFragmentMasses = Dia_mzSpectrum.Deconvolute(Dia_mzSpectrum.Range,
-                minZ, maxZ, commonParam.DeconvolutionMassTolerance.Value, commonParam.DeconvolutionIntensityRatio).ToList();
-
-            if (commonParam.AssumeOrphanPeaksAreZ1Fragments)
-            {
-                HashSet<double> alreadyClaimedMzs = new HashSet<double>(neutralExperimentalFragmentMasses
-                    .SelectMany(p => p.Peaks.Select(v => ClassExtensions.RoundedDouble(v.mz).Value)));
-
-                for (int i = 0; i < Dia_mzSpectrum.XArray.Length; i++)
-                {
-                    double mz = Dia_mzSpectrum.XArray[i];
-                    double intensity = Dia_mzSpectrum.YArray[i];
-
-                    if (!alreadyClaimedMzs.Contains(ClassExtensions.RoundedDouble(mz).Value))
-                    {
-                        neutralExperimentalFragmentMasses.Add(new IsotopicEnvelope(
-                            new List<(double mz, double intensity)> { (mz, intensity) },
-                            mz.ToMass(1), 1, intensity, 0, 0));
-                    }
-                }
-            }
-
-            return neutralExperimentalFragmentMasses.OrderBy(p => p.MonoisotopicMass).ToArray();
-        }
-
+        
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {
             var neutralExperimentalFragmentMasses =

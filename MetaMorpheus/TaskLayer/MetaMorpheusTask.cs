@@ -172,7 +172,6 @@ namespace TaskLayer
                                 {
                                     double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
                                     var monoPeak = envelope.Peaks.OrderByDescending(p => p.intensity).First();
-                                    PeakCurve precursorPeakCurve = PeakCurve.GetPeakCurve(ms1Scans, precursorSpectrum, monoPeak.mz, commonParameters);
                                     precursors.Add((monoPeakMz, envelope.Charge, envelope));
                                 }
                             }
@@ -300,97 +299,6 @@ namespace TaskLayer
             return scansWithPrecursors;
         }
 
-        //public static List<Ms2ScanWithSpecificMass>[] _GetMs2ScansForDIA(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
-        //{
-        //    var msNScans = myMSDataFile.GetAllScansList().Where(x => x.MsnOrder > 1).ToArray();
-        //    var ms1Scans = myMSDataFile.GetAllScansList().Where(x => x.MsnOrder == 1).ToArray();
-        //    var ms2Scans = msNScans.Where(p => p.MsnOrder == 2).ToArray();
-        //    var ms3Scans = msNScans.Where(p => p.MsnOrder == 3).ToArray();
-        //    var ms2Peaks = Peak.GetAllPeaks(ms2Scans);
-
-        //    Parallel.ForEach(Partitioner.Create(0, ms2Peaks.Count), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
-        //        (partitionRange, loopState) =>
-        //        {
-        //            for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-        //            {
-        //                ms2Peaks[i].XICforDIA = PeakCurve.GetXIC(ms2Peaks[i], ms2Peaks, commonParameters);
-        //            }
-        //        });
-
-        //    List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
-
-        //    if (!ms2Scans.Any())
-        //    {
-        //        return scansWithPrecursors;
-        //    }
-
-        //    Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
-        //        (partitionRange, loopState) =>
-        //        {
-        //            List<(double, int, double, PeakCurve)> precursors = new List<(double, int, double, PeakCurve)>();
-
-        //            for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-        //            {
-        //                if (GlobalVariables.StopLoops) { break; }
-
-        //                precursors.Clear();
-        //                MsDataScan ms2scan = ms2Scans[i];
-
-        //                if (ms2scan.OneBasedPrecursorScanNumber.HasValue)
-        //                {
-        //                    MsDataScan precursorSpectrum = myMSDataFile.GetOneBasedScan(ms2scan.OneBasedPrecursorScanNumber.Value);
-
-        //                    try
-        //                    {
-        //                        ms2scan.RefineSelectedMzAndIntensity(precursorSpectrum.MassSpectrum);
-        //                    }
-        //                    catch (MzLibException ex)
-        //                    {
-        //                        Warn("Could not get precursor ion for MS2 scan #" + ms2scan.OneBasedScanNumber + "; " + ex.Message);
-        //                        continue;
-        //                    }
-
-        //                    if (ms2scan.SelectedIonMonoisotopicGuessMz.HasValue)
-        //                    {
-        //                        ms2scan.ComputeMonoisotopicPeakIntensity(precursorSpectrum.MassSpectrum);
-        //                    }
-
-        //                    if (commonParameters.DoPrecursorDeconvolution)
-        //                    {
-        //                        foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
-        //                            precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
-        //                        {
-        //                            double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
-        //                            var monoPeak = envelope.Peaks.OrderByDescending(p => p.intensity).First();
-        //                            PeakCurve precursorPeakCurve = PeakCurve.GetPeakCurve(ms1Scans, precursorSpectrum, monoPeak.mz, commonParameters);
-        //                            precursors.Add((monoPeakMz, envelope.Charge, precursorSpectrum.RetentionTime, precursorPeakCurve));
-        //                        }
-        //                    }
-        //                }
-
-        //                scansWithPrecursors[i] = new List<Ms2ScanWithSpecificMass>();
-        //                IsotopicEnvelope[] neutralExperimentalFragments = null;
-        //                if (commonParameters.DissociationType != DissociationType.LowCID)
-        //                {
-        //                    neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2scan, commonParameters);
-        //                }
-
-        //                foreach (var precursor in precursors)
-        //                {
-        //                    // assign precursor for this MS2 scan
-        //                    var scan = new Ms2ScanWithSpecificMass(ms2scan, precursor.Item1,
-        //                        precursor.Item2, fullFilePath, commonParameters, neutralExperimentalFragments, precursor.Item3, precursor.Item4);
-
-        //                    scansWithPrecursors[i].Add(scan);
-        //                }
-        //            }
-        //        });
-
-        //    scansWithPrecursors = PeakCurve.GroupPrecursorPeaksAndFragmentIonsISD(scansWithPrecursors, ms2Peaks, commonParameters);
-
-        //    return scansWithPrecursors;
-        //}
-
         public static IEnumerable<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
             var scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[] { };
@@ -456,18 +364,18 @@ namespace TaskLayer
             }
             else
             {
-                var scansWithPre = _GetMs2ScansForDIA_XIC(myMSDataFile, fullFilePath, commonParameters);
+                var scansWithPre = _GetMs2ScansForISD_XIC(myMSDataFile, fullFilePath, commonParameters);
                 return scansWithPre.Where(n => n!= null).SelectMany(s => s).OrderBy(s => s.OneBasedScanNumber).ToArray();
             }
         }
 
-        public static List<Ms2ScanWithSpecificMass>[] _GetMs2ScansForDIA_XIC(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
+        public static List<Ms2ScanWithSpecificMass>[] _GetMs2ScansForISD_XIC(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
             int binSize = 100;
             var allScans = myMSDataFile.GetAllScansList().ToArray();
             var ms1Scans = allScans.Where(x => x.MsnOrder == 1).ToArray();
             var ms2Scans = allScans.Where(x => x.MsnOrder == 2).ToArray();
-            double rtShift = XICfromLFQ.GetRTshift(allScans);
+            double rtShift = XIC.GetRTshift(allScans);
             bool averageMs1 = false;
             bool averageMs2 = true;
             bool deconvoluteMs2 = false;
@@ -529,14 +437,9 @@ namespace TaskLayer
             {
                 for (int i = 0; i < ms2Scans.Length; i++)
                 {
-                    ms2Scans[i] = XICfromLFQ.GetDeconvolutedScan(ms2Scans[i], commonParameters, commonParameters.DeconvoluteMs2Type);
+                    ms2Scans[i] = XIC.GetDeconvolutedScan(ms2Scans[i], commonParameters, commonParameters.DeconvoluteMs2Type);
                 }
             }
-
-            var ms1Peaks = Peak.GetAllPeaks(ms1Scans);
-            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
-            var ms2Peaks = Peak.GetAllPeaks(ms2Scans);
-            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
 
             List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
 
@@ -625,7 +528,7 @@ namespace TaskLayer
             var allScans = myMSDataFile.GetAllScansList().ToArray();
             var ms1Scans = allScans.Where(x => x.MsnOrder == 1).ToArray();
             var ms2Scans = allScans.Where(x => x.MsnOrder == 2).ToArray();
-            double rtShift = XICfromLFQ.GetRTshift(allScans);
+            double rtShift = XIC.GetRTshift(allScans);
             bool averageMs1 = false;
             bool averageMs2 = false;
             bool deconvoluteMs2 = true;
@@ -687,14 +590,14 @@ namespace TaskLayer
             {
                 for (int i = 0; i < ms2Scans.Length; i++)
                 {
-                    ms2Scans[i] = XICfromLFQ.GetDeconvolutedScan(ms2Scans[i], commonParameters, "withCharge");
+                    ms2Scans[i] = XIC.GetDeconvolutedScan(ms2Scans[i], commonParameters, "withCharge");
                 }
             }
 
             var ms1Peaks = Peak.GetAllPeaks(ms1Scans);
-            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
+            var ms1Table = XIC.GetXICTable(ms1Peaks, binSize);
             var ms2Peaks = Peak.GetAllPeaks(ms2Scans);
-            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
+            var ms2Table = XIC.GetXICTable(ms2Peaks, binSize);
 
             List<Ms2ScanWithSpecificMass> scansWithPrecursors = new List<Ms2ScanWithSpecificMass>();
             List<Precursor>[] isdPrecursors = new List<Precursor>[ms2Scans.Length];
@@ -792,7 +695,7 @@ namespace TaskLayer
                             MZAnalyzerType.Orbitrap, intensity.Sum(), null, null, null);
                             var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, commonParameters);
                             Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, precursor.MonoPeakMz, precursor.Charge, fullFilePath,
-                            commonParameters, neutralExperimentalFragments);
+                                commonParameters, neutralExperimentalFragments);
                             newMs2WithPre[i] = scanWithprecursor;
                         }
                         catch
@@ -805,458 +708,6 @@ namespace TaskLayer
             scansWithPrecursors = newMs2WithPre.ToList();
 
             return scansWithPrecursors;
-        }
-
-        public static List<Ms2ScanWithSpecificMass> _GetMs2Scans_FilterPrecursors_NormalMS2GroupingPeaks(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
-        {
-            int binSize = 100;
-            var allScans = myMSDataFile.GetAllScansList().ToArray();
-            var ms1Scans = allScans.Where(x => x.MsnOrder == 1).ToArray();
-            var ms2Scans = allScans.Where(x => x.MsnOrder == 2).ToArray();
-            double rtShift = XICfromLFQ.GetRTshift(allScans);
-            bool averageMs1 = false;
-            bool averageMs2 = false;
-            bool deconvoluteMs2 = false;
-
-            //average ms2
-            if (averageMs2 == true)
-            {
-                var averageParam = new SpectralAveragingParameters()
-                {
-                    OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                    SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
-                    NumberOfScansToAverage = 5,
-                    ScanOverlap = 4,
-                    NormalizationType = NormalizationType.RelativeToTics,
-                    SpectralWeightingType = SpectraWeightingType.WeightEvenly
-                };
-                var averagedMS2 = SpectraFileAveraging.AverageSpectraFile(ms2Scans.ToList(), averageParam).ToList();
-                for (int i = 0; i < ms2Scans.Length; i++)
-                {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= ms2Scans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ms2Scans[i] = averagedMS2[i - averageParam.NumberOfScansToAverage / 2];
-                    }
-                }
-            }
-
-            //average MS1
-            if (averageMs1 == true)
-            {
-                var averageParam = new SpectralAveragingParameters()
-                {
-                    OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                    SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
-                    NumberOfScansToAverage = 5,
-                    ScanOverlap = 4,
-                    NormalizationType = NormalizationType.RelativeToTics,
-                    SpectralWeightingType = SpectraWeightingType.WeightEvenly
-                };
-                var averagedMS1 = SpectraFileAveraging.AverageSpectraFile(ms1Scans.ToList(), averageParam).ToList();
-                for (int i = 0; i < ms1Scans.Length; i++)
-                {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= ms1Scans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ms1Scans[i] = averagedMS1[i - averageParam.NumberOfScansToAverage / 2];
-                    }
-                }
-            }
-
-            //deconvolute MS2
-            if (deconvoluteMs2)
-            {
-                for (int i = 0; i < ms2Scans.Length; i++)
-                {
-                    ms2Scans[i] = XICfromLFQ.GetDeconvolutedScan(ms2Scans[i], commonParameters, "withCharge");
-                }
-            }
-
-            var ms1Peaks = Peak.GetAllPeaks(ms1Scans);
-            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
-            var ms2PeaksByScans = Peak.GetAllPeaksByScan(ms2Scans);
-            var ms2Peaks = ms2PeaksByScans.Where(s => s != null).SelectMany(s => s).ToList();
-            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
-
-            List<Ms2ScanWithSpecificMass> scansWithPrecursors = new List<Ms2ScanWithSpecificMass>();
-            List<Precursor>[] isdPrecursors = new List<Precursor>[ms2Scans.Length];
-
-            Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, //max number of threads modified to use locally
-                (partitionRange, loopState) =>
-                {
-                    List<Precursor> precursors = new List<Precursor>();
-
-                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-                    {
-                        if (GlobalVariables.StopLoops) { break; }
-
-                        precursors.Clear();
-                        MsDataScan ms2scan = ms2Scans[i];
-
-                        if (ms2scan.OneBasedPrecursorScanNumber.HasValue)
-                        {
-                            //modified for averaging
-                            MsDataScan precursorSpectrum = myMSDataFile.GetOneBasedScan(ms2scan.OneBasedPrecursorScanNumber.Value);
-
-                            try
-                            {
-                                ms2scan.RefineSelectedMzAndIntensity(precursorSpectrum.MassSpectrum);
-                            }
-                            catch (MzLibException ex)
-                            {
-                                Warn("Could not get precursor ion for MS2 scan #" + ms2scan.OneBasedScanNumber + "; " + ex.Message);
-                                continue;
-                            }
-
-                            if (ms2scan.SelectedIonMonoisotopicGuessMz.HasValue)
-                            {
-                                ms2scan.ComputeMonoisotopicPeakIntensity(precursorSpectrum.MassSpectrum);
-                            }
-
-                            if (commonParameters.DoPrecursorDeconvolution)
-                            {
-                                var massList = new List<double>();
-                                foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
-                                    precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
-                                {
-                                    if (envelope.Charge <= 3 || envelope.MonoisotopicMass < 5000)
-                                    {
-                                        continue;
-                                    }
-                                    double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
-                                    var highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;
-                                    var highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).First().intensity;
-                                    precursors.Add(new Precursor(monoPeakMz, envelope.Charge, precursorSpectrum.RetentionTime, highestPeakMz, highestPeakIntensity,
-                                        envelope.MonoisotopicMass, precursorSpectrum.OneBasedScanNumber));
-                                }
-                            }
-                        }
-
-                        isdPrecursors[i] = precursors;
-                    }
-                });
-
-            var preList = isdPrecursors.SelectMany(p => p).ToList();
-            //var preGroup1 = preList.GroupBy(p => new { p.Item1, p.Item2, p.Item5 }).ToList();
-            //var preGroup2 = preList.GroupBy(p => new { p.Item1, p.Item2, p.Item5 }).ToList();
-            //var preGroup3 = preList.GroupBy(p => new { p.Item2, p.Item5 }).ToList();
-            var preGroup3 = preList.GroupBy(p => new { mz = Math.Round(p.HighestPeakMz, 2)}).ToList();
-            var preGroup4 = preList.GroupBy(p => new { p.HighestPeakMz, p.MonoisotopicMass, p.Charge}).ToList();
-            var preGroup5 = preList.GroupBy(p => new { mz = Math.Round(p.HighestPeakMz, 2), mass = Math.Round(p.MonoisotopicMass, 2) }).ToList();
-            //var precursorsToSearch = preList.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 2), charge = p.Charge })
-            //    .Select(g => new { maxIntensityPre = g.OrderByDescending(p => p.HighestPeakIntensity).First() })
-            //    .Select(g => g.maxIntensityPre).ToArray();
-            var precursorsToSearch = preList.ToArray();
-            //var preGroup7 = preList.GroupBy(p => Math.Round(p.Item5, 1)).ToList();
-
-            var newMs2WithPre = new Ms2ScanWithSpecificMass[precursorsToSearch.Length];
-            var ms2XICs = XIC.GetAllXICs(ms2Table);
-            Parallel.ForEach(Partitioner.Create(0, precursorsToSearch.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
-                (partitionRange, loopState) =>
-                {
-                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-                    {
-                        var precursor = precursorsToSearch[i];
-                        var preXIC = XIC.GetXICwithMz(ms1Table, precursor.HighestPeakMz, binSize);
-                        var targetMs2 = ms2Scans.First(s => s.OneBasedScanNumber == precursor.ScanNumber + 1);
-                        var peaks = new List<(double mz, double intensity)>();
-                        var ms2PeakCandidates = ms2PeaksByScans[targetMs2.OneBasedScanNumber].ToArray();
-                        for (int k = 0; k < ms2PeakCandidates.Length; k++)
-                        {
-                            var ms2XIC = ms2PeakCandidates[k].XIC;
-                            double corr = XICfromLFQ.CalculatePearsonCorr(preXIC.XICpeaks, ms2XIC.XICpeaks, rtShift);
-                            if (corr > 0.9)
-                            {
-                                peaks.Add((ms2PeakCandidates[k].Mz, ms2PeakCandidates[k].Intensity));
-                            }
-                        }
-                        MzSpectrum diaSpectrum = new MzSpectrum(peaks.Select(p => p.mz).ToArray(), peaks.Select(p => p.intensity).ToArray(), false);
-                        MsDataScan newScan = new MsDataScan(diaSpectrum, targetMs2.OneBasedScanNumber, targetMs2.MsnOrder, targetMs2.IsCentroid,
-                            targetMs2.Polarity, targetMs2.RetentionTime, targetMs2.ScanWindowRange, targetMs2.ScanFilter, targetMs2.MzAnalyzer,
-                            targetMs2.TotalIonCurrent, targetMs2.InjectionTime, targetMs2.NoiseData, targetMs2.NativeId,
-                            targetMs2.SelectedIonMZ, targetMs2.SelectedIonChargeStateGuess, targetMs2.SelectedIonIntensity,
-                            targetMs2.IsolationMz, targetMs2.IsolationWidth, targetMs2.DissociationType, null,
-                            targetMs2.SelectedIonMonoisotopicGuessMz, targetMs2.HcdEnergy, targetMs2.ScanDescription);
-                        var scanWithPrecursor = new Ms2ScanWithSpecificMass(newScan, precursor.MonoPeakMz, precursor.Charge, fullFilePath,
-                commonParameters, null, precursor.RT);
-                        newMs2WithPre[i] = scanWithPrecursor;
-                    }
-                });
-
-            return newMs2WithPre.ToList();
-        }
-        public static List<Ms2ScanWithSpecificMass>[] _GetMs2Scans_Ms1PeakGroup_GroupMs2XICs(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
-        {
-            int binSize = 100;
-            var allScans = myMSDataFile.GetAllScansList().ToArray();
-            var ms1Scans = allScans.Where(x => x.MsnOrder == 1).ToArray();
-            var ms2Scans = allScans.Where(x => x.MsnOrder == 2).ToArray();
-            double rtShift = XICfromLFQ.GetRTshift(allScans);
-            bool averageMs1 = false;
-            bool averageMs2 = false;
-
-            //average ms2
-            if (averageMs2 == true)
-            {
-                var averageParam = new SpectralAveragingParameters()
-                {
-                    OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                    SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
-                    NumberOfScansToAverage = 5,
-                    ScanOverlap = 4,
-                    NormalizationType = NormalizationType.RelativeToTics,
-                    SpectralWeightingType = SpectraWeightingType.WeightEvenly
-                };
-                var averagedMS2 = SpectraFileAveraging.AverageSpectraFile(ms2Scans.ToList(), averageParam).ToList();
-                for (int i = 0; i < ms2Scans.Length; i++)
-                {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= ms2Scans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ms2Scans[i] = averagedMS2[i - averageParam.NumberOfScansToAverage / 2];
-                    }
-                }
-            }
-
-            //average MS1
-            if (averageMs1 == true)
-            {
-                var averageParam = new SpectralAveragingParameters()
-                {
-                    OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                    SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
-                    NumberOfScansToAverage = 5,
-                    ScanOverlap = 4,
-                    NormalizationType = NormalizationType.RelativeToTics,
-                    SpectralWeightingType = SpectraWeightingType.WeightEvenly
-                };
-                var averagedMS1 = SpectraFileAveraging.AverageSpectraFile(ms1Scans.ToList(), averageParam).ToList();
-                for (int i = 0; i < ms1Scans.Length; i++)
-                {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= ms1Scans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ms1Scans[i] = averagedMS1[i - averageParam.NumberOfScansToAverage / 2];
-                    }
-                }
-            }
-
-            var ms1Peaks = Peak.GetAllPeaks(ms1Scans);
-            var ms1Table = XICfromLFQ.GetXICTable(ms1Peaks, binSize);
-            var ms2Peaks = Peak.GetAllPeaks(ms2Scans);
-            var ms2Table = XICfromLFQ.GetXICTable(ms2Peaks, binSize);
-
-            //Construct Ms1 Groups
-            var allXICs = XIC.GetAllXICs_LFQ(ms1Peaks, ms1Scans, ms1Table, new PpmTolerance(20), binSize).OrderBy(x => x.ApexRT).ToArray();
-            var filteredXICs = allXICs.Where(x => x.XICpeaks.Count >= 10).OrderBy(x => x.AveragedMz).ToList();
-            var allGroups = XICgroup.FindAllGroups2(filteredXICs.ToList(), 8, 0.7);
-            var filteredGroups = allGroups.Where(g => g.XIClist.Count >= 5).ToArray();
-            var newMs1Spectra = XICgroup.GenerateNewMs1(filteredGroups.ToList()).ToArray();
-
-            List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[filteredGroups.Length];
-
-            var ms2XICs = XIC.GetAllXICs_LFQ(ms2Peaks, ms2Scans, ms2Table, commonParameters.ProductMassTolerance, binSize);
-            Parallel.ForEach(Partitioner.Create(0, filteredGroups.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
-                (partitionRange, loopState) =>
-                {
-                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-                    {
-                        var precursorXIC = filteredGroups[i].ReferenceXIC;
-                        var fragmentXICs = XIC.GroupFragmentXIC(precursorXIC, ms2XICs, 0.3, rtShift, 0.7);
-                        var peaks = new List<(double mz, double intensity)>();
-                        foreach (var xic in fragmentXICs)
-                        {
-                            peaks.Add((xic.AveragedMz, xic.AveragedIntensity));
-                        }
-                        double[] mz = peaks.OrderBy(p => p.mz).Select(p => p.mz).ToArray();
-                        double[] intensity = peaks.OrderBy(p => p.mz).Select(p => p.intensity).ToArray();
-                        var spectrum = new MzSpectrum(mz, intensity, false);
-                       
-                        int scanNumber = precursorXIC.ApexScanNumber + 1;
-                        var newMs2Scan = new MsDataScan(spectrum, scanNumber, 2, true, Polarity.Positive, double.NaN, new MzRange(mz.Min(), mz.Max()), null,
-                        MZAnalyzerType.Orbitrap, intensity.Sum(), null, null, null);
-                        scansWithPrecursors[i] = new List<Ms2ScanWithSpecificMass>();
-                        var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, commonParameters);
-                        foreach (IsotopicEnvelope envelope in Deconvoluter.Deconvolute(newMs1Spectra[i], commonParameters.PrecursorDeconvolutionParameters))
-                        {
-                            double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
-                            Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoPeakMz, envelope.Charge, fullFilePath,
-                            commonParameters, neutralExperimentalFragments);
-                            scansWithPrecursors[i].Add(scanWithprecursor);
-                        }
-                    }
-                });
-
-            return scansWithPrecursors;
-        }
-
-        public static List<Ms2ScanWithSpecificMass>[] _GetMs2Scans_DeconvoluteMs2(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
-        {
-            int binSize = 100;
-            var allScans = myMSDataFile.GetAllScansList().ToArray();
-            var ms1Scans = allScans.Where(x => x.MsnOrder == 1).ToArray();
-            var ms2Scans = allScans.Where(x => x.MsnOrder == 2).ToArray();
-
-            //check number of peaks
-            var peakNumRaw = ms2Scans.Sum(s => s.MassSpectrum.Size);
-
-            double rtShift = XICfromLFQ.GetRTshift(allScans);
-            bool averageMs1 = false;
-            bool averageMs2 = false;
-
-            //average ms2
-            if (averageMs2 == true)
-            {
-                var averageParam = new SpectralAveragingParameters()
-                {
-                    OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                    SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
-                    NumberOfScansToAverage = 5,
-                    ScanOverlap = 4,
-                    NormalizationType = NormalizationType.RelativeToTics,
-                    SpectralWeightingType = SpectraWeightingType.WeightEvenly
-                };
-                var averagedMS2 = SpectraFileAveraging.AverageSpectraFile(ms2Scans.ToList(), averageParam).ToList();
-                for (int i = 0; i < ms2Scans.Length; i++)
-                {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= ms2Scans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ms2Scans[i] = averagedMS2[i - averageParam.NumberOfScansToAverage / 2];
-                    }
-                }
-            }
-
-            //average MS1
-            if (averageMs1 == true)
-            {
-                var averageParam = new SpectralAveragingParameters()
-                {
-                    OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                    SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
-                    NumberOfScansToAverage = 5,
-                    ScanOverlap = 4,
-                    NormalizationType = NormalizationType.RelativeToTics,
-                    SpectralWeightingType = SpectraWeightingType.WeightEvenly
-                };
-                var averagedMS1 = SpectraFileAveraging.AverageSpectraFile(ms1Scans.ToList(), averageParam).ToList();
-                for (int i = 0; i < ms1Scans.Length; i++)
-                {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= ms1Scans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        ms1Scans[i] = averagedMS1[i - averageParam.NumberOfScansToAverage / 2];
-                    }
-                }
-            }
-
-            for (int i = 0; i < ms2Scans.Length; i++)
-            {
-                ms2Scans[i] = XICfromLFQ.GetDeconvolutedScan(ms2Scans[i], commonParameters, "withCharge");
-            }
-
-
-            //check number of peaks
-            //var newPeakNum = ms2Peaks.Count;
-
-            List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
-
-            if (!ms2Scans.Any())
-            {
-                return scansWithPrecursors;
-            }
-
-            Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally
-                (partitionRange, loopState) =>
-                {
-                    List<(double, int, double, double)> precursors = new List<(double, int, double, double)>();
-
-                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-                    {
-                        if (GlobalVariables.StopLoops) { break; }
-
-                        precursors.Clear();
-                        MsDataScan ms2scan = ms2Scans[i];
-
-                        if (ms2scan.OneBasedPrecursorScanNumber.HasValue)
-                        {
-                            //modified for averaging
-                            MsDataScan precursorSpectrum = myMSDataFile.GetOneBasedScan(ms2scan.OneBasedPrecursorScanNumber.Value);
-
-                            try
-                            {
-                                ms2scan.RefineSelectedMzAndIntensity(precursorSpectrum.MassSpectrum);
-                            }
-                            catch (MzLibException ex)
-                            {
-                                Warn("Could not get precursor ion for MS2 scan #" + ms2scan.OneBasedScanNumber + "; " + ex.Message);
-                                continue;
-                            }
-
-                            if (ms2scan.SelectedIonMonoisotopicGuessMz.HasValue)
-                            {
-                                ms2scan.ComputeMonoisotopicPeakIntensity(precursorSpectrum.MassSpectrum);
-                            }
-
-                            if (commonParameters.DoPrecursorDeconvolution)
-                            {
-                                var massList = new List<double>();
-                                foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
-                                    precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
-                                {
-                                    if (envelope.Charge <= 3)
-                                    {
-                                        continue;
-                                    }
-                                    if (envelope.MonoisotopicMass <= 8000)
-                                    {
-                                        continue;
-                                    }
-                                    //massList.Add(envelope.MonoisotopicMass);
-                                    double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
-                                    var highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;
-                                    var highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).First().intensity;
-                                    //precursors.Add((monoPeakMz, envelope.Charge, precursorSpectrum.RetentionTime, highestPeakMz, envelope.MonoisotopicMass));
-                                    precursors.Add((monoPeakMz, envelope.Charge, precursorSpectrum.RetentionTime, highestPeakMz));
-                                }
-                            }
-                        }
-                        scansWithPrecursors[i] = new List<Ms2ScanWithSpecificMass>();
-                        IsotopicEnvelope[] neutralExperimentalFragments = null;
-
-                        foreach (var precursor in precursors)
-                        {
-                            // assign precursor for this MS2 scan
-                            var scan = new Ms2ScanWithSpecificMass(ms2scan, precursor.Item1,
-                                precursor.Item2, fullFilePath, commonParameters, neutralExperimentalFragments, precursor.Item3, mostAbundantPrePeak: precursor.Item4);
-
-                            scansWithPrecursors[i].Add(scan);
-                        }
-                    }
-                });
-
-            var scansWithPrecursors2 = XIC.GroupFragmentIons_allXICs(scansWithPrecursors, ms1Scans, ms2Scans, commonParameters, binSize, rtShift, 0.5);
-
-            return scansWithPrecursors2;
         }
 
         public static List<Ms2ScanWithSpecificMass> GetMs2ScansWrapByScanNum(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters, out List<List<(double, int, double)>> precursors)

@@ -38,10 +38,9 @@ namespace Test.TestISD
             MyFileManager myFileManager = new MyFileManager(true);
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.DoDIA = true;
-            task.CommonParameters.DeconvoluteMs2Type = "mono";
+            task.CommonParameters.DeconvoluteMs2Type = "none";
             //task.SearchParameters.WriteSpectralLibrary = true;
             var myMsDataFile = myFileManager.LoadFile(filePath1, task.CommonParameters);
-            //var testScans = MetaMorpheusTask._GetMs2Scans_DeconvoluteMs2(myMsDataFile, filePath, task.CommonParameters);
             string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis\Search results\1pmol_5uL_ISD_RT32.16-35.59_GetMs2Scans_allXICs_no-tolerance_corr0.5_deconMS2mono";
             if (!Directory.Exists(outputFolder))
             {
