@@ -365,7 +365,8 @@ namespace TaskLayer
             else
             {
                 var scansWithPre = _GetMs2ScansForISD_XIC(myMSDataFile, fullFilePath, commonParameters);
-                return scansWithPre.Where(n => n!= null).SelectMany(s => s).OrderBy(s => s.OneBasedScanNumber).ToArray();
+                var sortedScansWithPre = scansWithPre.Where(n => n != null).SelectMany(s => s).OrderBy(s => s.OneBasedScanNumber).ToArray();
+                return sortedScansWithPre;
             }
         }
 
@@ -656,20 +657,13 @@ namespace TaskLayer
                     }
                 });
 
+            //Filter precursors to reduce the run time
             var preList = isdPrecursors.SelectMany(p => p).ToList();
-            //var preGroup1 = preList.GroupBy(p => new { p.Item1, p.Item2, p.Item5 }).ToList();
-            //var preGroup2 = preList.GroupBy(p => new { p.Item1, p.Item2, p.Item5 }).ToList();
-            //var preGroup3 = preList.GroupBy(p => new { p.Item2, p.Item5 }).ToList();
-            //var preGroup4 = preList.GroupBy(p => Math.Round(p.Item5, 2)).ToList();
-            //var preGroup5 = preList.GroupBy(p => new { mz = Math.Round(p.HighestPeakMz, 2), masss = Math.Round(p.MonoisotopicMass, 2) }).ToList();
-            //var precursorsToSearch = preList.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 2), charge = p.Charge })
-                //.Select(g => new { maxIntensityPre = g.OrderByDescending(p => p.HighestPeakIntensity).First() })
-                //.Select(g => g.maxIntensityPre).ToArray();
             var precursorsToSearch = preList.GroupBy(p => new { mz = Math.Round(p.HighestPeakMz, 2), mass = Math.Round(p.MonoisotopicMass, 2) })
                 .Select(g => new { maxIntensityPre = g.OrderByDescending(p => p.HighestPeakIntensity).First() })
                 .Select(g => g.maxIntensityPre).ToArray();
-            //var preGroup7 = preList.GroupBy(p => Math.Round(p.Item5, 1)).ToList();
 
+            //make new scans of Ms2WithSpecificMass: group each precursor XIC with the fragment XICs, take the average mz and intensity of the fragment XICs to make a new scan 
             var newMs2WithPre = new Ms2ScanWithSpecificMass[precursorsToSearch.Length];
             var ms2XICs = XIC.GetAllXICs(ms2Table);
             Parallel.ForEach(Partitioner.Create(0, precursorsToSearch.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 }, //max number of threads modified to use locally

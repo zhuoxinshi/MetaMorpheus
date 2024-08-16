@@ -25,8 +25,7 @@ namespace EngineLayer
         public double Intensity { get; set; }
         public double RT { get; set; }
         public int ScanNumber { get; set; }
-        public int Index { get; set; }
-        public PeakCurve XICforDIA { get; set; }   
+        public int Index { get; set; }  
         public int MsLevel { get; set; }
         public List<Peak> XICpeaks {  get; set; }
         public double ApexRT {  get; set; }

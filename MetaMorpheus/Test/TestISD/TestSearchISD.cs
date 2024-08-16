@@ -41,7 +41,7 @@ namespace Test.TestISD
             task.CommonParameters.DeconvoluteMs2Type = "none";
             //task.SearchParameters.WriteSpectralLibrary = true;
             var myMsDataFile = myFileManager.LoadFile(filePath1, task.CommonParameters);
-            string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis\Search results\1pmol_5uL_ISD_RT32.16-35.59_GetMs2Scans_allXICs_no-tolerance_corr0.5_deconMS2mono";
+            string outputFolder = @"E:\ISD Project\TestIsdDataAnalysis\Search results\1pmol_5uL_ISD_RT32.16-35.59_test";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);

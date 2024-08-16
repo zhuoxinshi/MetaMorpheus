@@ -244,6 +244,7 @@ namespace EngineLayer.ISD
             return corr;
         }
         
+        //Group precursor ion with fragment ions
         public static List<Ms2ScanWithSpecificMass>[] GroupFragmentIons_allXICs(List<Ms2ScanWithSpecificMass>[] scansWithPrecursors, MsDataScan[] ms1scans, MsDataScan[] ms2scans, CommonParameters commonParameters, int binSize, double rtShift, double corrCutOff)
         {
             var ms1Peaks = Peak.GetAllPeaks(ms1scans);
@@ -282,11 +283,23 @@ namespace EngineLayer.ISD
                                     }
                                 }
                                 MzSpectrum diaSpectrum = new MzSpectrum(peaks.Select(p => p.mz).ToArray(), peaks.Select(p => p.intensity).ToArray(), false);
+                                //if (commonParameters.DeconvoluteMs2Type == "withCharge" || commonParameters.DeconvoluteMs2Type == "none")
+                                //{
+                                //    var neutralFragments = Deconvoluter.Deconvolute(diaSpectrum, commonParameters.ProductDeconvolutionParameters, diaSpectrum.Range).ToArray();
+                                //    var newMs2WithPre = new Ms2ScanWithSpecificMass(targetScan.TheScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath,
+                                //        commonParameters, neutralFragments, targetScan.Pre_RT, mostAbundantPrePeak: targetScan.MostAbundantPrePeak);
+                                //    scansWithPrecursors[i][j] = newMs2WithPre;
+                                //}
+                                MsDataScan newScan = new MsDataScan(diaSpectrum, targetScan.TheScan.OneBasedScanNumber, targetScan.TheScan.MsnOrder, targetScan.TheScan.IsCentroid,
+                        targetScan.TheScan.Polarity, targetScan.TheScan.RetentionTime, targetScan.TheScan.ScanWindowRange, targetScan.TheScan.ScanFilter, targetScan.TheScan.MzAnalyzer,
+                        targetScan.TheScan.TotalIonCurrent, targetScan.TheScan.InjectionTime, targetScan.TheScan.NoiseData, targetScan.TheScan.NativeId,
+                        targetScan.TheScan.SelectedIonMZ, targetScan.TheScan.SelectedIonChargeStateGuess, targetScan.TheScan.SelectedIonIntensity,
+                        targetScan.TheScan.IsolationMz, targetScan.TheScan.IsolationWidth, targetScan.TheScan.DissociationType, null,
+                        targetScan.TheScan.SelectedIonMonoisotopicGuessMz, targetScan.TheScan.HcdEnergy, targetScan.TheScan.ScanDescription);
                                 if (commonParameters.DeconvoluteMs2Type == "withCharge" || commonParameters.DeconvoluteMs2Type == "none")
                                 {
-                                    var neutralFragments = Deconvoluter.Deconvolute(diaSpectrum, commonParameters.ProductDeconvolutionParameters, diaSpectrum.Range).ToArray();
-                                    var newMs2WithPre = new Ms2ScanWithSpecificMass(targetScan.TheScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath,
-                                        commonParameters, neutralFragments, targetScan.Pre_RT, mostAbundantPrePeak: targetScan.MostAbundantPrePeak);
+                                    var newMs2WithPre = new Ms2ScanWithSpecificMass(newScan, targetScan.PrecursorMonoisotopicPeakMz, targetScan.PrecursorCharge, targetScan.FullFilePath,
+                        commonParameters, null, targetScan.Pre_RT, mostAbundantPrePeak: targetScan.MostAbundantPrePeak);
                                     scansWithPrecursors[i][j] = newMs2WithPre;
                                 }
                                 if (commonParameters.DeconvoluteMs2Type == "mono")
@@ -398,6 +411,7 @@ namespace EngineLayer.ISD
             return allPeaks;
         }
 
+        //Take the deconvoluted peaks and make a new scan
         public static MsDataScan GetDeconvolutedScan(MsDataScan scan, CommonParameters commonParameters, string type)
         {
             var peaks = GetDeconvolutedPeaks(scan, commonParameters, type).OrderBy(p => p.Mz).ToList();
@@ -411,6 +425,7 @@ namespace EngineLayer.ISD
             return newScan;
         }
 
+        //Calculate the average RT interval between MS1 and ISD scans to match the RTs
         public static double GetRTshift(MsDataScan[] allScans)
         {
             List<double> rtShift = new List<double>();
