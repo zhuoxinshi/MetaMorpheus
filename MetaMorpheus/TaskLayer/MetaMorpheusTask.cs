@@ -370,6 +370,8 @@ namespace TaskLayer
             }
         }
 
+        //Method 1: Deconvolute ms2 scans as usual to get all the precursors and copies of MS2WithSpecificMass. For each MS2WithSpecificMass, group the precursor ion with the fragments
+        //using XIC correlations.
         public static List<Ms2ScanWithSpecificMass>[] _GetMs2ScansForISD_XIC(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
             int binSize = 100;
@@ -523,6 +525,8 @@ namespace TaskLayer
             return scansWithPrecursors;
         }
 
+        //Method 2: Deconvolute ms2 scans to get all the precursors and do some filtering to reduce the number of precursors to search. For each filtered precursor, find fragment ions correlated
+        //with the precursor based on XIC, take the averaged mz and intensity of fragment XICs to make a new MS2WithSpecificMass for search.
         public static List<Ms2ScanWithSpecificMass> _GetMs2Scans_FilterPrecursors_GroupMs2XICs(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
             int binSize = 100;
