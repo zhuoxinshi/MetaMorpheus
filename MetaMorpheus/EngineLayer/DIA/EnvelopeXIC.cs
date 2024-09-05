@@ -1,0 +1,22 @@
+﻿using FlashLFQ;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace EngineLayer.DIA
+{
+    public class EnvelopeXIC
+    {
+        public EnvelopeXIC()
+        {
+
+        }
+
+        public Dictionary<double, IsotopicEnvelope> EnvelopeRtMap { get; set; }
+        public double MonoisotopicMass {  get; set; }
+        public int Charge { get; set; }
+
+    }
+}

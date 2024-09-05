@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Nett;
 using Omics.Fragmentation.Peptide;
+using EngineLayer.DIA;
 
 namespace EngineLayer
 {
@@ -185,6 +186,8 @@ namespace EngineLayer
         public DissociationType MS3ChildScanDissociationType { get; private set; }
 
         public bool UseMostAbundantPrecursorIntensity { get; set; }
+
+        public DIAparameters DIAparameters { get; set; }
         
         public CommonParameters Clone()
         {

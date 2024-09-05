@@ -21,6 +21,7 @@ using Omics.SpectrumMatch;
 using SpectralAveraging;
 using UsefulProteomicsDatabases;
 using Easy.Common.Extensions;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -321,6 +322,13 @@ namespace TaskLayer
 
         public static IEnumerable<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
+            if (commonParameters.DIAparameters != null)
+            {
+                var diaEngine = new DIAEngine(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                diaEngine.GetPseudoMS2Scans();
+                var scansWithPre = diaEngine.PseudoMs2WithPre;
+                return scansWithPre;
+            }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);
 
             if (scansWithPrecursors.Length == 0)

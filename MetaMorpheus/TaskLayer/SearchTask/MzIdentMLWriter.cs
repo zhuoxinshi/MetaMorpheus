@@ -412,17 +412,19 @@ namespace TaskLayer
                 {
                     peptide_ids[p.FullSequence].Item2.Add("SII_" + scan_result_scan_item.Item1 + "_" + scan_result_scan_item.Item2);
                 }
-                _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2] = new mzIdentML110.Generated.SpectrumIdentificationItemType()
+                try
                 {
-                    rank = 1,
-                    chargeState = psm.ScanPrecursorCharge,
-                    id = "SII_" + scan_result_scan_item.Item1 + "_" + scan_result_scan_item.Item2,
-                    experimentalMassToCharge = Math.Round(psm.ScanPrecursorMonoisotopicPeakMz, 5),
-                    passThreshold = psm.FdrInfo.QValue <= 0.01,
-                    //NOTE:ONLY CAN HAVE ONE PEPTIDE REF PER SPECTRUM IDENTIFICATION ITEM
-                    peptide_ref = "P_" + peptide_ids[psm.FullSequence].Item1,
-                    PeptideEvidenceRef = new mzIdentML110.Generated.PeptideEvidenceRefType[psm.BestMatchingBioPolymersWithSetMods.Select(p => p.Peptide).Distinct().Count()],
-                    cvParam = new mzIdentML110.Generated.CVParamType[2]
+                    _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2] = new mzIdentML110.Generated.SpectrumIdentificationItemType()
+                    {
+                        rank = 1,
+                        chargeState = psm.ScanPrecursorCharge,
+                        id = "SII_" + scan_result_scan_item.Item1 + "_" + scan_result_scan_item.Item2,
+                        experimentalMassToCharge = Math.Round(psm.ScanPrecursorMonoisotopicPeakMz, 5),
+                        passThreshold = psm.FdrInfo.QValue <= 0.01,
+                        //NOTE:ONLY CAN HAVE ONE PEPTIDE REF PER SPECTRUM IDENTIFICATION ITEM
+                        peptide_ref = "P_" + peptide_ids[psm.FullSequence].Item1,
+                        PeptideEvidenceRef = new mzIdentML110.Generated.PeptideEvidenceRefType[psm.BestMatchingBioPolymersWithSetMods.Select(p => p.Peptide).Distinct().Count()],
+                        cvParam = new mzIdentML110.Generated.CVParamType[2]
                     {
                         new mzIdentML110.Generated.CVParamType
                         {
@@ -439,7 +441,12 @@ namespace TaskLayer
                             value = psm.FdrInfo.QValue.ToString()
                         }
                     }
-                };
+                    };
+                } catch
+                {
+
+                }
+                
                 if (psm.BioPolymerWithSetModsMonoisotopicMass.HasValue)
                 {
                     _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2].calculatedMassToCharge = Math.Round(psm.BioPolymerWithSetModsMonoisotopicMass.Value.ToMz(psm.ScanPrecursorCharge), 5);

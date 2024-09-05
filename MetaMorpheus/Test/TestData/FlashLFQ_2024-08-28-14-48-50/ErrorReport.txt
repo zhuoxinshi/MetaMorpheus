@@ -1,0 +1,12 @@
+FlashLFQ version: 1.2.6.299
+Data files were processed on a computer running Microsoft Windows 10.0.22631 with a 64-bit Intel(R) Core(TM) i9-10900X CPU @ 3.70GHz processor with 20 threads and 64GB installed RAM.
+.NET version: .NET 6.0.26
+e: System.Collections.Generic.KeyNotFoundException: The given key 'smallCalibrate' was not present in the dictionary.
+   at Util.PsmReader.ReadPsms(String filepath, Boolean silent, List`1 rawfiles) in C:\projects\flashlfq\Util\PsmReader.cs:line 103
+   at GUI.MainWindow.RunFlashLfq() in C:\projects\flashlfq\GUI\MainWindow.xaml.cs:line 500
+e.Message: The given key 'smallCalibrate' was not present in the dictionary.
+e.Data: System.Collections.ListDictionaryInternal
+e.Source: System.Private.CoreLib
+e.StackTrace:    at Util.PsmReader.ReadPsms(String filepath, Boolean silent, List`1 rawfiles) in C:\projects\flashlfq\Util\PsmReader.cs:line 103
+   at GUI.MainWindow.RunFlashLfq() in C:\projects\flashlfq\GUI\MainWindow.xaml.cs:line 500
+e.TargetSite: Void ThrowKeyNotFoundException[T](T)
