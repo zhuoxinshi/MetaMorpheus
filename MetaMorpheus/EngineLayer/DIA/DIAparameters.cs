@@ -16,8 +16,9 @@ namespace EngineLayer.DIA
         public int PeakSearchBinSize {  get; set; }
         public double OverlapRatioCutOff {  get; set; }
         public double CorrelationCutOff {  get; set; }
+        public double ApexRtTolerance { get; set; }
 
-        public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, double overlapRatioCutOff, double correlationCutOff)
+        public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -25,6 +26,7 @@ namespace EngineLayer.DIA
             PeakSearchBinSize = binSize;
             OverlapRatioCutOff = overlapRatioCutOff;
             CorrelationCutOff = correlationCutOff;
+            ApexRtTolerance = apexRtTolerance;
         }
 
     }

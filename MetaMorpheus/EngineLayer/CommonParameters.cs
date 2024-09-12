@@ -172,8 +172,9 @@ namespace EngineLayer
         public double? WindowWidthThomsons { get; private set; }
         public int? NumberOfWindows { get; private set; }
         public bool NormalizePeaksAccrossAllWindows { get; private set; }
-        public bool TrimMs1Peaks { get; private set; }
-        public bool TrimMsMsPeaks { get; private set; }
+        //changed private set to public for DIA
+        public bool TrimMs1Peaks { get; set; }
+        public bool TrimMsMsPeaks { get; set; }
         public List<ProductType> CustomIons { get; private set; }
         public bool AssumeOrphanPeaksAreZ1Fragments { get; private set; }
         public int MaxHeterozygousVariants { get; private set; }

@@ -716,7 +716,6 @@ namespace TaskLayer
                 {
                     output.WriteLine(x.ToString());
                 }
-
             }
         }
 

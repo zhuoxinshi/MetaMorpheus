@@ -9,10 +9,11 @@ namespace EngineLayer.DIA
 {
     public class PrecursorFragmentPair
     {
-        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag)
+        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag, double corr)
         {
             PrecursorPeakCurve = pre;
             FragmentPeakCurve = frag;
+            Correlation = corr;
         }
 
         public PeakCurve PrecursorPeakCurve { get; set; }

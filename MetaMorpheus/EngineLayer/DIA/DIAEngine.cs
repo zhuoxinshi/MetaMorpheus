@@ -2,6 +2,7 @@
 using MassSpectrometry;
 using MzLibUtil;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -71,6 +72,7 @@ namespace EngineLayer.DIA
             var allMs1Scans = MyMSDataFile.GetMS1Scans().ToArray();
             var allMs1PeakCurves = PeakCurve.GetMs1PeakCurves(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
             //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves(allMs1Scans, DIAparameters, CommonParameters);
+            //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves_isotope(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
             Ms1PeakCurves = allMs1PeakCurves.Where(c => c.Peaks.Count >= 5).ToList();
 
             //for debug
@@ -91,15 +93,16 @@ namespace EngineLayer.DIA
                 var ms2scans = ms2Group.Value.ToArray();
                 MzRange range = ms2scans[0].IsolationRange;
                 var allMs2Peaks = Peak.GetAllPeaks(ms2scans, DIAparameters.PeakSearchBinSize);
+                var rankedMs2Peaks = allMs2Peaks.OrderByDescending(p => p.Intensity).ToList();
                 var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparameters.PeakSearchBinSize);
                 ms2PeakCurves[range] = new List<PeakCurve>();
-                foreach(var peak in allMs2Peaks)
+                foreach(var peak in rankedMs2Peaks)
                 {
                     if (peak.PeakCurve == null)
                     {
                         var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
                             DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
-                        if (newPeakCurve.Peaks.Count >= 5)
+                        if (newPeakCurve.Peaks.Count > 4)
                         {
                             ms2PeakCurves[range].Add(newPeakCurve);
                         }
@@ -114,27 +117,36 @@ namespace EngineLayer.DIA
             PFgroups = new List<PrecursorFragmentsGroup> ();
             foreach(var ms2group in Ms2PeakCurves)
             {
-                var precursorsInRange = Ms1PeakCurves.Where(c => c.MzRange.IsOverlapping(ms2group.Key));
-                foreach(var precursor in precursorsInRange)
+                var precursorsInRange = Ms1PeakCurves.Where(c => c.MzRange.IsOverlapping(ms2group.Key)).ToArray();
+
+                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 },
+                (partitionRange, loopState) =>
                 {
-                    var preFragGroup = new PrecursorFragmentsGroup(precursor);
-                    foreach(var ms2curve in ms2group.Value)
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
-                        if (ms2curve.ApexRT >= precursor.StartRT && ms2curve.ApexRT <= precursor.EndRT)
+                        var precursor = precursorsInRange[i];
+                        var preFragGroup = new PrecursorFragmentsGroup(precursor);
+                        foreach (var ms2curve in ms2group.Value)
                         {
-                            double corr = PeakCurve.CalculateCorr(precursor, ms2curve);
-                            if (corr > DIAparameters.CorrelationCutOff)
+                            if (ms2curve.ApexRT >= precursor.StartRT && ms2curve.ApexRT <= precursor.EndRT)
                             {
-                                var PFpair = new PrecursorFragmentPair(precursor, ms2curve);
-                                preFragGroup.PFpairs.Add(PFpair);
+                                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
+                                {
+                                    double corr = PeakCurve.CalculateCorr_spline(precursor, ms2curve, "cubic", 0.005);
+                                    if (corr > DIAparameters.CorrelationCutOff)
+                                    {
+                                        var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
+                                        preFragGroup.PFpairs.Add(PFpair);
+                                    }
+                                }
                             }
                         }
+                        if (preFragGroup.PFpairs.Count > 0)
+                        {
+                            PFgroups.Add(preFragGroup);
+                        }
                     }
-                    if (preFragGroup.PFpairs.Count > 0)
-                    {
-                        PFgroups.Add(preFragGroup);
-                    }
-                }
+                });
             }
             //debug
             var rankedPFgroups = PFgroups.OrderByDescending(pf => pf.PFpairs.Count).ToList();

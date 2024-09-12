@@ -8,6 +8,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Plotly.NET;
+using MathNet.Numerics;
+using MathNet.Numerics.Interpolation;
+using System.Numerics;
+
 namespace EngineLayer.DIA
 {
     public class PeakCurve
@@ -38,6 +42,8 @@ namespace EngineLayer.DIA
         public double TotalIntensity => Peaks.Sum(p => p.Intensity);
         public double AveragedMz => AverageMz();
         public double AveragedIntensity => AverageIntensity();
+        public LinearSpline LinearSpline { get; set; }
+        public CubicSpline CubicSpline { get; set; }    
 
         public double AverageMz()
         {
@@ -62,6 +68,45 @@ namespace EngineLayer.DIA
                 averagedIntensity += weight * peak.Intensity;
             }
             return averagedIntensity;
+        }
+
+        public void GetLinearSpline()
+        {
+            var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
+            var rtArray = sortedPeaks.Select(p => p.RetentionTime).ToArray();
+            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
+            var linearSpline = LinearSpline.InterpolateSorted(rtArray, intensityArray);
+            this.LinearSpline = linearSpline;
+
+            //plot
+            //var rtSeq = new List<double>();
+            //var intensities = new List<double>();
+            //for (double i = StartRT; i < EndRT; i += 0.0001)
+            //{
+            //    rtSeq.Add(i);
+            //}
+            //foreach(var rt in rtSeq)
+            //{
+            //    intensities.Add(linearSpline.Interpolate(rt));
+            //}
+
+            //var plot1 = Chart2D.Chart.Point<double, double, string>(
+            //    x: Peaks.Select(p => p.RetentionTime),
+            //    y: Peaks.Select(p => p.Intensity)).WithTraceInfo("original").WithMarkerStyle(Color: Color.fromString("red"));
+            //var plot2 = Chart2D.Chart.Point<double, double, string>(
+            //    x: rtSeq,
+            //    y: intensities).WithTraceInfo("interpolate").WithMarkerStyle(Color: Color.fromString("blue"));
+            //var combinedPlot = Chart.Combine(new[] { plot1, plot2 });
+            //combinedPlot.Show();
+        }
+
+        public void GetCubicSpline()
+        {
+            var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
+            var rtArray = sortedPeaks.Select(p => p.RetentionTime).ToArray();
+            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
+            var cubicSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
+            this.CubicSpline = cubicSpline;
         }
 
         public static Peak GetPeakFromScan(double targetMz, List<Peak>[] peakTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
@@ -128,7 +173,6 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
-
                 m--;
             }
 
@@ -152,7 +196,7 @@ namespace EngineLayer.DIA
             int missedScans = 0;
             for (int t = targetPeak.ZeroBasedScanIndex + 1; t < scans.Length; t++)
             {
-                var peak = GetPeakFromScan(targetPeak.Mz, peakTable, t, mzTolerance, binSize);
+                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
 
                 if (peak == null)
                 {
@@ -160,7 +204,8 @@ namespace EngineLayer.DIA
                 }
                 else if (peak != null)
                 {
-                    if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
+                    //if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
+                    if(peak.PeakCurve == null)
                     {
                         missedScans = 0;
                         xic.Add(peak);
@@ -182,7 +227,7 @@ namespace EngineLayer.DIA
             missedScans = 0;
             for (int t = targetPeak.ZeroBasedScanIndex - 1; t >= 0; t--)
             {
-                var peak = GetPeakFromScan(targetPeak.Mz, peakTable, t, mzTolerance, binSize);
+                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
 
                 if (peak == null)
                 {
@@ -190,7 +235,8 @@ namespace EngineLayer.DIA
                 }
                 else if (peak != null)
                 {
-                    if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
+                    //if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
+                    if(peak.PeakCurve == null)
                     {
                         missedScans = 0;
                         xic.Add(peak);
@@ -212,7 +258,15 @@ namespace EngineLayer.DIA
             return newPeakCurve;
         }
 
-        public static double CalculateCorr(PeakCurve peakCurve1,  PeakCurve peakCurve2)
+        public static PeakCurve FindPeakCurve_mz(double targetMz, int zeroBasedScanIndex, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
+            , Tolerance mzTolerance, int binSize)
+        {
+            var targetPeak = GetPeakFromScan(targetMz,  peakTable, zeroBasedScanIndex, mzTolerance, binSize);
+            var pc = FindPeakCurve(targetPeak, peakTable, scans, isolationWindow, maxMissedScans, mzTolerance, binSize);
+            return pc;
+        }
+
+        public static double CalculatePeakCurveCorr(PeakCurve peakCurve1,  PeakCurve peakCurve2)
         {
             var peakList1 = peakCurve1.Peaks.ToArray();
             var peakList2 = peakCurve2.Peaks.ToArray();
@@ -273,6 +327,62 @@ namespace EngineLayer.DIA
             }
         }
 
+        public static double CalculateCorr_spline(PeakCurve peakCurve1, PeakCurve peakCurve2, string splineType, double timeInterval)
+        {
+            if (peakCurve2.Peaks.Count <3 || peakCurve1.Peaks.Count < 3)
+            {
+                return 0;
+            }
+            var startRT = Math.Max(peakCurve1.StartRT, peakCurve2.StartRT);
+            var endRT = Math.Min(peakCurve1.EndRT, peakCurve2.EndRT);
+            var rtSeq = new List<double>();
+            for (double i = startRT; i < endRT; i += timeInterval)
+            {
+                rtSeq.Add(i);
+            }
+            var intensities1 = new List<double>();
+            var intensities2 = new List<double>();
+
+            if (splineType == "linear")
+            {
+                if (peakCurve1.LinearSpline == null)
+                {
+                    peakCurve1.GetLinearSpline();
+                }
+                if (peakCurve2.LinearSpline == null)
+                {
+                    peakCurve2.GetLinearSpline();
+                }
+                foreach (var rt in rtSeq)
+                {
+                    intensities1.Add(peakCurve1.LinearSpline.Interpolate(rt));
+                    intensities2.Add(peakCurve2.LinearSpline.Interpolate(rt));
+                }
+                double corr = Correlation.Pearson(intensities1, intensities2);
+                return corr;
+            }
+
+            if (splineType == "cubic")
+            {
+                if (peakCurve1.CubicSpline == null)
+                {
+                    peakCurve1.GetCubicSpline();
+                }
+                if (peakCurve2.CubicSpline == null)
+                {
+                    peakCurve2.GetCubicSpline();
+                }
+                foreach (var rt in rtSeq)
+                {
+                    intensities1.Add(peakCurve1.CubicSpline.Interpolate(rt));
+                    intensities2.Add(peakCurve2.CubicSpline.Interpolate(rt));
+                }
+                double corr = Correlation.Pearson(intensities1, intensities2);
+                return corr;
+            }
+            return 0;
+        }
+
         public static List<PeakCurve> GetMs1PeakCurves(MsDataScan[] allMs1Scans, List<Peak>[] ms1PeakTable, DIAparameters DIAparameters, CommonParameters commonParameters)
         {
             //Get all precursors
@@ -291,13 +401,17 @@ namespace EngineLayer.DIA
                 }
             }
             //sort precursors by envelope totalintensity
-            var preGroups = allPrecursors.GroupBy(p => new { p.MonoisotopicMass, p.Charge, p.HighestPeakMz }).ToList();
+            var preGroups = allPrecursors.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 2), p.Charge}).ToList();
             var referencePrecursors = preGroups.Select(g => g.OrderByDescending(p => p.Envelope.TotalIntensity).First()).ToList();
             var allMs1PeakCurves = new List<PeakCurve>();
 
             //debug
             var peak2 = GetPeakFromScan(626.997, ms1PeakTable, 1391, new PpmTolerance(5), 100);
             var pc2 = FindPeakCurve(peak2, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(10), 100);
+            var peak3 = GetPeakFromScan(627.331, ms1PeakTable, 1391, new PpmTolerance(5), 100);
+            var pc3 = FindPeakCurve(peak3, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
+            var peak4 = GetPeakFromScan(627.666, ms1PeakTable, 1391, new PpmTolerance(5), 100);
+            var pc4 = FindPeakCurve(peak4, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
 
             //Find precursor XIC
             foreach (var precursor in referencePrecursors)
@@ -324,5 +438,7 @@ namespace EngineLayer.DIA
             }
             return allMs1PeakCurves;
         }
+
+        
     }
 }
