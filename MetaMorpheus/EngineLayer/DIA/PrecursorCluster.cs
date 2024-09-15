@@ -103,7 +103,7 @@ namespace EngineLayer.DIA
                 }
             }
             var percentIntensityFound = theorIntensityRatio.Zip(intensityCount, (a,b) => a*b).Sum();
-            if (percentIntensityFound >= 0.5)
+            if (percentIntensityFound >= 0.3)
             {
                 return peaksFound;
             }

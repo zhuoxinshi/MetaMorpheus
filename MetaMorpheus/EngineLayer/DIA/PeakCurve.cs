@@ -401,7 +401,7 @@ namespace EngineLayer.DIA
                 }
             }
             //sort precursors by envelope totalintensity
-            var preGroups = allPrecursors.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 2), p.Charge}).ToList();
+            var preGroups = allPrecursors.GroupBy(p => new { p.MonoisotopicMass, p.Charge}).ToList();
             var referencePrecursors = preGroups.Select(g => g.OrderByDescending(p => p.Envelope.TotalIntensity).First()).ToList();
             var allMs1PeakCurves = new List<PeakCurve>();
 
