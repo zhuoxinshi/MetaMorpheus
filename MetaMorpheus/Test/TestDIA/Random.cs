@@ -293,5 +293,36 @@ namespace Test.TestDIA
             diaEngine.GetMs2PeakCurves();
             var diaMs2Peaks = diaEngine.Ms2PeakCurves.Values.SelectMany(pc => pc).Sum(pc => pc.Peaks.Count);
         }
+
+        [Test]
+        public static void TestMs1PeakCurveDetection()
+        {
+            var diaFile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
+            var commonParameters = new CommonParameters();
+            commonParameters.TrimMsMsPeaks = true;
+            MyFileManager myFileManager = new MyFileManager(true);
+            var diaDataFile = myFileManager.LoadFile(diaFile, commonParameters);
+            var diaParam = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 1, 100, 0.5, 0.5, 2);
+
+            var ms1scans = diaDataFile.GetMS1Scans().ToArray();
+            var allMs1Peaks = Peak.GetAllPeaks(ms1scans, diaParam.PeakSearchBinSize);
+            var rankedMs1Peaks = allMs1Peaks.OrderByDescending(p => p.Intensity).ToList();
+            var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, diaParam.PeakSearchBinSize);
+            var ms1PeakCurves = new List<PeakCurve>();
+            foreach (var peak in rankedMs1Peaks)
+            {
+                if (peak.PeakCurve == null)
+                {
+                    var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms1PeakTable, ms1scans, ms1scans[0].IsolationRange,
+                        diaParam.MaxNumMissedScan, diaParam.Ms2PeakFindingTolerance, diaParam.PeakSearchBinSize);
+                    if (newPeakCurve.Peaks.Count > 0)
+                    {
+                        ms1PeakCurves.Add(newPeakCurve);
+                    }
+                }
+            }
+            //check
+            var numOfPeaks = ms1PeakCurves.Sum(pc => pc.Peaks.Count);
+        }
     }
 }
