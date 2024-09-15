@@ -383,62 +383,54 @@ namespace EngineLayer.DIA
             return 0;
         }
 
-        public static List<PeakCurve> GetMs1PeakCurves(MsDataScan[] allMs1Scans, List<Peak>[] ms1PeakTable, DIAparameters DIAparameters, CommonParameters commonParameters)
+        public static Dictionary<(double min, double max), List<MsDataScan>> ConstructMs2Group(MsDataScan[] ms2Scans)
         {
-            //Get all precursors
-            var allPrecursors = new List<Precursor>();
-            for (int i = 0; i < allMs1Scans.Length; i++)
+            var DIAScanWindowMap = new Dictionary<(double min, double max), List<MsDataScan>>();
+            foreach (var ms2 in ms2Scans)
             {
-                var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], commonParameters.PrecursorDeconvolutionParameters);
-                foreach (var envelope in envelopes)
+                (double min, double max) range = new(ms2.IsolationRange.Minimum, ms2.IsolationRange.Maximum);
+                if (!DIAScanWindowMap.ContainsKey(range))
                 {
-                    var charge = envelope.Charge;
-                    double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
-                    double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new Precursor(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                        allMs1Scans[i].OneBasedScanNumber, i);
-                    allPrecursors.Add(precursor);
+                    DIAScanWindowMap[range] = new List<MsDataScan>();
+                    DIAScanWindowMap[range].Add(ms2);
+                }
+                else
+                {
+                    DIAScanWindowMap[range].Add(ms2);
                 }
             }
-            //sort precursors by envelope totalintensity
-            var preGroups = allPrecursors.GroupBy(p => new { p.MonoisotopicMass, p.Charge}).ToList();
-            var referencePrecursors = preGroups.Select(g => g.OrderByDescending(p => p.Envelope.TotalIntensity).First()).ToList();
-            var allMs1PeakCurves = new List<PeakCurve>();
-
-            //debug
-            var peak2 = GetPeakFromScan(626.997, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-            var pc2 = FindPeakCurve(peak2, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(10), 100);
-            var peak3 = GetPeakFromScan(627.331, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-            var pc3 = FindPeakCurve(peak3, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
-            var peak4 = GetPeakFromScan(627.666, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-            var pc4 = FindPeakCurve(peak4, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
-
-            //Find precursor XIC
-            foreach (var precursor in referencePrecursors)
-            {
-                var highestPeak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, ms1PeakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0), DIAparameters.PeakSearchBinSize);
-                if (Math.Abs(highestPeak.Mz - 626.997) < 0.005 && highestPeak.ScanNumber > 4170 && highestPeak.ScanNumber < 4190)
-                {
-                    int stop = 0;
-                    var peak = GetPeakFromScan(626.663, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-                    var pc = FindPeakCurve(peak, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(10), 100);
-                    
-                }
-                if (highestPeak.PeakCurve == null)
-                {
-                    //TODO: label the peaks that have been included in a PeakCurve
-                    var newPeakCurve = PeakCurve.FindPeakCurve(highestPeak, ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
-                        DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
-                    newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
-                    newPeakCurve.Charge = precursor.Charge;
-                    newPeakCurve.StartMz = precursor.Envelope.Peaks.Min(p => p.mz);
-                    newPeakCurve.EndMz = precursor.Envelope.Peaks.Max(p => p.mz);
-                    allMs1PeakCurves.Add(newPeakCurve);
-                }
-            }
-            return allMs1PeakCurves;
+            return DIAScanWindowMap;
         }
 
-        
+        public static Dictionary<MzRange, List<PeakCurve>> GetMs2PeakCurves(MsDataScan[] allMs2scans, List<Peak>[] allPeaks, DIAparameters DIAparam)
+        {
+            var ms2PeakCurves = new Dictionary<MzRange, List<PeakCurve>>();
+            var DIAScanWindowMap = ConstructMs2Group(allMs2scans);
+            foreach (var ms2Group in DIAScanWindowMap)
+            {
+                var ms2scans = ms2Group.Value.ToArray();
+                MzRange range = ms2scans[0].IsolationRange;
+                var allMs2Peaks = allPeaks.Where(v => v != null).SelectMany(p => p).Where(p => 
+                p.IsolationRange != null && p.IsolationRange.Maximum == range.Maximum && p.IsolationRange.Minimum == range.Minimum).ToList();
+                var rankedMs2Peaks = allMs2Peaks.OrderByDescending(p => p.Intensity).ToList();
+                var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparam.PeakSearchBinSize);
+                ms2PeakCurves[range] = new List<PeakCurve>();
+                foreach (var peak in rankedMs2Peaks)
+                {
+                    if (peak.PeakCurve == null)
+                    {
+                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
+                            DIAparam.MaxNumMissedScan, DIAparam.Ms2PeakFindingTolerance, DIAparam.PeakSearchBinSize);
+                        if (newPeakCurve.Peaks.Count > 4)
+                        {
+                            ms2PeakCurves[range].Add(newPeakCurve);
+                        }
+                    }
+                }
+            }
+            return ms2PeakCurves;
+        }
+
+
     }
 }

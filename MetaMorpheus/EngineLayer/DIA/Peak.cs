@@ -5,12 +5,13 @@ using System.Text;
 using System.Threading.Tasks;
 using EngineLayer.DIA;
 using MassSpectrometry;
+using MzLibUtil;
 
 namespace EngineLayer
 {
     public class Peak
     {
-        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber, int ZeroBasedScanNumber, int index = 0, PeakCurve peakCurve = null)
+        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber, int ZeroBasedScanNumber, int index = 0, PeakCurve peakCurve = null, MzRange isolationRange = null)
         {
             Mz = mz;
             Intensity = intensity;
@@ -20,6 +21,7 @@ namespace EngineLayer
             MsLevel = msLevel;
             PeakCurve = peakCurve;
             ZeroBasedScanIndex = ZeroBasedScanNumber;
+            IsolationRange = isolationRange;
         }
 
         public double Mz { get; set; }
@@ -30,20 +32,24 @@ namespace EngineLayer
         public int Index { get; set; }
         public int MsLevel { get; set; }
         public PeakCurve PeakCurve { get; set; }
+        public MzRange IsolationRange { get; set; }
 
-        public static List<Peak> GetAllPeaks(MsDataScan[] scans, int binsPerDalton)
+        public static List<Peak>[] GetAllPeaks(MsDataScan[] scans, out Dictionary<int, int> scanIndexMap)
         {
-            var allPeaks = new List<Peak>();
+            var allPeaks = new List<Peak>[scans.Length + 1];
+            scanIndexMap = new Dictionary<int, int>();
             int index = 0;
             int zeroBasedScanIndex = 0;
             for (int i = 0; i < scans.Length; i++)
             {
+                allPeaks[i] = new List<Peak>();
+                scanIndexMap.Add(scans[i].OneBasedScanNumber, zeroBasedScanIndex);
                 var spectrum = scans[i].MassSpectrum;
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
-                        scans[i].OneBasedScanNumber, zeroBasedScanIndex, index);
-                    allPeaks.Add(newPeak);
+                        scans[i].OneBasedScanNumber, zeroBasedScanIndex, index, null, scans[i].IsolationRange);
+                    allPeaks[i].Add(newPeak);
                     index++;
                 }
                 zeroBasedScanIndex++;
@@ -67,5 +73,6 @@ namespace EngineLayer
             }
             return table;
         }
+
     }
 }
