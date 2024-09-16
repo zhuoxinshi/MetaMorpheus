@@ -439,6 +439,28 @@ namespace EngineLayer.DIA
             return allMs1PeakCurves;
         }
 
-        
+        public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
+        {
+            double overlap = 0;
+            var ms1rtrange = curve1.EndRT - curve1.StartRT;
+            var ms2rtrange = curve2.EndRT - curve2.StartRT;
+            if (curve1.StartRT >= curve2.StartRT && curve1.StartRT <= curve2.EndRT && curve1.EndRT >= curve2.EndRT)
+            {
+                overlap = (curve2.EndRT - curve1.StartRT) / ms1rtrange;
+            }
+            else if (curve1.EndRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT && curve1.StartRT <= curve2.StartRT)
+            {
+                overlap = (curve1.EndRT - curve2.StartRT) / ms1rtrange;
+            }
+            else if (curve1.StartRT <= curve2.StartRT && curve1.EndRT >= curve2.EndRT)
+            {
+                overlap = ms2rtrange / ms1rtrange;
+            }
+            else if (curve1.StartRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT)
+            {
+                overlap = 1;
+            }
+            return overlap;
+        }
     }
 }

@@ -70,9 +70,9 @@ namespace EngineLayer.DIA
         public void GetMs1PeakCurves()
         {
             var allMs1Scans = MyMSDataFile.GetMS1Scans().ToArray();
-            //var allMs1PeakCurves = PeakCurve.GetMs1PeakCurves(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
+            var allMs1PeakCurves = PeakCurve.GetMs1PeakCurves(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
             //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves(allMs1Scans, DIAparameters, CommonParameters);
-            var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves_isotope(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
+            //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves_isotope(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
             Ms1PeakCurves = allMs1PeakCurves.Where(c => c.Peaks.Count >= 5).ToList();
 
             //for debug
@@ -132,12 +132,17 @@ namespace EngineLayer.DIA
                             {
                                 if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                                 {
-                                    double corr = PeakCurve.CalculateCorr_spline(precursor, ms2curve, "cubic", 0.005);
-                                    if (corr > DIAparameters.CorrelationCutOff)
+                                    var overlap = PeakCurve.CalculateRTOverlapRatio(precursor, ms2curve);
+                                    if (overlap > DIAparameters.OverlapRatioCutOff)
                                     {
-                                        var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
-                                        preFragGroup.PFpairs.Add(PFpair);
+                                        double corr = PeakCurve.CalculateCorr_spline(precursor, ms2curve, "cubic", 0.005);
+                                        if (corr > DIAparameters.CorrelationCutOff)
+                                        {
+                                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
+                                            preFragGroup.PFpairs.Add(PFpair);
+                                        }
                                     }
+                                    
                                 }
                             }
                         }
