@@ -21,14 +21,14 @@ namespace Test.TestDIA
         public static void TestDIASearch()
         {
             var task = new SearchTask();
-            task.CommonParameters.TrimMsMsPeaks = true;
+            task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\test_corr0.7_chargeAdded_noMassRound_envelopeXIC_cubicSpline_apexRT0.5_PeakTrim_maxMissed2";
+            string outputFolder = @"E:\DIA\TestSearch\scanBased_corr0.7_highestPeakXIC_cubicSpline_apexRT0.25_noPeakTrim_maxMissed1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 2, 100, 0.5, 0.7, 0.5);
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 1, 100, 0.5, 0.7, 0.25);
             //string myFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\SmallCalibratible_Yeast.mzML");
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
             var fm = new MyFileManager(false);

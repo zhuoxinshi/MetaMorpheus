@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Easy.Common.Extensions;
 using EngineLayer.DIA;
 using MassSpectrometry;
 using MzLibUtil;
@@ -34,42 +35,48 @@ namespace EngineLayer
         public PeakCurve PeakCurve { get; set; }
         public MzRange IsolationRange { get; set; }
 
-        public static List<Peak>[] GetAllPeaks(MsDataScan[] scans, out Dictionary<int, int> scanIndexMap)
+        public static List<Peak>[] GetAllPeaks(MsDataScan[] scans)
         {
             var allPeaks = new List<Peak>[scans.Length + 1];
-            scanIndexMap = new Dictionary<int, int>();
             int index = 0;
-            int zeroBasedScanIndex = 0;
             for (int i = 0; i < scans.Length; i++)
             {
                 allPeaks[i] = new List<Peak>();
-                scanIndexMap.Add(scans[i].OneBasedScanNumber, zeroBasedScanIndex);
                 var spectrum = scans[i].MassSpectrum;
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
-                        scans[i].OneBasedScanNumber, zeroBasedScanIndex, index, null, scans[i].IsolationRange);
+                        scans[i].OneBasedScanNumber, 0, index, null, scans[i].IsolationRange);
                     allPeaks[i].Add(newPeak);
                     index++;
                 }
-                zeroBasedScanIndex++;
             }
             return allPeaks;
         }
 
-        public static List<Peak>[] GetPeakTable(List<Peak> allPeaks, int binsPerDalton)
+        public static List<Peak>[] GetPeakTable(List<Peak>[] allPeaks, int binsPerDalton, out Dictionary<int, int> scanIndexMap)
         {
-            var table = new List<Peak>[(int)Math.Ceiling(allPeaks.Max(p => p.Mz) * binsPerDalton) + 1];
-            //var peaks = allPeaks.ToArray();
-            for (int i = 0; i < allPeaks.Count; i++)
-            {
-                int roundedMz = (int)Math.Round(allPeaks[i].Mz * binsPerDalton, 0);
+            var table = new List<Peak>[(int)Math.Ceiling(allPeaks.Where(v => v != null).SelectMany(p => p).Max(p => p.Mz) * binsPerDalton) + 1];
+            int zeroBasedScanIndex = 0;
+            scanIndexMap = new Dictionary<int, int>();
 
-                if (table[roundedMz] == null)
+            for (int i = 0; i < allPeaks.Length; i++)
+            {
+                scanIndexMap.Add(allPeaks[i].FirstOrDefault().ScanNumber, zeroBasedScanIndex);
+                for (int j = 0; j < allPeaks[i].Count; j++)
                 {
-                    table[roundedMz] = new List<Peak>();
+                    //Label the peak with zeroBasedScanIndex
+                    allPeaks[i][j].ZeroBasedScanIndex = zeroBasedScanIndex;
+
+                    int roundedMz = (int)Math.Round(allPeaks[i][j].Mz * binsPerDalton, 0);
+
+                    if (table[roundedMz] == null)
+                    {
+                        table[roundedMz] = new List<Peak>();
+                    }
+                    table[roundedMz].Add(allPeaks[i][j]);
                 }
-                table[roundedMz].Add(allPeaks[i]);
+                zeroBasedScanIndex++;
             }
             return table;
         }

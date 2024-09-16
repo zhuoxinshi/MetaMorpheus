@@ -132,11 +132,12 @@ namespace TaskLayer
 
             var allscans = myMSDataFile.GetAllScansList().OrderBy(s => s.OneBasedScanNumber).ToArray();
             var ms1scans = allscans.Where(s => s.MsnOrder == 1).ToArray();
-            var allPeaks = Peak.GetAllPeaks(allscans, out Dictionary<int, int> scanIndexMap);
-            var allMs1Peaks = allPeaks.Where(v => v!= null).SelectMany(p => p).Where(p => p.MsLevel == 1).ToList();
-            var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, 100);
+            var allPeaks = Peak.GetAllPeaks(allscans);
+            var allMs1Peaks = allPeaks.Where(v => v!= null && v.FirstOrDefault().MsLevel == 1).ToArray();
+            var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, 100, out Dictionary<int, int> scanIndexMap);
             var DIAparam= commonParameters.DIAparameters;
             var allMs2PeakCurves = PeakCurve.GetMs2PeakCurves(ms2Scans, allPeaks, DIAparam);
+            var allMs1PeakCurves = PeakCurve.GetAllMs1PeakCurves(ms1scans, allPeaks, ms1PeakTable, DIAparam);
 
             Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                 (partitionRange, loopState) =>
@@ -229,36 +230,42 @@ namespace TaskLayer
                                     , DIAparam.PeakSearchBinSize);
                             }
                             var DIApeaks = new List<Peak>();
-                            foreach(var peak in allms2PeaksForThisScan)
+                            if (precursorPeak.PeakCurve.Peaks.Count > 4)
                             {
-                                var ms2curve = peak.PeakCurve;
-                                var ms1curve = precursorPeak.PeakCurve;
-                                if (ms2curve.ApexRT >= ms1curve.StartRT && ms2curve.ApexRT <= ms1curve.EndRT)
+                                foreach (var peak in allms2PeaksForThisScan)
                                 {
-                                    if (Math.Abs(ms2curve.ApexRT - ms1curve.ApexRT) <= DIAparam.ApexRtTolerance)
+                                    var ms2curve = peak.PeakCurve;
+                                    var ms1curve = precursorPeak.PeakCurve;
+                                    if (ms2curve.ApexRT >= ms1curve.StartRT && ms2curve.ApexRT <= ms1curve.EndRT)
                                     {
-                                        double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.005);
-                                        if (corr > DIAparam.CorrelationCutOff)
+                                        if (Math.Abs(ms2curve.ApexRT - ms1curve.ApexRT) < DIAparam.ApexRtTolerance)
                                         {
-                                            DIApeaks.Add(peak);
+                                            double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.01);
+                                            if (corr > DIAparam.CorrelationCutOff)
+                                            {
+                                                DIApeaks.Add(peak);
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            var newSpectrum = new MzSpectrum(DIApeaks.Select(p => p.Mz).ToArray(), DIApeaks.Select(p => p.Intensity).ToArray(), false);
-                            MsDataScan newScan = new MsDataScan(newSpectrum, ms2scan.OneBasedScanNumber, ms2scan.MsnOrder, ms2scan.IsCentroid,ms2scan.Polarity, 
-                                ms2scan.RetentionTime, ms2scan.ScanWindowRange, ms2scan.ScanFilter, ms2scan.MzAnalyzer, ms2scan.TotalIonCurrent, ms2scan.InjectionTime,
-                                ms2scan.NoiseData, ms2scan.NativeId, ms2scan.SelectedIonMZ, ms2scan.SelectedIonChargeStateGuess, ms2scan.SelectedIonIntensity, 
-                                ms2scan.IsolationMz, ms2scan.IsolationWidth, ms2scan.DissociationType, null,ms2scan.SelectedIonMonoisotopicGuessMz, ms2scan.HcdEnergy, ms2scan.ScanDescription);
-                            if (commonParameters.DissociationType != DissociationType.LowCID)
-                            {
-                                neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newScan, commonParameters);
-                            }
-                            var scan = new Ms2ScanWithSpecificMass(newScan, precursor.MonoPeakMz,
-                                precursor.Charge, fullFilePath, commonParameters, neutralExperimentalFragments,
-                                precursor.Intensity, precursor.PeakCount, precursor.FractionalIntensity);
+                                if (DIApeaks.Count > 0)
+                                {
+                                    var newSpectrum = new MzSpectrum(DIApeaks.Select(p => p.Mz).ToArray(), DIApeaks.Select(p => p.Intensity).ToArray(), false);
+                                    MsDataScan newScan = new MsDataScan(newSpectrum, ms2scan.OneBasedScanNumber, ms2scan.MsnOrder, ms2scan.IsCentroid, ms2scan.Polarity,
+                                        ms2scan.RetentionTime, ms2scan.ScanWindowRange, ms2scan.ScanFilter, ms2scan.MzAnalyzer, ms2scan.TotalIonCurrent, ms2scan.InjectionTime,
+                                        ms2scan.NoiseData, ms2scan.NativeId, ms2scan.SelectedIonMZ, ms2scan.SelectedIonChargeStateGuess, ms2scan.SelectedIonIntensity,
+                                        ms2scan.IsolationMz, ms2scan.IsolationWidth, ms2scan.DissociationType, null, ms2scan.SelectedIonMonoisotopicGuessMz, ms2scan.HcdEnergy, ms2scan.ScanDescription);
+                                    if (commonParameters.DissociationType != DissociationType.LowCID)
+                                    {
+                                        neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newScan, commonParameters);
+                                    }
+                                    var scan = new Ms2ScanWithSpecificMass(newScan, precursor.MonoPeakMz,
+                                        precursor.Charge, fullFilePath, commonParameters, neutralExperimentalFragments,
+                                        precursor.Intensity, precursor.PeakCount, precursor.FractionalIntensity);
 
-                            scansWithPrecursors[i].Add(scan);
+                                    scansWithPrecursors[i].Add(scan);
+                                }
+                            }
                         }
                     }
                 });

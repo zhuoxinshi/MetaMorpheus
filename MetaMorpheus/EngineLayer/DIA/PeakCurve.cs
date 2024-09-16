@@ -11,6 +11,7 @@ using Plotly.NET;
 using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
 using System.Numerics;
+using System.Threading;
 
 namespace EngineLayer.DIA
 {
@@ -329,7 +330,7 @@ namespace EngineLayer.DIA
 
         public static double CalculateCorr_spline(PeakCurve peakCurve1, PeakCurve peakCurve2, string splineType, double timeInterval)
         {
-            if (peakCurve2.Peaks.Count <3 || peakCurve1.Peaks.Count < 3)
+            if (peakCurve2.Peaks.Count < 5 || peakCurve1.Peaks.Count < 5)
             {
                 return 0;
             }
@@ -410,10 +411,10 @@ namespace EngineLayer.DIA
             {
                 var ms2scans = ms2Group.Value.ToArray();
                 MzRange range = ms2scans[0].IsolationRange;
-                var allMs2Peaks = allPeaks.Where(v => v != null).SelectMany(p => p).Where(p => 
-                p.IsolationRange != null && p.IsolationRange.Maximum == range.Maximum && p.IsolationRange.Minimum == range.Minimum).ToList();
-                var rankedMs2Peaks = allMs2Peaks.OrderByDescending(p => p.Intensity).ToList();
-                var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparam.PeakSearchBinSize);
+                var allMs2Peaks = allPeaks.Where(v => v != null && v.FirstOrDefault().IsolationRange != null &&
+                 v.FirstOrDefault().IsolationRange.Maximum == range.Maximum && v.FirstOrDefault().IsolationRange.Minimum == range.Minimum).ToArray();
+                var rankedMs2Peaks = allMs2Peaks.SelectMany(p => p).OrderByDescending(p => p.Intensity).ToList();
+                var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparam.PeakSearchBinSize, out Dictionary<int, int> scanIndexMap);
                 ms2PeakCurves[range] = new List<PeakCurve>();
                 foreach (var peak in rankedMs2Peaks)
                 {
@@ -431,6 +432,48 @@ namespace EngineLayer.DIA
             return ms2PeakCurves;
         }
 
+        public static List<PeakCurve> GetAllMs1PeakCurves(MsDataScan[] ms1scans, List<Peak>[] allPeaks, List<Peak>[] ms1PeakTable, DIAparameters DIAparam)
+        {
+            var allMs1PeakCurves = new List<PeakCurve>();
+            var allMs1Peaks = allPeaks.Where(v => v != null && v.FirstOrDefault().MsLevel == 1).ToArray();
+            var rankedMs1Peaks = allMs1Peaks.SelectMany(p => p).OrderByDescending(p => p.Intensity).ToList();
+            foreach (var peak in rankedMs1Peaks)
+            {
+                if (peak.PeakCurve == null)
+                {
+                    var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms1PeakTable, ms1scans, ms1scans[0].IsolationRange,
+                        DIAparam.MaxNumMissedScan, DIAparam.Ms2PeakFindingTolerance, DIAparam.PeakSearchBinSize);
+                    if (newPeakCurve.Peaks.Count > 4)
+                    {
+                        allMs1PeakCurves.Add(newPeakCurve);
+                    }
+                }
+            }
+            return allMs1PeakCurves;
+        }
 
+        public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
+        {
+            double overlap = 0;
+            var ms1rtrange = curve1.EndRT - curve1.StartRT;
+            var ms2rtrange = curve2.EndRT - curve2.StartRT;
+            if (curve1.StartRT >= curve2.StartRT && curve1.StartRT <= curve2.EndRT && curve1.EndRT >= curve2.EndRT)
+            {
+                overlap = (curve2.EndRT - curve1.StartRT) / ms1rtrange;
+            }
+            else if (curve1.EndRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT && curve1.StartRT <= curve2.StartRT)
+            {
+                overlap = (curve1.EndRT - curve2.StartRT) / ms1rtrange;
+            }
+            else if (curve1.StartRT <= curve2.StartRT && curve1.EndRT >= curve2.EndRT)
+            {
+                overlap = ms2rtrange / ms1rtrange;
+            }
+            else if (curve1.StartRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT)
+            {
+                overlap = 1;
+            }
+            return overlap;
+        }
     }
 }
