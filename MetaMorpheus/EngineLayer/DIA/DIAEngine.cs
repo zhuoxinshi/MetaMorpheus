@@ -142,9 +142,13 @@ namespace EngineLayer.DIA
                                             preFragGroup.PFpairs.Add(PFpair);
                                         }
                                     }
-                                    
                                 }
                             }
+                        }
+                        if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+                        {
+                            var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+                            preFragGroup.PFpairs = filtered.ToList();
                         }
                         if (preFragGroup.PFpairs.Count > 0)
                         {

@@ -414,7 +414,7 @@ namespace EngineLayer.DIA
             var pc4 = FindPeakCurve(peak4, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
 
             //Find precursor XIC
-            foreach (var precursor in referencePrecursors)
+            foreach (var precursor in allPrecursors)
             {
                 var highestPeak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, ms1PeakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0), DIAparameters.PeakSearchBinSize);
                 if (Math.Abs(highestPeak.Mz - 626.997) < 0.005 && highestPeak.ScanNumber > 4170 && highestPeak.ScanNumber < 4190)

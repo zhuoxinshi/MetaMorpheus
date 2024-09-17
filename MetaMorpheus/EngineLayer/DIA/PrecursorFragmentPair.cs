@@ -19,6 +19,8 @@ namespace EngineLayer.DIA
         public PeakCurve PrecursorPeakCurve { get; set; }
         public PeakCurve FragmentPeakCurve { get; set; }    
         public double Correlation { get; set; }
+        public int FragmentRank { get; set; }
+        public int PrecursorRank { get; set; }
 
     }
 }
