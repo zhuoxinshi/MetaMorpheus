@@ -359,6 +359,11 @@ namespace EngineLayer
             s[PsmTsvHeader.QValueNotch] = qValueNotch;
             s[PsmTsvHeader.PEP] = PEP;
             s[PsmTsvHeader.PEP_QValue] = PEP_Qvalue;
+
+            if (peptide != null)
+            {
+                s[PsmTsvHeader.PeakCount] = peptide.MsDataScan.MassSpectrum.Size.ToString();
+            }
         }
     }
 }

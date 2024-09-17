@@ -83,6 +83,9 @@
         public const string BetaPeptideMatchedIonIntensitiesLabel = "Beta Peptide Matched Ion Intensities";
         public const string XLTotalScoreLabel = "XL Total Score";
         public const string ParentIonsLabel = "Parent Ions";
+
+        //for DIA debug
+        public const string PeakCount = "Peak Count";
     }
 
     public static class PsmTsvHeader_Cross

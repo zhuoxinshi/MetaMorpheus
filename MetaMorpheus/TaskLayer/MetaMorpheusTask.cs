@@ -230,6 +230,7 @@ namespace TaskLayer
                                     , DIAparam.PeakSearchBinSize);
                             }
                             var DIApeaks = new List<Peak>();
+                            var corrList = new List<double>();
                             if (precursorPeak.PeakCurve.Peaks.Count > 4)
                             {
                                 foreach (var peak in allms2PeaksForThisScan)
@@ -240,13 +241,24 @@ namespace TaskLayer
                                     {
                                         if (Math.Abs(ms2curve.ApexRT - ms1curve.ApexRT) < DIAparam.ApexRtTolerance)
                                         {
-                                            double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.01);
-                                            if (corr > DIAparam.CorrelationCutOff)
+                                            var overlap = PeakCurve.CalculateRTOverlapRatio(ms1curve, ms2curve);
+                                            if (overlap >= DIAparam.OverlapRatioCutOff)
                                             {
-                                                DIApeaks.Add(peak);
+                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.01);
+                                                if (corr > DIAparam.CorrelationCutOff)
+                                                {
+                                                    DIApeaks.Add(peak);
+                                                    corrList.Add(corr);
+                                                }
                                             }
                                         }
                                     }
+                                }
+                                if(corrList.Count > 300)
+                                {
+                                    var indices = corrList.Select((value, index) => new { Value = value, Index = index })
+                                                  .OrderByDescending(x => x.Value).Take(300).Select(x => x.Index).ToList();
+                                    DIApeaks = indices.Select(index => DIApeaks[index]).ToList();
                                 }
                                 if (DIApeaks.Count > 0)
                                 {
