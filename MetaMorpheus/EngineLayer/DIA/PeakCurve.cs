@@ -12,6 +12,9 @@ using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
 using System.Numerics;
 using System.Threading;
+using ThermoFisher.CommonCore.Data.Business;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace EngineLayer.DIA
 {
@@ -29,14 +32,14 @@ namespace EngineLayer.DIA
         }
 
         public List<Peak> Peaks { get; set; }
-        public int MsLevel {  get; set; }
+        public int MsLevel { get; set; }
         public MzRange IsolationRange { get; set; }
         public double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
         public List<Peak> IsotopePeaks { get; set; }
         public double StartRT => Peaks.Select(p => p.RetentionTime).OrderBy(t => t).First();
         public double EndRT => Peaks.Select(p => p.RetentionTime).OrderByDescending(t => t).First();
-        public double StartMz {  get; set; }
+        public double StartMz { get; set; }
         public double EndMz { get; set; }
         public MzRange MzRange => new MzRange(StartMz, EndMz);
         public double ApexRT => Peaks.OrderByDescending(p => p.Intensity).First().RetentionTime;
@@ -44,7 +47,7 @@ namespace EngineLayer.DIA
         public double AveragedMz => AverageMz();
         public double AveragedIntensity => AverageIntensity();
         public LinearSpline LinearSpline { get; set; }
-        public CubicSpline CubicSpline { get; set; }    
+        public CubicSpline CubicSpline { get; set; }
 
         public double AverageMz()
         {
@@ -206,7 +209,7 @@ namespace EngineLayer.DIA
                 else if (peak != null)
                 {
                     //if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
-                    if(peak.PeakCurve == null)
+                    if (peak.PeakCurve == null)
                     {
                         missedScans = 0;
                         xic.Add(peak);
@@ -237,7 +240,7 @@ namespace EngineLayer.DIA
                 else if (peak != null)
                 {
                     //if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
-                    if(peak.PeakCurve == null)
+                    if (peak.PeakCurve == null)
                     {
                         missedScans = 0;
                         xic.Add(peak);
@@ -262,12 +265,12 @@ namespace EngineLayer.DIA
         public static PeakCurve FindPeakCurve_mz(double targetMz, int zeroBasedScanIndex, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
             , Tolerance mzTolerance, int binSize)
         {
-            var targetPeak = GetPeakFromScan(targetMz,  peakTable, zeroBasedScanIndex, mzTolerance, binSize);
+            var targetPeak = GetPeakFromScan(targetMz, peakTable, zeroBasedScanIndex, mzTolerance, binSize);
             var pc = FindPeakCurve(targetPeak, peakTable, scans, isolationWindow, maxMissedScans, mzTolerance, binSize);
             return pc;
         }
 
-        public static double CalculatePeakCurveCorr(PeakCurve peakCurve1,  PeakCurve peakCurve2)
+        public static double CalculatePeakCurveCorr(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
             var peakList1 = peakCurve1.Peaks.ToArray();
             var peakList2 = peakCurve2.Peaks.ToArray();
@@ -276,16 +279,16 @@ namespace EngineLayer.DIA
             //for plot
             var rtPair = new List<(double, double)>();
 
-            if(peakList1.Length < peakList2.Length)
+            if (peakList1.Length < peakList2.Length)
             {
-                foreach(var peak in peakList1)
+                foreach (var peak in peakList1)
                 {
                     var indexList = peakList2.Select(p => p.ZeroBasedScanIndex).ToArray();
                     var index = Array.BinarySearch(indexList, peak.ZeroBasedScanIndex);
                     if (index > 0)
                     {
                         intensityPair.Add((peak.Intensity, peakList2[index].Intensity));
-                        rtPair.Add((peak.RetentionTime, peakList2[index].RetentionTime));    
+                        rtPair.Add((peak.RetentionTime, peakList2[index].RetentionTime));
                     }
                 }
             }
@@ -302,7 +305,7 @@ namespace EngineLayer.DIA
                     }
                 }
             }
-            
+
             if (intensityPair.Count >= 5)
             {
                 double corr = Correlation.Pearson(intensityPair.Select(pair => pair.Item1), intensityPair.Select(pair => pair.Item2));
@@ -474,6 +477,91 @@ namespace EngineLayer.DIA
                 overlap = 1;
             }
             return overlap;
+        }
+
+        public static List<Ms2ScanWithSpecificMass>[] GetPseudoMs2Scans(List<Ms2ScanWithSpecificMass>[] scansWithPrecursor, CommonParameters commonParam, DIAparameters DIAparam, List<Peak>[] allPeaks)
+        {
+            var newScansWithPre = new List<Ms2ScanWithSpecificMass>[scansWithPrecursor.Length];
+            Parallel.ForEach(Partitioner.Create(0, scansWithPrecursor.Length), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+                (partitionRange, loopState) =>
+                {
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        newScansWithPre[i] = new List<Ms2ScanWithSpecificMass>();
+                        foreach (var scan in scansWithPrecursor[i])
+                        {
+                            var allms2PeaksForThisScan = allPeaks[scan.OneBasedScanNumber - 1];
+                            var ms1curve = scan.PrecursorPeakCurve;
+                            var DIApeaks = new List<Peak>();
+                            var corrList = new List<double>();
+
+                            if (ms1curve.Peaks.Count > 4)
+                            {
+                                foreach (var peak in allms2PeaksForThisScan)
+                                {
+                                    var ms2curve = peak.PeakCurve;
+                                    if (ms2curve.ApexRT >= ms1curve.StartRT && ms2curve.ApexRT <= ms1curve.EndRT)
+                                    {
+                                        if (Math.Abs(ms2curve.ApexRT - ms1curve.ApexRT) < DIAparam.ApexRtTolerance)
+                                        {
+                                            var overlap = PeakCurve.CalculateRTOverlapRatio(ms1curve, ms2curve);
+                                            if (overlap >= DIAparam.OverlapRatioCutOff)
+                                            {
+                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.01);
+                                                if (corr > DIAparam.CorrelationCutOff)
+                                                {
+                                                    DIApeaks.Add(peak);
+                                                    corrList.Add(corr);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (corrList.Count > DIAparam.FragmentRankCutOff)
+                                {
+                                    var indices = corrList.Select((value, index) => new { Value = value, Index = index })
+                                                  .OrderByDescending(x => x.Value).Take(DIAparam.FragmentRankCutOff).Select(x => x.Index).ToList();
+                                    DIApeaks = DIApeaks.Select((value, index) => new {Value = value, Index = index}).Where(p => indices.Contains(p.Index)).
+                                    OrderBy(p => p.Value.Mz).Select(p => p.Value).ToList();
+                                }
+                                if (DIApeaks.Count > 0)
+                                {
+                                    var newSpectrum = new MzSpectrum(DIApeaks.Select(p => p.Mz).ToArray(), DIApeaks.Select(p => p.Intensity).ToArray(), false);
+                                    MsDataScan newScan = new MsDataScan(newSpectrum, scan.TheScan.OneBasedScanNumber, scan.TheScan.MsnOrder, scan.TheScan.IsCentroid,
+                                                            scan.TheScan.Polarity, scan.TheScan.RetentionTime, scan.TheScan.ScanWindowRange, scan.TheScan.ScanFilter, scan.TheScan.MzAnalyzer,
+                                                            scan.TheScan.TotalIonCurrent, scan.TheScan.InjectionTime, scan.TheScan.NoiseData, scan.TheScan.NativeId,
+                                                            scan.TheScan.SelectedIonMZ, scan.TheScan.SelectedIonChargeStateGuess, scan.TheScan.SelectedIonIntensity,
+                                                            scan.TheScan.IsolationMz, scan.TheScan.IsolationWidth, scan.TheScan.DissociationType, null,
+                                                            scan.TheScan.SelectedIonMonoisotopicGuessMz, scan.TheScan.HcdEnergy, scan.TheScan.ScanDescription);
+                                    var newScanWithPrecursor = new Ms2ScanWithSpecificMass(newScan, scan.PrecursorMonoisotopicPeakMz, scan.PrecursorCharge, scan.FullFilePath, commonParam);
+                                    newScansWithPre[i].Add(newScanWithPrecursor);
+                                }
+                            }
+                        }
+                    }
+                });
+            return newScansWithPre;
+        }
+
+        public static void GetPrecursorPeakCurve(List<Ms2ScanWithSpecificMass>[] scansWithPrecursor, MsDataScan[] ms1scans, List<Peak>[] allPeaks,
+            List<Peak>[] ms1PeakTable, DIAparameters DIAparam, Dictionary<int, int> scanIndexMap)
+        {
+            for (int i = 0; i < scansWithPrecursor.Length; i++)
+            {
+                foreach (var scan in scansWithPrecursor[i])
+                {
+                    var preScan = ms1scans.Where(s => s.OneBasedScanNumber == scan.OneBasedPrecursorScanNumber).First();
+                    var precursorPeak = GetPeakFromScan(scan.HighestPeakMz, ms1PeakTable, scanIndexMap[preScan.OneBasedScanNumber], new PpmTolerance(0), DIAparam.PeakSearchBinSize);
+                    if (precursorPeak.PeakCurve == null)
+                    {
+                        scan.PrecursorPeakCurve = FindPeakCurve(precursorPeak, ms1PeakTable, ms1scans, null, DIAparam.MaxNumMissedScan, DIAparam.Ms1PeakFindingTolerance, DIAparam.PeakSearchBinSize);
+                    }
+                    else
+                    {
+                        scan.PrecursorPeakCurve = precursorPeak.PeakCurve;
+                    }
+                }
+            }
         }
     }
 }

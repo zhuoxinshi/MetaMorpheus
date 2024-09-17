@@ -137,7 +137,7 @@ namespace TaskLayer
             var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, 100, out Dictionary<int, int> scanIndexMap);
             var DIAparam= commonParameters.DIAparameters;
             var allMs2PeakCurves = PeakCurve.GetMs2PeakCurves(ms2Scans, allPeaks, DIAparam);
-            var allMs1PeakCurves = PeakCurve.GetAllMs1PeakCurves(ms1scans, allPeaks, ms1PeakTable, DIAparam);
+            //var allMs1PeakCurves = PeakCurve.GetAllMs1PeakCurves(ms1scans, allPeaks, ms1PeakTable, DIAparam);
 
             Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                 (partitionRange, loopState) =>
@@ -178,9 +178,9 @@ namespace TaskLayer
                                     double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
                                     int peakCount = envelope.Peaks.Count();
                                     double intensity = 1;
-                                    if (commonParameters.UseMostAbundantPrecursorIntensity) 
-                                    { 
-                                        intensity = envelope.Peaks.Max(p => p.intensity); 
+                                    if (commonParameters.UseMostAbundantPrecursorIntensity)
+                                    {
+                                        intensity = envelope.Peaks.Max(p => p.intensity);
                                     }
                                     else
                                     {
@@ -190,9 +190,7 @@ namespace TaskLayer
                                     var fractionalIntensity = envelope.TotalIntensity /
                                           (double)precursorSpectrum.MassSpectrum.YArray
                                           [
-                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)
-                                              ..
-                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
+                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
                                           ].Sum();
 
                                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;
@@ -206,83 +204,22 @@ namespace TaskLayer
                         scansWithPrecursors[i] = new List<Ms2ScanWithSpecificMass>();
                         IsotopicEnvelope[] neutralExperimentalFragments = null;
 
-                        // get child scans
-                        List<MsDataScan> ms2ChildScans = null;
-                        List<MsDataScan> ms3ChildScans = null;
-                        if (commonParameters.MS2ChildScanDissociationType != DissociationType.Unknown || commonParameters.MS3ChildScanDissociationType != DissociationType.Unknown)
-                        {
-                            ms3ChildScans = ms3Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber).ToList();
-
-                            ms2ChildScans = ms2Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber ||
-                            (p.OneBasedPrecursorScanNumber == ms2scan.OneBasedPrecursorScanNumber
-                                && p.OneBasedScanNumber > ms2scan.OneBasedScanNumber
-                                && Math.Abs(p.IsolationMz.Value - ms2scan.IsolationMz.Value) < 0.01)).ToList();
-                        }
-
-                        var allms2PeaksForThisScan = allPeaks[ms2scan.OneBasedScanNumber - 1];
                         foreach (var precursor in precursors)
                         {
-                            var ms1scan = myMSDataFile.GetOneBasedScan((int)ms2scan.OneBasedPrecursorScanNumber.Value);
-                            var precursorPeak = PeakCurve.GetPeakFromScan(precursor.highestPeakMz, ms1PeakTable, scanIndexMap[ms1scan.OneBasedScanNumber], new PpmTolerance(0), 100);
-                            if (precursorPeak.PeakCurve == null)
-                            {
-                                var precursorPeakCurve = PeakCurve.FindPeakCurve(precursorPeak, ms1PeakTable, ms1scans, null, DIAparam.MaxNumMissedScan, DIAparam.Ms1PeakFindingTolerance
-                                    , DIAparam.PeakSearchBinSize);
-                            }
-                            var DIApeaks = new List<Peak>();
-                            var corrList = new List<double>();
-                            if (precursorPeak.PeakCurve.Peaks.Count > 4)
-                            {
-                                foreach (var peak in allms2PeaksForThisScan)
-                                {
-                                    var ms2curve = peak.PeakCurve;
-                                    var ms1curve = precursorPeak.PeakCurve;
-                                    if (ms2curve.ApexRT >= ms1curve.StartRT && ms2curve.ApexRT <= ms1curve.EndRT)
-                                    {
-                                        if (Math.Abs(ms2curve.ApexRT - ms1curve.ApexRT) < DIAparam.ApexRtTolerance)
-                                        {
-                                            var overlap = PeakCurve.CalculateRTOverlapRatio(ms1curve, ms2curve);
-                                            if (overlap >= DIAparam.OverlapRatioCutOff)
-                                            {
-                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.01);
-                                                if (corr > DIAparam.CorrelationCutOff)
-                                                {
-                                                    DIApeaks.Add(peak);
-                                                    corrList.Add(corr);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                if(corrList.Count > DIAparam.FragmentRankCutOff)
-                                {
-                                    var indices = corrList.Select((value, index) => new { Value = value, Index = index })
-                                                  .OrderByDescending(x => x.Value).Take(DIAparam.FragmentRankCutOff).Select(x => x.Index).ToList();
-                                    DIApeaks = indices.Select(index => DIApeaks[index]).ToList();
-                                }
-                                if (DIApeaks.Count > 0)
-                                {
-                                    var newSpectrum = new MzSpectrum(DIApeaks.Select(p => p.Mz).ToArray(), DIApeaks.Select(p => p.Intensity).ToArray(), false);
-                                    MsDataScan newScan = new MsDataScan(newSpectrum, ms2scan.OneBasedScanNumber, ms2scan.MsnOrder, ms2scan.IsCentroid, ms2scan.Polarity,
-                                        ms2scan.RetentionTime, ms2scan.ScanWindowRange, ms2scan.ScanFilter, ms2scan.MzAnalyzer, ms2scan.TotalIonCurrent, ms2scan.InjectionTime,
-                                        ms2scan.NoiseData, ms2scan.NativeId, ms2scan.SelectedIonMZ, ms2scan.SelectedIonChargeStateGuess, ms2scan.SelectedIonIntensity,
-                                        ms2scan.IsolationMz, ms2scan.IsolationWidth, ms2scan.DissociationType, null, ms2scan.SelectedIonMonoisotopicGuessMz, ms2scan.HcdEnergy, ms2scan.ScanDescription);
-                                    if (commonParameters.DissociationType != DissociationType.LowCID)
-                                    {
-                                        neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newScan, commonParameters);
-                                    }
-                                    var scan = new Ms2ScanWithSpecificMass(newScan, precursor.MonoPeakMz,
-                                        precursor.Charge, fullFilePath, commonParameters, neutralExperimentalFragments,
-                                        precursor.Intensity, precursor.PeakCount, precursor.FractionalIntensity);
+                            // assign precursor for this MS2 scan
+                            var scan = new Ms2ScanWithSpecificMass(ms2scan, precursor.MonoPeakMz,
+                                precursor.Charge, fullFilePath, commonParameters, neutralExperimentalFragments,
+                                precursor.Intensity, precursor.PeakCount, precursor.FractionalIntensity);
+                            scan.HighestPeakMz = precursor.highestPeakMz;
 
-                                    scansWithPrecursors[i].Add(scan);
-                                }
-                            }
+                            scansWithPrecursors[i].Add(scan);
                         }
                     }
                 });
+            PeakCurve.GetPrecursorPeakCurve(scansWithPrecursors, ms1scans, allPeaks, ms1PeakTable, DIAparam, scanIndexMap);
+            var newScanWithPre = PeakCurve.GetPseudoMs2Scans(scansWithPrecursors, commonParameters, DIAparam, allPeaks);
 
-            return scansWithPrecursors;
+            return newScanWithPre;
         }
 
         public static IEnumerable<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)

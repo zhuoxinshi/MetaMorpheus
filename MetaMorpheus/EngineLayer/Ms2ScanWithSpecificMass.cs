@@ -3,6 +3,7 @@ using MassSpectrometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using EngineLayer.DIA;
 
 namespace EngineLayer
 {
@@ -59,6 +60,8 @@ namespace EngineLayer
         public int NumPeaks => TheScan.MassSpectrum.Size;
 
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
+        public double HighestPeakMz { get; set; }
+        public PeakCurve PrecursorPeakCurve { get; set; }
 
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {
