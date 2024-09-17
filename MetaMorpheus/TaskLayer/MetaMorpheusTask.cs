@@ -254,10 +254,10 @@ namespace TaskLayer
                                         }
                                     }
                                 }
-                                if(corrList.Count > 300)
+                                if(corrList.Count > DIAparam.FragmentRankCutOff)
                                 {
                                     var indices = corrList.Select((value, index) => new { Value = value, Index = index })
-                                                  .OrderByDescending(x => x.Value).Take(300).Select(x => x.Index).ToList();
+                                                  .OrderByDescending(x => x.Value).Take(DIAparam.FragmentRankCutOff).Select(x => x.Index).ToList();
                                     DIApeaks = indices.Select(index => DIApeaks[index]).ToList();
                                 }
                                 if (DIApeaks.Count > 0)
