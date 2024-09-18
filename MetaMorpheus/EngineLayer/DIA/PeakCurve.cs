@@ -507,7 +507,7 @@ namespace EngineLayer.DIA
                                             var overlap = PeakCurve.CalculateRTOverlapRatio(ms1curve, ms2curve);
                                             if (overlap >= DIAparam.OverlapRatioCutOff)
                                             {
-                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.01);
+                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.05);
                                                 if (corr > DIAparam.CorrelationCutOff)
                                                 {
                                                     DIApeaks.Add(peak);
