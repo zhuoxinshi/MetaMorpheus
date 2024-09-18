@@ -324,7 +324,7 @@ namespace TaskLayer
         {
             if (commonParameters.DIAparameters != null)
             {
-                var diaEngine = new DIAEngine(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                var diaEngine = new DIAEngine2(myMSDataFile, commonParameters, commonParameters.DIAparameters);
                 diaEngine.GetPseudoMS2Scans();
                 var scansWithPre = diaEngine.PseudoMs2WithPre;
                 return scansWithPre;

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -22,8 +23,8 @@ namespace EngineLayer.DIA
         public DIAparameters DIAparameters { get; set; }
         public List<Peak>[] Ms1PeakTable { get; set; }
         public List<Peak>[] Ms2PeakTable { get; set; }
-        public List<PeakCurve> Ms1PeakCurves { get; set; }
-        public Dictionary<MzRange, List<PeakCurve>> Ms2PeakCurves { get; set; }
+        public Dictionary<(double min, double max), List<PeakCurve>> Ms1PeakCurves { get; set; }
+        public Dictionary<(double min, double max), List<PeakCurve>> Ms2PeakCurves { get; set; }
         public MsDataFile MyMSDataFile { get; set; }
         public CommonParameters CommonParameters { get; set; }
         public List<Ms2ScanWithSpecificMass> PseudoMS2Scans { get; set; }
@@ -70,14 +71,43 @@ namespace EngineLayer.DIA
         public void GetMs1PeakCurves()
         {
             var allMs1Scans = MyMSDataFile.GetMS1Scans().ToArray();
-            var allMs1PeakCurves = PeakCurve.GetMs1PeakCurves(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
-            //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves(allMs1Scans, DIAparameters, CommonParameters);
-            //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves_isotope(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
-            Ms1PeakCurves = allMs1PeakCurves.Where(c => c.Peaks.Count >= 5).ToList();
-
-            //for debug
-            var allMasses = Ms1PeakCurves.Select(c => c.MonoisotopicMass).ToList();
-            var allRTs = Ms1PeakCurves.Select(c => c.ApexRT).ToList();
+            Ms1PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
+            foreach(var ms1window in DIAScanWindowMap.Keys)
+            {
+                Ms1PeakCurves[ms1window] = new List<PeakCurve>();
+                var ms1Range = new MzRange(ms1window.min, ms1window.max);
+                var allPrecursors = new List<Precursor>();
+                for (int i = 0; i < allMs1Scans.Length; i++)
+                {
+                    var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters, ms1Range);
+                    foreach (var envelope in envelopes)
+                    {
+                        var charge = envelope.Charge;
+                        double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
+                        double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
+                        var precursor = new Precursor(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                            allMs1Scans[i].OneBasedScanNumber, i);
+                        allPrecursors.Add(precursor);
+                    }
+                }
+                allPrecursors = allPrecursors.OrderByDescending(p => p.HighestPeakIntensity).ToList();
+                foreach (var precursor in allPrecursors)
+                {
+                    var peak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, Ms1PeakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0),
+                        DIAparameters.PeakSearchBinSize);
+                    if (peak.PeakCurve == null)
+                    {
+                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
+                        DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
+                        newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
+                        newPeakCurve.Charge = precursor.Charge;
+                        if(newPeakCurve.Peaks.Count > 4)
+                        {
+                            Ms1PeakCurves[ms1window].Add(newPeakCurve);
+                        }
+                    }
+                }
+            }
         }
 
         public void PrecursorFilter()
@@ -87,7 +117,7 @@ namespace EngineLayer.DIA
 
         public void GetMs2PeakCurves()
         {
-            var ms2PeakCurves = new Dictionary<MzRange, List<PeakCurve>>();
+            var ms2PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
             foreach (var ms2Group in DIAScanWindowMap)
             {
                 var ms2scans = ms2Group.Value.ToArray();
@@ -95,7 +125,7 @@ namespace EngineLayer.DIA
                 var allMs2Peaks = Peak.GetAllPeaks(ms2scans, DIAparameters.PeakSearchBinSize);
                 var rankedMs2Peaks = allMs2Peaks.OrderByDescending(p => p.Intensity).ToList();
                 var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparameters.PeakSearchBinSize);
-                ms2PeakCurves[range] = new List<PeakCurve>();
+                ms2PeakCurves[ms2Group.Key] = new List<PeakCurve>();
                 foreach (var peak in rankedMs2Peaks)
                 {
                     if (peak.PeakCurve == null)
@@ -104,7 +134,7 @@ namespace EngineLayer.DIA
                             DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
                         if (newPeakCurve.Peaks.Count > 4)
                         {
-                            ms2PeakCurves[range].Add(newPeakCurve);
+                            ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
                         }
                     }
                 }
@@ -117,7 +147,7 @@ namespace EngineLayer.DIA
             PFgroups = new List<PrecursorFragmentsGroup>();
             foreach (var ms2group in Ms2PeakCurves)
             {
-                var precursorsInRange = Ms1PeakCurves.Where(c => c.MzRange.IsOverlapping(ms2group.Key)).ToArray();
+                var precursorsInRange = Ms1PeakCurves[ms2group.Key].ToArray();
 
                 Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 },
                 (partitionRange, loopState) =>
