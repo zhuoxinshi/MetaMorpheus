@@ -23,13 +23,12 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\test2.0_corr0.7_noGroup_highestPeakXIC_cubicSpline_apexRT0.25_noPeakTrim_maxMissed1_overlap0.3_FragRank300";
+            string outputFolder = @"E:\DIA\TestSearch\test2.0_corr0_noGroup_highestPeakXIC_cubicSpline_apexRT0.25_noPeakTrim_maxMissed1_overlap0.2_FragRank100";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 1, 100, 0.3, 0.7, 0.25, 300, 25);
-            //string myFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\SmallCalibratible_Yeast.mzML");
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 1, 100, 0.2, 0, 0.25, 100, 25);
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
             string myDatabase = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
             string myDatabase_xml = @"E:\ISD Project\ISD_240812\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
