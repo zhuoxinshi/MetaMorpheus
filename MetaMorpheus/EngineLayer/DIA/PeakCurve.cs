@@ -16,7 +16,7 @@ namespace EngineLayer.DIA
 {
     public class PeakCurve
     {
-        public PeakCurve(List<Peak> peaks, int msLevel, MzRange isolationRange, double mass = double.NaN, int charge = 0, double startMz = 0, double endMz = 0)
+        public PeakCurve(List<Peak> peaks, int msLevel, MzRange isolationRange, double mass = double.NaN, int charge = 0, double startMz = 0, double endMz = 0, int index = 0)
         {
             Peaks = peaks;
             MsLevel = msLevel;
@@ -25,6 +25,7 @@ namespace EngineLayer.DIA
             Charge = charge;
             StartMz = startMz;
             EndMz = endMz;
+            Index = index;
         }
 
         public List<Peak> Peaks { get; set; }
@@ -44,6 +45,7 @@ namespace EngineLayer.DIA
         public double AveragedIntensity => AverageIntensity();
         public LinearSpline LinearSpline { get; set; }
         public CubicSpline CubicSpline { get; set; }    
+        public int Index {  get; set; }
 
         public double AverageMz()
         {

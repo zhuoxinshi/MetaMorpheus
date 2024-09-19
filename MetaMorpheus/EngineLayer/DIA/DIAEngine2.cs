@@ -72,7 +72,8 @@ namespace EngineLayer.DIA
         {
             var allMs1Scans = MyMSDataFile.GetMS1Scans().ToArray();
             Ms1PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
-            foreach(var ms1window in DIAScanWindowMap.Keys)
+            int index = 1;
+            foreach (var ms1window in DIAScanWindowMap.Keys)
             {
                 Ms1PeakCurves[ms1window] = new List<PeakCurve>();
                 var ms1Range = new MzRange(ms1window.min, ms1window.max);
@@ -104,6 +105,8 @@ namespace EngineLayer.DIA
                         if(newPeakCurve.Peaks.Count > 4)
                         {
                             Ms1PeakCurves[ms1window].Add(newPeakCurve);
+                            newPeakCurve.Index = index;
+                            index++;
                         }
                     }
                 }
@@ -182,6 +185,7 @@ namespace EngineLayer.DIA
                         }
                         if (preFragGroup.PFpairs.Count > 0)
                         {
+                            preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
                             PFgroups.Add(preFragGroup);
                         }
                     }
@@ -189,18 +193,24 @@ namespace EngineLayer.DIA
             }
             //debug
             var rankedPFgroups = PFgroups.OrderByDescending(pf => pf.PFpairs.Count).ToList();
+
+            //TODO?
+            //Check the fragment correlations within each pfgroup for filtering
         }
 
         public void ConstructNewMs2Scans()
         {
             PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
-            int oneBasedScanNum = 1;
             foreach (var pfGroup in PFgroups)
             {
+                if (pfGroup.Index == 156)
+                {
+                    bool stop = true;
+                }
                 var mzs = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedMz).ToArray();
                 var intensities = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedIntensity).ToArray();
                 var spectrum = new MzSpectrum(mzs, intensities, false);
-                var newMs2Scan = new MsDataScan(spectrum, oneBasedScanNum, 2, true, Polarity.Positive, double.NaN, new MzRange(mzs.Min(), mzs.Max()), null,
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, double.NaN, new MzRange(mzs.Min(), mzs.Max()), null,
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, CommonParameters);
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
@@ -208,7 +218,6 @@ namespace EngineLayer.DIA
                 Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoPeakMz, charge
                     , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
                 PseudoMs2WithPre.Add(scanWithprecursor);
-                oneBasedScanNum++;
             }
         }
     }

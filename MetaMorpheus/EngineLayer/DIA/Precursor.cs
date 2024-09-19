@@ -20,6 +20,7 @@ namespace EngineLayer.DIA
         public int ZeroBasedScanIndex {  get; set; }
         public IsotopicEnvelope Envelope { get; set; }
         public int MassIndex => Envelope.MassIndex;
+        public int Index;
 
         public Precursor(IsotopicEnvelope envelope, int charge, double rt, double highestPeakMz, double highestPeakIntensity, double monoisotopicMass, int scanNumber, int zeroBasedScanNum)
         {

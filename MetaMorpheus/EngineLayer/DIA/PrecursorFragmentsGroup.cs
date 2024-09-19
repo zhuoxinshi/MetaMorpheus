@@ -16,11 +16,14 @@ namespace EngineLayer.DIA
 
         public PeakCurve PrecursorPeakCurve { get; set; }
         public List<PrecursorFragmentPair> PFpairs { get; set; }
+        public int Index => PrecursorPeakCurve.Index;
 
         //TODO: finish this
         public static PrecursorFragmentsGroup GroupPF(PeakCurve prePeakCurve, List<PeakCurve> fragPeakCurves)
         {
             return new PrecursorFragmentsGroup(prePeakCurve);
         }
+        
+        //public GetPrecursorRank
     }
 }

@@ -324,5 +324,56 @@ namespace Test.TestDIA
             //check
             var numOfPeaks = ms1PeakCurves.Sum(pc => pc.Peaks.Count);
         }
+
+        [Test]
+        public static void VisualizeScanXIC()
+        {
+            var diaFile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
+            var commonParameters = new CommonParameters();
+            commonParameters.TrimMsMsPeaks = false;
+            MyFileManager myFileManager = new MyFileManager(true);
+            var diaDataFile = myFileManager.LoadFile(diaFile, commonParameters);
+            var diaParam = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 1, 100, 0.2, 0.5, 0.25, 100, 25);
+            var diaEngine2 = new DIAEngine2(diaDataFile, commonParameters, diaParam);
+            diaEngine2.Ms1PeakIndexing();
+            diaEngine2.ConstructMs2Group();
+            diaEngine2.GetMs1PeakCurves();
+            diaEngine2.GetMs2PeakCurves();
+            diaEngine2.PrecursorFragmentPairing();
+            diaEngine2.ConstructNewMs2Scans();
+
+            string pepFile = @"E:\DIA\TestSearch\test2.0_corr0.5_noGroup_highestPeakXIC_cubicSpline_apexRT0.25_noPeakTrim_maxMissed1_overlap0.2_FragRank100\AllPeptides.psmtsv";
+            var psms = PsmTsvReader.ReadTsv(pepFile, out List<string> warnings);
+            var seq = "";
+            int scanNumber = 156;
+            var pfgroup = diaEngine2.PFgroups.Where(g => g.Index == scanNumber).First();
+            var psm = psms.Where(psm => psm.Ms2ScanNumber == scanNumber).First();
+            var matchedIonMzs = psm.MatchedIons.Select(i => i.Mz);
+
+            var plots = new List<GenericChart>();
+            var precursorPeakCurve = pfgroup.PrecursorPeakCurve;
+            var precursorPlot = Chart2D.Chart.Point<double, double, string>(
+                x: precursorPeakCurve.Peaks.Select(p => p.RetentionTime),
+                y: precursorPeakCurve.Peaks.Select(p => p.Intensity)).WithTraceInfo("precursor").WithMarkerStyle(Color: Color.fromString("red"));
+            plots.Add(precursorPlot);
+            foreach(double mz in matchedIonMzs)
+            {
+                var fragmentPeakCurve = pfgroup.PFpairs.Where(pair => Math.Abs(pair.FragmentPeakCurve.AveragedMz - mz) < 0.001).First().FragmentPeakCurve;
+                var fragmentPlot = Chart2D.Chart.Point<double, double, string>(
+                    x: fragmentPeakCurve.Peaks.Select(p => p.RetentionTime),
+                    y: fragmentPeakCurve.Peaks.Select(p => p.Intensity)).WithTraceInfo("fragment").WithMarkerStyle(Color: Color.fromString("blue"));
+                plots.Add(fragmentPlot);
+            }
+            var combinedPlot = Chart.Combine(plots);
+            combinedPlot.Show();
+
+            //spline plots
+            var splinePlots = new List<GenericChart>();
+            var allPCs = new List<PeakCurve> { precursorPeakCurve};
+            allPCs.AddRange(pfgroup.PFpairs.Select(pair => pair.FragmentPeakCurve).ToList());
+            var startRT = allPCs.Min(pc => pc.StartRT);
+            var endRT = allPCs.Max(pc => pc.EndRT); 
+
+        }
     }
 }
