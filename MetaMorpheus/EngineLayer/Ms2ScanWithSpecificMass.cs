@@ -49,7 +49,6 @@ namespace EngineLayer
         public List<Ms2ScanWithSpecificMass> ChildScans { get; set; } // MS2/MS3 scans that are children of this MS2 scan
         private double[] DeconvolutedMonoisotopicMasses;
         public string NativeId { get; } 
-
         public int OneBasedScanNumber => TheScan.OneBasedScanNumber;
 
         public int? OneBasedPrecursorScanNumber => TheScan.OneBasedPrecursorScanNumber;
@@ -59,6 +58,7 @@ namespace EngineLayer
         public int NumPeaks => TheScan.MassSpectrum.Size;
 
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
+        public double HighestPrecursorPeakMz { get; set; }
 
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {

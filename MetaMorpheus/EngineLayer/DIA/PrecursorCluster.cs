@@ -13,7 +13,7 @@ namespace EngineLayer.DIA
 {
     public class PrecursorCluster
     {
-        public PrecursorCluster(double monoisotopicMass, int charge, double totalIntensity = 0, List<Precursor> precursors = null)
+        public PrecursorCluster(double monoisotopicMass, int charge, double totalIntensity = 0, List<DeconvolutedMass> precursors = null)
         {
             Precursors = precursors;
             MonoisotopicMass = monoisotopicMass;
@@ -21,7 +21,7 @@ namespace EngineLayer.DIA
             TotalIntensity = totalIntensity;
         }
 
-        public List<Precursor> Precursors;
+        public List<DeconvolutedMass> Precursors;
         public List<PeakCurve> PeakCurves;
         public PeakCurve PeakCurveForGrouping {  get; set; }
         public double ApexRT => Precursors.OrderByDescending(p => p.Envelope.TotalIntensity).First().RetentionTime;
@@ -160,7 +160,7 @@ namespace EngineLayer.DIA
         public static List<PeakCurve> GetMs1PeakCurves_isotope(MsDataScan[] allMs1Scans, List<Peak>[] ms1PeakTable, DIAparameters DIAparameters, CommonParameters commonParameters)
         {
             var allMs1PeakCurves = new List<PeakCurve>();
-            var allPrecursors = new List<Precursor>();
+            var allPrecursors = new List<DeconvolutedMass>();
             for (int i = 0; i < allMs1Scans.Length; i++)
             {
                 var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], commonParameters.PrecursorDeconvolutionParameters);
@@ -169,7 +169,7 @@ namespace EngineLayer.DIA
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new Precursor(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }

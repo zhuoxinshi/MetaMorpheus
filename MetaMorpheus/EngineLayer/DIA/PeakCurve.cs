@@ -1,6 +1,5 @@
 ﻿using Chemistry;
 using Easy.Common.Extensions;
-using FlashLFQ;
 using MassSpectrometry;
 using MathNet.Numerics.Statistics;
 using MzLibUtil;
@@ -10,7 +9,6 @@ using System.Linq;
 using Plotly.NET;
 using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
-using System.Numerics;
 
 namespace EngineLayer.DIA
 {
@@ -26,6 +24,7 @@ namespace EngineLayer.DIA
             StartMz = startMz;
             EndMz = endMz;
             Index = index;
+            PFpairs = new List<PrecursorFragmentPair>();
         }
 
         public List<Peak> Peaks { get; set; }
@@ -34,6 +33,7 @@ namespace EngineLayer.DIA
         public double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
         public List<Peak> IsotopePeaks { get; set; }
+        public List<double> IsotopePeaksMz { get; set; }
         public double StartRT => Peaks.Select(p => p.RetentionTime).OrderBy(t => t).First();
         public double EndRT => Peaks.Select(p => p.RetentionTime).OrderByDescending(t => t).First();
         public double StartMz {  get; set; }
@@ -46,6 +46,8 @@ namespace EngineLayer.DIA
         public LinearSpline LinearSpline { get; set; }
         public CubicSpline CubicSpline { get; set; }    
         public int Index {  get; set; }
+        public List<PrecursorFragmentPair> PFpairs { get; set; }
+        public IsotopicEnvelope Envelope { get; set; }
 
         public double AverageMz()
         {
@@ -109,6 +111,19 @@ namespace EngineLayer.DIA
             var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
             var cubicSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
             this.CubicSpline = cubicSpline;
+        }
+
+        public void GetPrecursorRanks()
+        {
+            // Sort PFpairs by correlation in descending order and assign ranks
+            var rankedPairs = PFpairs.OrderByDescending(p => p.Correlation)
+                .Select((p, index) => new { PFpair = p, Rank = index + 1 }).ToList();
+
+            // Update the PFpairs with their ranks
+            foreach (var rankedPair in rankedPairs)
+            {
+                rankedPair.PFpair.PrecursorRank = rankedPair.Rank;
+            }
         }
 
         public static Peak GetPeakFromScan(double targetMz, List<Peak>[] peakTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
@@ -187,7 +202,7 @@ namespace EngineLayer.DIA
         }
 
         public static PeakCurve FindPeakCurve(Peak targetPeak, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
-            , Tolerance mzTolerance, int binSize)
+            , Tolerance mzTolerance, int binSize, double maxRTrange = 2)
         {
             var xic = new List<Peak>();
             xic.Add(targetPeak);
@@ -223,6 +238,10 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
+                if (newPeakCurve.EndRT - newPeakCurve.ApexRT > maxRTrange)
+                {
+                    break;
+                }
             }
 
             // go left
@@ -251,6 +270,10 @@ namespace EngineLayer.DIA
                 }
 
                 if (missedScans > maxMissedScans)
+                {
+                    break;
+                }
+                if (newPeakCurve.ApexRT - newPeakCurve.StartRT > maxRTrange)
                 {
                     break;
                 }
@@ -331,7 +354,7 @@ namespace EngineLayer.DIA
 
         public static double CalculateCorr_spline(PeakCurve peakCurve1, PeakCurve peakCurve2, string splineType, double timeInterval)
         {
-            if (peakCurve2.Peaks.Count <3 || peakCurve1.Peaks.Count < 3)
+            if (peakCurve2.Peaks.Count <5 || peakCurve1.Peaks.Count < 5)
             {
                 return 0;
             }
@@ -388,7 +411,7 @@ namespace EngineLayer.DIA
         public static List<PeakCurve> GetMs1PeakCurves(MsDataScan[] allMs1Scans, List<Peak>[] ms1PeakTable, DIAparameters DIAparameters, CommonParameters commonParameters)
         {
             //Get all precursors
-            var allPrecursors = new List<Precursor>();
+            var allPrecursors = new List<DeconvolutedMass>();
             for (int i = 0; i < allMs1Scans.Length; i++)
             {
                 var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], commonParameters.PrecursorDeconvolutionParameters);
@@ -397,7 +420,7 @@ namespace EngineLayer.DIA
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new Precursor(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }
@@ -463,6 +486,69 @@ namespace EngineLayer.DIA
                 overlap = 1;
             }
             return overlap;
+        }
+
+        public static List<GenericChart> VisualizePFgroups(MsDataFile dataFile, List<PsmFromTsv> psms, CommonParameters commonParameters, DIAparameters diaParam)
+        {
+            var diaEngine2 = new DIAEngine2(dataFile, commonParameters, diaParam);
+            diaEngine2.Ms1PeakIndexing();
+            diaEngine2.ConstructMs2Group();
+            diaEngine2.GetMs1PeakCurves();
+            diaEngine2.GetMs2PeakCurves();
+
+            var chartList = new List<GenericChart>();
+            foreach (var psm in psms)
+            {
+                var precursorPeakCurve = diaEngine2.Ms1PeakCurves.Values.SelectMany(v => v).Where(pc => pc.Index == psm.Ms2ScanNumber).First();
+                var ms2curves = diaEngine2.Ms2PeakCurves.Where(d => precursorPeakCurve.AveragedMz +1 > d.Key.min && precursorPeakCurve.AveragedMz -1 < d.Key.max)
+                .First().Value;
+                var pfgroup = DIAEngine2.GroupPrecursorFragments(precursorPeakCurve, ms2curves, diaParam);
+                var plots = new List<GenericChart>();
+                var normalizedIntensity = precursorPeakCurve.Peaks.Select(p => Math.Log10(p.Intensity));
+                var precursorPlot = Chart2D.Chart.Line<double, double, string>(
+                    x: precursorPeakCurve.Peaks.Select(p => p.RetentionTime),
+                    y: normalizedIntensity).WithTraceInfo($"precursor_{Math.Round(precursorPeakCurve.AveragedMz, 3)}_{psm.DecoyContamTarget}").WithMarkerStyle(Color: Color.fromString("red"));
+                plots.Add(precursorPlot);
+
+                var matchedIonPeakCurves = new List<PeakCurve>();
+                var matchedIonMzs = psm.MatchedIons.Select(i => i.Mz);
+                foreach (double mz in matchedIonMzs)
+                {
+                    try
+                    {
+                        var fragmentPeakCurve = pfgroup.PFpairs.Where(p => Math.Abs(p.FragmentPeakCurve.AveragedMz - mz) < 0.005).First().FragmentPeakCurve;
+                        matchedIonPeakCurves.Add(fragmentPeakCurve);
+                    }
+                    catch
+                    {
+
+                    }
+                }
+                foreach (var pf in pfgroup.PFpairs)
+                {
+                    if (!matchedIonPeakCurves.Contains(pf.FragmentPeakCurve))
+                    {
+                        var norm2 = pf.FragmentPeakCurve.Peaks.Select(p => Math.Log10(p.Intensity));
+                        var fragmentPlot2 = Chart2D.Chart.Line<double, double, string>(
+                                                       x: pf.FragmentPeakCurve.Peaks.Select(p => p.RetentionTime),
+                                                       y: norm2).WithTraceInfo($"fragment_{Math.Round(pf.FragmentPeakCurve.AveragedMz, 3)}_{pf.Correlation}_{pf.FragmentRank}")
+                                                       .WithMarkerStyle(Color: Color.fromString("green"));
+                        plots.Add(fragmentPlot2);
+                    }
+                    else
+                    {
+                        var norm2 = pf.FragmentPeakCurve.Peaks.Select(p => Math.Log10(p.Intensity));
+                        var fragmentPlot2 = Chart2D.Chart.Line<double, double, string>(
+                                                       x: pf.FragmentPeakCurve.Peaks.Select(p => p.RetentionTime),
+                                                       y: norm2).WithTraceInfo($"fragment_{Math.Round(pf.FragmentPeakCurve.AveragedMz, 3)}_{pf.Correlation}_{pf.FragmentRank}")
+                                                       .WithMarkerStyle(Color: Color.fromString("blue"));
+                        plots.Add(fragmentPlot2);
+                    }
+                }
+                var combinedPlot = Chart.Combine(plots).WithLayout(Layout.init<string>(Title: Title.init($"{psm.Ms2ScanNumber}_{psm.Score}_{psm.DecoyContamTarget}")));
+                chartList.Add(combinedPlot);
+            }   
+            return chartList;
         }
     }
 }

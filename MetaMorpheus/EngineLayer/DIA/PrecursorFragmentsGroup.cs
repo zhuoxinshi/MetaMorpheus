@@ -17,6 +17,7 @@ namespace EngineLayer.DIA
         public PeakCurve PrecursorPeakCurve { get; set; }
         public List<PrecursorFragmentPair> PFpairs { get; set; }
         public int Index => PrecursorPeakCurve.Index;
+        public int NumHighCorrFragments { get; set; }
 
         //TODO: finish this
         public static PrecursorFragmentsGroup GroupPF(PeakCurve prePeakCurve, List<PeakCurve> fragPeakCurves)
@@ -24,6 +25,9 @@ namespace EngineLayer.DIA
             return new PrecursorFragmentsGroup(prePeakCurve);
         }
         
-        //public GetPrecursorRank
+        public void GetNumberOfHighCorrFragments(DIAparameters diaParam)
+        {
+            NumHighCorrFragments = PFpairs.Where(p => p.Correlation >= diaParam.HighCorrThreshold).Count();
+        }
     }
 }

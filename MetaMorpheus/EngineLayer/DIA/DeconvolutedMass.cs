@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EngineLayer.DIA
 {
-    public class Precursor
+    public class DeconvolutedMass
     {
         public int Charge { get; set; }
         public double RetentionTime { get; set; }
@@ -22,7 +22,7 @@ namespace EngineLayer.DIA
         public int MassIndex => Envelope.MassIndex;
         public int Index;
 
-        public Precursor(IsotopicEnvelope envelope, int charge, double rt, double highestPeakMz, double highestPeakIntensity, double monoisotopicMass, int scanNumber, int zeroBasedScanNum)
+        public DeconvolutedMass(IsotopicEnvelope envelope, int charge, double rt, double highestPeakMz, double highestPeakIntensity, double monoisotopicMass, int scanNumber, int zeroBasedScanNum)
         {
             Envelope = envelope;
             Charge = charge;
