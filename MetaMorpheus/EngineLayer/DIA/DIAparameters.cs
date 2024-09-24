@@ -18,9 +18,10 @@ namespace EngineLayer.DIA
         public double CorrelationCutOff {  get; set; }
         public double ApexRtTolerance { get; set; }
         public int FragmentRankCutOff {  get; set; }
+        public double MaxRTrange { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, 
-            double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000)
+            double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, double maxRTrange = 2)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -30,6 +31,7 @@ namespace EngineLayer.DIA
             CorrelationCutOff = correlationCutOff;
             ApexRtTolerance = apexRtTolerance;
             FragmentRankCutOff = fragmentRankCutOff;
+            MaxRTrange = maxRTrange;
         }
 
     }
