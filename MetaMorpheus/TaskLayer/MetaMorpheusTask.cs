@@ -217,7 +217,8 @@ namespace TaskLayer
                     }
                 });
             PeakCurve.GetPrecursorPeakCurve(scansWithPrecursors, ms1scans, allPeaks, ms1PeakTable, DIAparam, scanIndexMap);
-            var newScanWithPre = PeakCurve.GetPseudoMs2Scans(scansWithPrecursors, commonParameters, DIAparam, allPeaks);
+            //var newScanWithPre = PeakCurve.GetPseudoMs2Scans(scansWithPrecursors, commonParameters, DIAparam, allPeaks);
+            var newScanWithPre = PeakCurve.GetPseudoMs2Scans_PFgroup(scansWithPrecursors, commonParameters, DIAparam, allPeaks, allMs2PeakCurves, myMSDataFile);
 
             return newScanWithPre;
         }

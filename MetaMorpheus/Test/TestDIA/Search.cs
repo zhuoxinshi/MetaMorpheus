@@ -23,12 +23,12 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\scanBased2_corr0.5_highestPeakXIC_cubicSpline0.05_apexRT0.25_noPeakTrim_maxMissed1_overlap0.2_Frank150";
+            string outputFolder = @"E:\DIA\TestSearch\scanBased2_pfGroup_corr0.5_highestPeakXIC_ms1Tol5ppm_cubicSpline0.05_apexRT0.25_noPeakTrim_maxMissed1_overlap0.2_Frank100_Prank10_maxRT0.5";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 1, 100, 0.2, 0.5, 0.25, 150);
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 1, 100, 0.2, 0.5, 0.25, 100, 10, maxRTrange: 0.5);
             //string myFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\SmallCalibratible_Yeast.mzML");
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
             var fm = new MyFileManager(false);
