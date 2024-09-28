@@ -449,6 +449,15 @@ namespace TaskLayer
                 
                 if (psm.BioPolymerWithSetModsMonoisotopicMass.HasValue)
                 {
+                    try { 
+                        _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2].calculatedMassToCharge = Math.Round(psm.BioPolymerWithSetModsMonoisotopicMass.Value.ToMz(psm.ScanPrecursorCharge), 5);
+                    }
+                    catch
+                    {
+                        scan_result_scan_item = null;
+                        _mzid = null;
+                        _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2].calculatedMassToCharge = Math.Round(psm.BioPolymerWithSetModsMonoisotopicMass.Value.ToMz(psm.ScanPrecursorCharge), 5);
+                    }
                     _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2].calculatedMassToCharge = Math.Round(psm.BioPolymerWithSetModsMonoisotopicMass.Value.ToMz(psm.ScanPrecursorCharge), 5);
                     _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2].calculatedMassToChargeSpecified = true;
                 }

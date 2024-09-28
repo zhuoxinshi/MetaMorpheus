@@ -128,6 +128,7 @@ namespace EngineLayer.DIA
                 rankedPair.PFpair.PrecursorRank = rankedPair.Rank;
             }
         }
+
         public static Peak GetPeakFromScan(double targetMz, List<Peak>[] peakTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
         {
             Peak bestPeak = null;
@@ -631,6 +632,7 @@ namespace EngineLayer.DIA
             {
                 ms2curve.GetPrecursorRanks();
             }
+            int oneBasedScanNum = 1;
             for (var i = 0; i < pfGroups.Length; i++)
             {
                 foreach (var group in pfGroups[i])
@@ -645,7 +647,7 @@ namespace EngineLayer.DIA
                     var mzs = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedMz).ToArray();
                     var intensities = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedIntensity).ToArray();
                     var spectrum = new MzSpectrum(mzs, intensities, false);
-                    var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                    var newMs2Scan = new MsDataScan(spectrum, oneBasedScanNum, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
                                 MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                     var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, commonParam);
                     var charge = pfGroup.PrecursorPeakCurve.Charge;
@@ -653,9 +655,10 @@ namespace EngineLayer.DIA
                     Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, pfGroup.MonoPeakMz, charge
                         , myMSDataFile.FilePath, commonParam, neutralExperimentalFragments);
                     newScansWithPre[i].Add(scanWithprecursor);
+                    oneBasedScanNum++;
                 }
             }
-            return newScansWithPre;
+                return newScansWithPre;
         }
         public static void GetPrecursorPeakCurve(List<Ms2ScanWithSpecificMass>[] scansWithPrecursor, MsDataScan[] ms1scans, List<Peak>[] allPeaks,
             List<Peak>[] ms1PeakTable, DIAparameters DIAparam, Dictionary<int, int> scanIndexMap)
