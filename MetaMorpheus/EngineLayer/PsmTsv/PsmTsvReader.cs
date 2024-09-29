@@ -74,6 +74,7 @@ namespace EngineLayer
             parsedHeader.Add(PsmTsvHeader.PrecursorIntensity, Array.IndexOf(spl, PsmTsvHeader.PrecursorIntensity));
             parsedHeader.Add(PsmTsvHeader.PrecursorMz, Array.IndexOf(spl, PsmTsvHeader.PrecursorMz));
             parsedHeader.Add(PsmTsvHeader.PrecursorMass, Array.IndexOf(spl, PsmTsvHeader.PrecursorMass));
+            parsedHeader.Add(PsmTsvHeader.PrecursorHighestPeakMz, Array.IndexOf(spl, PsmTsvHeader.PrecursorHighestPeakMz));
             parsedHeader.Add(PsmTsvHeader.Score, Array.IndexOf(spl, PsmTsvHeader.Score));
             parsedHeader.Add(PsmTsvHeader.DeltaScore, Array.IndexOf(spl, PsmTsvHeader.DeltaScore));
             parsedHeader.Add(PsmTsvHeader.Notch, Array.IndexOf(spl, PsmTsvHeader.Notch));
