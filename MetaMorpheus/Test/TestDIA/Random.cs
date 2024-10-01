@@ -79,6 +79,17 @@ namespace Test.TestDIA
                 envelopes_small.AddRange(envelopes);
             }
             envelopes_small = envelopes_small.OrderBy(p => p.MonoisotopicMass.ToMz(p.Charge)).ToList();
+            var diaTestScan2 = ms1scans.Where(p => p.OneBasedScanNumber == 1663).FirstOrDefault();
+            var test20mz = Deconvoluter.Deconvolute(diaTestScan2, task.CommonParameters.PrecursorDeconvolutionParameters, new MzRange(613, 631));
+            var test5mz = new List<IsotopicEnvelope>();
+            var windows5mz = new List<MzRange> { new MzRange(613, 618), new MzRange(616, 621), new MzRange(619, 624), new MzRange(622, 627), new MzRange(625, 631) };
+            var windows10mz = new List<MzRange> { new MzRange(613, 623), new MzRange(621, 631)};
+            var test10mz = new List<IsotopicEnvelope>();
+            foreach (var window in windows10mz)
+            {
+                var envelopes = Deconvoluter.Deconvolute(diaTestScan2, task.CommonParameters.PrecursorDeconvolutionParameters, window);
+                test10mz.AddRange(envelopes);
+            }
 
             var tdMs1 = ddaFile.GetMS1Scans().Where(p => p.OneBasedScanNumber == 1280).FirstOrDefault();
             var tdDeconParam = new ClassicDeconvolutionParameters(10, 40, 5, 3);
@@ -92,6 +103,8 @@ namespace Test.TestDIA
                     smallwindowTd.AddRange(envelopes);
                 }
             }
+
+            
         }
 
     }
