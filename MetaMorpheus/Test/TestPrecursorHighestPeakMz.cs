@@ -15,14 +15,14 @@ namespace Test
         [Test]
         public static void TestPreHighestPeakMz()
         {
-            string file = @"E:\ISD Project\Targeted\fd_incList3.psmtsv";
+            string file = @"E:\ISD Project\Targeted\fd_incList4.psmtsv";
             var psms = PsmTsvReader.ReadTsv(file, out var warnings);
             var outputList = new List<(string sequence, double mz, double? startRT, double? EndRT)>();
             foreach(var psm in psms)
             {
                 var highestPeakMz = psm.PrecursorHighestPeakMz;
-                var startRT = psm.RetentionTime - 2.5;
-                var endRT = psm.RetentionTime + 2.5;
+                var startRT = psm.RetentionTime - 3;
+                var endRT = psm.RetentionTime + 3;
                 var seq = psm.FullSequence;
                 if (psm.RetentionTime < 3)
                 {
@@ -35,10 +35,10 @@ namespace Test
                 }
             }
 
-            var outputTsv = @"E:\ISD Project\Targeted\fd_inclusionList3.csv";
+            var outputTsv = @"E:\ISD Project\Targeted\fd_inclusionList4.csv";
             using (var sw = new StreamWriter(File.Create(outputTsv)))
             {
-                sw.WriteLine("Compound, Mz, t start (min), t stop (min)");
+                sw.WriteLine("Compound, m/z, t start (min), t stop (min)");
                 foreach (var id in outputList)
                 {
                     sw.WriteLine($"{id.sequence},{id.mz},{id.startRT},{id.EndRT}");
