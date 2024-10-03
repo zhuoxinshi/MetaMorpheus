@@ -113,6 +113,25 @@ namespace EngineLayer.DIA
             this.CubicSpline = cubicSpline;
         }
 
+        public static void SplitPeak(PeakCurve pc)
+        {
+            pc.GetCubicSpline();
+            double[] stationaryPt = pc.CubicSpline.StationaryPoints();
+            var minima = new List<double>();
+            var maxima = new List<double>();
+            foreach (var point in stationaryPt)
+            {
+                if (pc.CubicSpline.Differentiate2(point) < 0)
+                {
+                    maxima.Add(point);
+                }
+                if (pc.CubicSpline.Differentiate2(point) > 0) 
+                {
+                    minima.Add(point);
+                }
+            }
+        }
+
         public void GetPrecursorRanks()
         {
             // Sort PFpairs by correlation in descending order and assign ranks
