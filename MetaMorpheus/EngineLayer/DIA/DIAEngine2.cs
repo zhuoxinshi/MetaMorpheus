@@ -116,6 +116,8 @@ namespace EngineLayer.DIA
                             Ms1PeakCurves[ms1window].Add(newPeakCurve);
                             newPeakCurve.Index = index;
                             index++;
+                            //debug
+                            //newPeakCurve.GetCubicSpline();
                         }
                     }
                 }
@@ -147,6 +149,8 @@ namespace EngineLayer.DIA
                         if (newPeakCurve.Peaks.Count > 4)
                         {
                             ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
+                            //debug
+                            newPeakCurve.GetCubicSpline();
                         }
                     }
                 }

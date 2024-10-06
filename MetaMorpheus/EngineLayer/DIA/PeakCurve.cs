@@ -111,6 +111,27 @@ namespace EngineLayer.DIA
             var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
             var cubicSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
             this.CubicSpline = cubicSpline;
+
+            //plot
+            var rtSeq = new List<double>();
+            var intensities = new List<double>();
+            for (double i = StartRT; i < EndRT; i += 0.0001)
+            {
+                rtSeq.Add(i);
+            }
+            foreach (var rt in rtSeq)
+            {
+                intensities.Add(cubicSpline.Interpolate(rt));
+            }
+
+            var plot1 = Chart2D.Chart.Point<double, double, string>(
+                x: Peaks.Select(p => p.RetentionTime),
+                y: Peaks.Select(p => p.Intensity)).WithTraceInfo("original").WithMarkerStyle(Color: Color.fromString("red"));
+            var plot2 = Chart2D.Chart.Point<double, double, string>(
+                x: rtSeq,
+                y: intensities).WithTraceInfo("interpolate").WithMarkerStyle(Color: Color.fromString("blue"));
+            var combinedPlot = Chart.Combine(new[] { plot1, plot2 });
+            combinedPlot.Show();
         }
 
         public static void SplitPeak(PeakCurve pc)
