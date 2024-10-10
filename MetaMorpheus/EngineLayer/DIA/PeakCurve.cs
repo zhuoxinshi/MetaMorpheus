@@ -9,6 +9,8 @@ using System.Linq;
 using Plotly.NET;
 using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
+using static Plotly.NET.StyleParam;
+using System.Xml.Linq;
 
 namespace EngineLayer.DIA
 {
@@ -48,6 +50,13 @@ namespace EngineLayer.DIA
         public int Index {  get; set; }
         public List<PrecursorFragmentPair> PFpairs { get; set; }
         public IsotopicEnvelope Envelope { get; set; }
+
+        public List<PeakRidge> PeakRidgeList { get; set; }
+        public List<(float rt1, float rt2, float rt3)> PeakRegionList { get; set; }
+        public List<List<float>> NoRidgeRegion { get; set; }
+
+        public WaveletMassDetector WaveletMassDetector { get; set; }
+        public CwtParameters CwtParameters => new CwtParameters(2f, 150, 0.1f, 0.3f);
 
         public double AverageMz()
         {
@@ -590,5 +599,301 @@ namespace EngineLayer.DIA
             }   
             return chartList;
         }
+
+        public void DetectPeakRegions()
+        {
+            PeakRidgeList = new List<PeakRidge>();
+            PeakRegionList = new List<(float rt1, float rt2, float rt3)>();
+
+            //need a parameter
+            if (EndRT - StartRT < 0.1)
+            {
+                return;
+            }
+
+            //need to consider other spline types and time interval settings
+            if (CubicSpline == null)
+            {
+                GetCubicSpline();
+            }
+            var rtSeq = new List<float>();
+            for (float i = (float)StartRT; i < (float)EndRT; i += 0.05f)
+            {
+                rtSeq.Add(i);
+            }
+            float[] peakArrayList = new float[rtSeq.Count*2];
+            for (int i = 0; i < rtSeq.Count; i++)
+            {
+                peakArrayList[2 * i] = rtSeq[i];
+                peakArrayList[2 * i + 1] = (float)CubicSpline.Interpolate(rtSeq[i]);
+            }
+            WaveletMassDetector = new WaveletMassDetector(peakArrayList, (int)(EndRT - StartRT) * 150);
+            WaveletMassDetector.Run();
+
+            int maxScale = WaveletMassDetector.PeakRidge.Length - 1;
+
+            float[] DisMatrixF = null;
+                                      
+            for (int i = maxScale; i >= 0; i--)//trace peak ridge from maximum wavelet scale to minimum scale
+            {
+                //Get peak ridge list (maximum RT points given a CWT scale
+                var PeakRidgeArray = WaveletMassDetector.PeakRidge[i];
+
+                if (PeakRidgeArray == null)
+                {
+                    maxScale = i;
+                    continue;
+                }
+                if (PeakRidgeArray.Count == 0)
+                {
+                    continue;
+                }
+
+                //RT distance matrix between the existing peak riges and peak ridges extracted from current CWT scale
+                int r = PeakRidgeList.Count(), c = PeakRidgeArray.Count();
+                if (DisMatrixF == null || r * c > DisMatrixF.Length)
+                {
+                    DisMatrixF = new float[r * c * 2];
+                }
+
+                for (int k = 0; k < PeakRidgeList.Count(); k++)
+                {   
+                    ///For each existing peak ridge line
+                    for (int l = 0; l < PeakRidgeArray.Count(); l++)
+                    {
+                        DisMatrixF[k * c + l] = (float)Math.Abs(PeakRidgeList[k].RT - PeakRidgeArray[l].rt);
+                    }
+                }
+
+                var conti = true;
+                var removedRidgeList = new List<(float rt, float intensity)>();
+                while (conti)
+                {
+                    //find the smallest value from the matrix first, if find the ridge it belongs to, add it then move to the second smallest; if not, stop looking
+                    float closest = float.MaxValue;
+                    int ExistingRideIdx = -1;
+                    int PeakRidgeInx = -1;
+                    for (int k = 0; k < PeakRidgeList.Count(); k++)
+                    {
+                        for (int l = 0; l < PeakRidgeArray.Count(); l++)
+                        {
+                            {
+                                if (DisMatrixF[k * c + l] < closest)
+                                {
+                                    closest = DisMatrixF[k * c + l];
+                                    ExistingRideIdx = k;
+                                    PeakRidgeInx = l;
+                                }
+                            }
+                        }
+                    }
+                    //if even closet is larger than MinRTRange (too far from the PeakRidge), stop looking => setting conti to false
+                    if (closest < float.MaxValue && closest <= CwtParameters.MinRTRange)
+                    {
+                        PeakRidge ridge = PeakRidgeList[ExistingRideIdx]; //update the matched PeakRidge line
+                        PeakRidgeList.Remove(ridge); //remove the existing PeakRidge line from the list
+                        ridge.lowScale = i; //update the lowest scale of the PeakRidge line
+                        ridge.ContinuousLevel++; //update the continous level of the PeakRidge line
+                        var nearestRidge = PeakRidgeArray[PeakRidgeInx]; //why updating the RT?
+                        ridge.RT = nearestRidge.rt;
+                        PeakRidgeList.Add(ridge); //re-add the updated PeakRidge to the list
+                        removedRidgeList.Add(nearestRidge); //remove the potential PeakRidge from the array so we don't start a new PeakRidge line on it
+                        for (int k = 0; k < PeakRidgeList.Count(); k++)
+                        {
+                            DisMatrixF[k * c + PeakRidgeInx] = float.MaxValue; //update the distance matrix so the potential PeakRidge point won't be matched again
+                        }
+                        for (int l = 0; l < PeakRidgeArray.Count(); l++)
+                        {
+                            DisMatrixF[ExistingRideIdx * c + l] = float.MaxValue; //update the distance matrix so the existing PeakRidge line won't be matched again
+                        }
+                    }
+                    else
+                    {
+                        conti = false;
+                    }
+                }
+
+                PeakRidgeArray.RemoveAll(x => removedRidgeList.Contains(x));
+                removedRidgeList.Clear();
+                removedRidgeList = null;
+
+                //remove the existing PeakRidge line if it is too far from the current CWT scale and do not have enough continuous levels
+                var removelist = new List<PeakRidge>();
+                for (int k = 0; k < PeakRidgeList.Count(); k++)
+                {
+                    PeakRidge existridge = PeakRidgeList[k];
+                    if (existridge.lowScale - i > 2 && existridge.ContinuousLevel < maxScale / 2)
+                    {
+                        removelist.Add(existridge);
+                    }
+                }
+                PeakRidgeList.RemoveAll(x => removelist.Contains(x));
+                removelist.Clear();
+                removelist = null;
+
+                //for those potential PeakRidge points that are not matched to any existing PeakRidge line, start a new PeakRidge line
+                if (i > maxScale / 2)
+                {
+                    foreach (var ridge in PeakRidgeArray)
+                    {
+                        PeakRidge newRidge = new PeakRidge(ridge.rt, ridge.intensity, i);
+                        newRidge.ContinuousLevel++;
+                        //newRidge.intensity = SmoothData.GetPoinByXCloset(newRidge.RT).getY();
+                        //don't understand why we need to find the point in the spline again; the intensity is already in the ridge
+                        PeakRidgeList.Add(newRidge);
+                    }
+                }
+                PeakRidgeArray.Clear();
+                PeakRidgeArray = null;
+            }
+
+            //if PeakRidgeList is empty or only have one PeakRidge line, add the whole region as a peak region
+            if (PeakRidgeList.Count() <= 1)
+            {
+                PeakRegionList.Add((rtSeq.First(), (float)ApexRT, rtSeq.Last()));
+                var RidgeRTs = new List<float>();
+                RidgeRTs.Add((float)ApexRT);
+                NoRidgeRegion.Add(RidgeRTs);
+            }
+
+            //if we have more than one PeakRidge line, we can have valley points now (local minimum)
+            if (PeakRidgeList.Count() > 1)
+            {
+                var ValleyPoints = new (float rt, float intensity)[PeakRidgeList.Count() + 1];
+                ValleyPoints[0] = (peakArrayList[0], peakArrayList[1]);
+                PeakRidge currentridge = PeakRidgeList.First();
+                var localmin = (-1f, float.MaxValue);
+                int startidx = rtSeq.IndexOf(currentridge.RT);
+
+                //loop over all PeakRidge lines, find the local minimum between two PeakRidge lines next to each other
+                for (int j = 1; j < PeakRidgeList.Count(); j++)
+                {
+                    PeakRidge nextridge = PeakRidgeList[j];
+                    for (int i = startidx; i < rtSeq.Count(); i++) //loop over all points in the spline
+                    {
+                        var point = (rtSeq[i], peakArrayList[2 * i + 1]);
+                        if (point.Item1 > currentridge.RT && point.Item1 < nextridge.RT) //check if the point is between the two PeakRidge lines
+                        {
+                            if (localmin.Item2 > point.Item2) //if the point is lower than the current local minimum, update the local minimum
+                            {
+                                localmin = (point.Item1, point.Item2);
+                            }
+                        }
+                        if (point.Item1 >= nextridge.RT) //when looping to the next PeakRidge line, stop the loop
+                        {
+                            startidx = i;
+                            break;
+                        }
+                    }
+                    ValleyPoints[j] = localmin; 
+                    localmin = (-1f, float.MaxValue);
+                    currentridge = nextridge;
+                }
+                ValleyPoints[PeakRidgeList.Count()] = (rtSeq.Last(), peakArrayList.Last());
+
+                //Correct ridge rt and intensity
+                startidx = 0;
+                for (int i = 0; i < PeakRidgeList.Count(); i++)
+                {
+                    PeakRidge ridge = PeakRidgeList[i];
+                    for (int j = startidx; j < rtSeq.Count(); j++)
+                    {
+                        var point = (rtSeq[j], peakArrayList[2*j +1]);
+                        if (point.Item1 < ValleyPoints[i + 1].rt)
+                        {
+                            if (ridge.Intensity < point.Item2)
+                            {
+                                ridge.Intensity = point.Item2;
+                                ridge.RT = point.Item1;
+                            }
+                        }
+                        else
+                        {
+                            startidx = j;
+                            break;
+                        }
+                    }
+                }//go through each peak (between two valleypoints), check if local maximum is another point
+
+                //Find split points to generate peak regions
+                bool[] Splitpoints = new bool[PeakRidgeList.Count() - 1];
+                int left = 0;
+                int right = PeakRidgeList.Count() - 1;
+                FindSplitPoint(left, right, ValleyPoints, Splitpoints);
+                bool split = false;
+
+                var RidgeRTs = new List<float>();
+                startidx = 0;
+                PeakRidge maxridge = PeakRidgeList.First();
+
+                for (int i = 0; i < PeakRidgeList.Count() - 1; i++)
+                {
+                    RidgeRTs.Add(PeakRidgeList[i].RT);
+                    if (PeakRidgeList[i].Intensity > maxridge.Intensity)
+                    {
+                        maxridge = PeakRidgeList[i]; //find the apex of this split region
+                    }
+                    if (Splitpoints[i])
+                    {
+                        PeakRegionList.Add((ValleyPoints[startidx].Item1, maxridge.RT, ValleyPoints[i + 1].Item1));
+                        NoRidgeRegion.Add(RidgeRTs);
+
+                        maxridge = PeakRidgeList[i + 1];
+                        RidgeRTs = new List<float>(); //ridgeRTs updates everytime there is a split, it contains all ridge RTs for a split region
+                        startidx = i + 1;
+                    }
+                }
+                RidgeRTs.Add(PeakRidgeList.Last().RT);
+                if (PeakRidgeList.Last().Intensity > maxridge.Intensity)
+                {
+                    maxridge = PeakRidgeList[PeakRidgeList.Count() - 1];
+                }
+                PeakRegionList.Add((ValleyPoints[startidx].Item1, maxridge.RT, ValleyPoints[PeakRidgeList.Count()].Item1));
+                //RidgeRTs.trimToSize();
+                NoRidgeRegion.Add(RidgeRTs);
+            }
+            WaveletMassDetector = null;
+            PeakRidgeList.Clear();
+            PeakRidgeList = null;
+        }
+
+        private void FindSplitPoint(int left, int right, (float, float)[] ValleyPoints, bool[] splitpoints)
+        {
+            for (int i = left; i < right; i++)
+            {
+                if (ValidSplitPoint(left, right, i, ValleyPoints))
+                {
+                    splitpoints[i] = true;
+                    FindSplitPoint(left, i, ValleyPoints, splitpoints);
+                    FindSplitPoint(i + 1, right, ValleyPoints, splitpoints);
+                    break;
+                }
+            }
+        }
+
+        private bool ValidSplitPoint(int left, int right, int cut, (float, float)[] ValleyPoints)
+        {
+
+            PeakRidge leftridge = PeakRidgeList[left];
+            PeakRidge rightridge = PeakRidgeList[cut + 1];
+
+            for (int i = left; i <= cut; i++)
+            {
+                if (PeakRidgeList[i].Intensity > leftridge.Intensity)
+                {
+                    leftridge = PeakRidgeList[i];
+                }
+            }
+            for (int i = cut + 1; i <= right; i++)
+            {
+                if (PeakRidgeList[i].Intensity > rightridge.Intensity)
+                {
+                    rightridge = PeakRidgeList[i];
+                }
+            }
+            return (Math.Abs(ValleyPoints[left].Item2 - ValleyPoints[cut + 1].Item2) / leftridge.Intensity < CwtParameters.SymThreshold
+                && Math.Abs(ValleyPoints[cut + 1].Item2 - ValleyPoints[right + 1].Item2) / rightridge.Intensity < CwtParameters.SymThreshold);
+        }
     }
-}
+ 
+    }

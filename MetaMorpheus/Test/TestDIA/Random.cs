@@ -16,6 +16,8 @@ using MathNet.Numerics.Interpolation;
 using static iText.IO.Util.IntHashtable;
 using OxyPlot.Axes;
 using static Plotly.NET.StyleParam;
+using Omics.Modifications;
+using UsefulProteomicsDatabases;
 
 namespace Test.TestDIA
 {
@@ -460,6 +462,15 @@ namespace Test.TestDIA
             {
                 chart.Show();
             }
+        }
+
+        [Test]
+        public static void TestDatabaseSize()
+        {
+            var fastaGPTMD_isd = @"E:\ISD Project\ISD_240927\allISD_oldMM_cali-avg-gptmd-fasta\Task3-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02GPTMD.xml";
+            var xmlGPTMD_isd = @"E:\ISD Project\ISD_240927\allISD_oldMM_cali-avg-gptmd_xml\Task3-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
+            var xml = ProteinDbLoader.LoadProteinXML(xmlGPTMD_isd, true, DecoyType.None, GlobalVariables.AllModsKnown, false, new List<string>(), out var ok);
+            var fasta = ProteinDbLoader.LoadProteinXML(fastaGPTMD_isd, true, DecoyType.None, GlobalVariables.AllModsKnown, false, new List<string>(), out var ok2);
         }
     }
 }
