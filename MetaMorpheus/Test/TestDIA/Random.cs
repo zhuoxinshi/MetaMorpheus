@@ -11,12 +11,6 @@ using TaskLayer;
 using EngineLayer.DIA;
 using MzLibUtil;
 using Plotly.NET;
-using System.IO;
-using MathNet.Numerics.Interpolation;
-using static iText.IO.Util.IntHashtable;
-using OxyPlot.Axes;
-using static Plotly.NET.StyleParam;
-using Omics.Modifications;
 using UsefulProteomicsDatabases;
 
 namespace Test.TestDIA
@@ -472,5 +466,6 @@ namespace Test.TestDIA
             var xml = ProteinDbLoader.LoadProteinXML(xmlGPTMD_isd, true, DecoyType.None, GlobalVariables.AllModsKnown, false, new List<string>(), out var ok);
             var fasta = ProteinDbLoader.LoadProteinXML(fastaGPTMD_isd, true, DecoyType.None, GlobalVariables.AllModsKnown, false, new List<string>(), out var ok2);
         }
+
     }
 }

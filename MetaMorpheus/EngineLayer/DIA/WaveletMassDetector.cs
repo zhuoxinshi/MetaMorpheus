@@ -11,12 +11,12 @@ namespace EngineLayer.DIA
 {
     public class WaveletMassDetector
     {
-        private int NPOINTS;
+        private int NPOINTS; //number of points in the data
         private int WAVELET_ESL = -5;
         private int WAVELET_ESR = 5;
         public List<double>[] PeakRidges { get; set; }
         public float[] DataPoint;
-        double waveletWindow = 0.3;
+        double WaveletWindow = 0.3;
         private double[] MEXHAT;
         public int d;
         public double NPOINTS_half;
@@ -29,19 +29,19 @@ namespace EngineLayer.DIA
         {
             this.DataPoint = DataPoint;
             this.NPOINTS = NoPoints;
-            double wstep = ((WAVELET_ESR - WAVELET_ESL) / NPOINTS);
+            double wstep = ((WAVELET_ESR - WAVELET_ESL) / NPOINTS); //range of the wavelet[-5, 5]/number of points
             MEXHAT = new double[(int)NPOINTS];
 
             double waveletIndex = WAVELET_ESL;
             for (int j = 0; j < NPOINTS; j++)
             {
                 // Pre calculate the values of the wavelet
-                MEXHAT[j] = cwtMEXHATreal(waveletIndex, waveletWindow, 0.0);
+                MEXHAT[j] = cwtMEXHATreal(waveletIndex, WaveletWindow, 0.0); //construct the theoretical mother MEXHAT wavelet distribution: calculate the relative intensity at each point
                 waveletIndex += wstep;
             }
 
             NPOINTS_half = NPOINTS / 2;
-            d = (int)NPOINTS / (WAVELET_ESR - WAVELET_ESL);
+            d = (int)NPOINTS / (WAVELET_ESR - WAVELET_ESL); //density of the points in the wavelet
         }
 
         public void Run()
@@ -55,84 +55,63 @@ namespace EngineLayer.DIA
             //        int maxscale = (int) (Math.max(Math.min((DataPoint.get(DataPoint.size() - 1).getX() - DataPoint.get(0).getX()), parameter.MaxCurveRTRange), 0.5f) * parameter.NoPeakPerMin / (WAVELET_ESR + WAVELET_ESR));
             int maxscale = (int)(Math.Max(Math.Min((DataPoint[2 * (DataPoint.Length / 2 - 1)] - DataPoint[0]), MaxCurveRTRange), 0.5f) * NoPeakPerMin / (WAVELET_ESR + WAVELET_ESR));
 
-            //waveletCWT = new ArrayList[15];
             PeakRidge = new List<(float rt, float intensity)>[maxscale];
-            //XYData maxint = new XYData(0f, 0f);
             for (int scaleLevel = 0; scaleLevel < maxscale; scaleLevel++)
             {
-                //            ArrayList<XYData> wavelet = performCWT(scaleLevel * 2 + 5);
-                float[] wavelet = performCWT(scaleLevel * 2 + 5);
+                float[] wavelet = performCWT(scaleLevel * 2 + 5); //the cwt coefficient calculated at each point
                 PeakRidge[scaleLevel] = new List<(float rt, float intensity)>();
-                //waveletCWT[scaleLevel] = wavelet;
-                //            XYData lastpt = wavelet.get(0);
                 int lastptidx = 0;
-                //            XYData localmax = null;
                 int localmaxidx = -1;
-                //            XYData startpt = wavelet.get(0);
                 int startptidx = 0;
 
                 var increasing = false;
                 var decreasing = false;
-                //            XYData localmaxint = null;
                 int localmaxintidx = -1;
 
-                //            for (int cwtidx = 1; cwtidx < wavelet.size(); cwtidx++) {
                 for (int cwtidx = 1; cwtidx < wavelet.Length / 2; cwtidx++)
                 {
-                    //                XYData CurrentPoint = wavelet.get(cwtidx);
                     float CurrentPointY = wavelet[2 * cwtidx + 1],
                             lastptY = wavelet[2 * lastptidx + 1],
                             startptY = wavelet[2 * startptidx + 1],
                             localmaxY = localmaxidx == -1 ? float.NaN : wavelet[2 * localmaxidx + 1];
-                    //                if (CurrentPoint.getY() > lastpt.getY()) {//the peak is increasing
                     if (CurrentPointY > lastptY)
-                    {//the peak is increasing
+                    {
+                        //the peak is increasing
                         if (decreasing)
                         {//first increasing point, last point was a possible local minimum
                          //check if the peak was symetric
-                         //                        if (localmax != null && (lastpt.getY() <= startpt.getY() || Math.abs(lastpt.getY() - startpt.getY()) / localmax.getY() < parameter.SymThreshold)) {
                             if (localmaxidx != -1 && (lastptY <= startptY || Math.Abs(lastptY - startptY) / localmaxY < SymThreshold))
                             {
-                                //                            PeakRidge[scaleLevel].add(localmax);
                                 PeakRidge[scaleLevel].Add(new (wavelet[2 * localmaxidx], wavelet[2 * localmaxidx + 1]));
-                                //                            localmax = CurrentPoint;
                                 localmaxidx = cwtidx;
-                                //                            startpt = lastpt;
                                 startptidx = lastptidx;
                             }
                         }
                         increasing = true;
                         decreasing = false;
-                        //                } else if (CurrentPoint.getY() < lastpt.getY()) {//peak decreasing
                     }
                     else if (CurrentPointY < lastptY)
-                    {//peak decreasing
+                    {
+                        //peak decreasing
                         if (increasing)
-                        {//first point decreasing, last point was a possible local maximum
-                         //                        if (localmax == null || localmax.getY() < lastpt.getY()) {
+                        {
+                            //first point decreasing, last point was a possible local maximum
                             if (localmaxidx == -1 || localmaxY < lastptY)
                             {
-                                //                            localmax = lastpt;
                                 localmaxidx = lastptidx;
                             }
                         }
                         decreasing = true;
                         increasing = false;
                     }
-                    //                lastpt = CurrentPoint;
                     lastptidx = cwtidx;
                     float localmaxintY = localmaxintidx == -1 ? float.NaN : wavelet[2 * localmaxintidx + 1];
-                    //                if (localmaxint == null || CurrentPoint.getY() > localmaxint.getY()) {
                     if (localmaxintidx == -1 || CurrentPointY > localmaxintY)
                     {
-                        //                    localmaxint = CurrentPoint;
                         localmaxintidx = cwtidx;
                     }
-                    //                if (cwtidx == wavelet.size() - 1 && decreasing) {
                     if (cwtidx == wavelet.Length / 2 - 1 && decreasing)
                     {
-                        //                    if (localmax != null && (CurrentPoint.getY() <= startpt.getY() || Math.abs(CurrentPoint.getY() - startpt.getY()) / localmax.getY() < parameter.SymThreshold)) {
-                        //                    final float startptY=wavelet[2*startptidx+1];
                         if (localmaxidx != -1 && (CurrentPointY <= startptY || Math.Abs(CurrentPointY - startptY) / localmaxY < SymThreshold))
                         {
                             var localmax = (wavelet[2 * localmaxidx], wavelet[2 * localmaxidx + 1]);
@@ -143,17 +122,22 @@ namespace EngineLayer.DIA
             }
         }
 
+        /**
+        * Perform the CWT over raw data points in the selected scale level
+        */
         private float[] performCWT(int scaleLevel)
         {
-            //        int length = DataPoint.size();
             int length = DataPoint.Length / 2;
-            //        ArrayList<XYData> cwtDataPoints = new ArrayList<XYData>();
             float[] cwtDataPoints = new float[length * 2];
 
-            int a_esl = scaleLevel * WAVELET_ESL;
+            int a_esl = scaleLevel * WAVELET_ESL; //stretch or shrink the wavelet range
             int a_esr = scaleLevel * WAVELET_ESR;
             double sqrtScaleLevel = Math.Sqrt(scaleLevel);
-            for (int dx = 0; dx < length; dx++)
+
+            //This for loop is the process of sliding the wavelet along the raw data points, each loop represents the snapshot of the wavelet at a certain position
+            //dx is the index of the raw data points, the position where the theoretical wavelet is currently centered on 
+            //The second loop inside this loop sums the intensity at each overlapped point to calculate the coefficient C(a,b) at this snapshot
+            for (int dx = 0; dx < length; dx++) 
             {
                 /*
                  * Compute wavelet boundaries
@@ -167,7 +151,7 @@ namespace EngineLayer.DIA
                 if (t2 >= length)
                 {
                     t2 = (length - 1);
-                }
+                } // this gives the range of raw data points that overlap with the theoretical wavelet wavelet
 
                 /*
                  * Perform convolution
@@ -176,6 +160,9 @@ namespace EngineLayer.DIA
                 for (int i = t1; i <= t2; i++)
                 {
                     int ind = (int)(NPOINTS_half) + (d * (i - dx) / scaleLevel);
+                    //(d * (i - dx) / scaleLevel) is the relative position of the raw data point to the center of the wavelet in index space
+                    //Because the wavelet is symmetric, MEXHAT[] is in index space and cannot take negative values
+                    //(t-b)/a is transformed to index space by adding half of number of points
                     if (ind < 0)
                     {
                         ind = 0;
@@ -184,10 +171,6 @@ namespace EngineLayer.DIA
                     {
                         ind = (int)NPOINTS - 1;
                     }
-                    //                if(i<0 || ind<0){
-                    //                    System.out.print("");
-                    //                }
-                    //                intensity += DataPoint.get(i).getY() * MEXHAT[ind];
                     intensity += DataPoint[2 * i + 1] * (float)MEXHAT[ind];
                 }
                 intensity /= (float)sqrtScaleLevel;
@@ -196,13 +179,14 @@ namespace EngineLayer.DIA
                 {
                     intensity = 0;
                 }
-                //            cwtDataPoints.add(new XYData(DataPoint.get(dx).getX(), intensity));
                 cwtDataPoints[2 * dx] = DataPoint[2 * dx];
                 cwtDataPoints[2 * dx + 1] = intensity;
             }
             return cwtDataPoints;
         }
 
+        //This function calculates the value phi(t) at each point t; x is t (ESL + step, x axis of the wavelet, not in real time unit), window is sigma,
+        //b is the center of the wavelet which is set to default 0
         private double cwtMEXHATreal(double x, double window, double b)
         {
             /*

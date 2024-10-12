@@ -11,6 +11,8 @@ using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
 using static Plotly.NET.StyleParam;
 using System.Xml.Linq;
+using ThermoFisher.CommonCore.Data.Business;
+using ThermoFisher.CommonCore.Data;
 
 namespace EngineLayer.DIA
 {
@@ -26,6 +28,12 @@ namespace EngineLayer.DIA
             StartMz = startMz;
             EndMz = endMz;
             Index = index;
+            PFpairs = new List<PrecursorFragmentPair>();
+            CwtParameters = new CwtParameters(2f, 150, 0.1f, 0.3f);
+        }
+
+        public PeakCurve()
+        {
             PFpairs = new List<PrecursorFragmentPair>();
         }
 
@@ -56,7 +64,8 @@ namespace EngineLayer.DIA
         public List<List<float>> NoRidgeRegion { get; set; }
 
         public WaveletMassDetector WaveletMassDetector { get; set; }
-        public CwtParameters CwtParameters => new CwtParameters(2f, 150, 0.1f, 0.3f);
+        public CwtParameters CwtParameters { get; set; }
+        public List<(float, float)> SmoothedData { get; set; }
 
         public double AverageMz()
         {
@@ -120,45 +129,26 @@ namespace EngineLayer.DIA
             var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
             var cubicSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
             this.CubicSpline = cubicSpline;
+        }
 
-            //plot
-            var rtSeq = new List<double>();
-            var intensities = new List<double>();
-            for (double i = StartRT; i < EndRT; i += 0.0001)
+        public void Interpolte_cubic(int NoPeakPerMin)
+        {
+            if (CubicSpline == null)
+            {
+                GetCubicSpline();
+            }
+            var rtSeq = new List<float>();
+            var RTwindow = EndRT - StartRT;
+            var totalNumPoints = (int)(RTwindow * NoPeakPerMin);
+            float timeInterval = (float)(RTwindow / (totalNumPoints - 1));
+            for (float i = (float)StartRT; i < (float)EndRT; i += 0.05f)
             {
                 rtSeq.Add(i);
             }
-            foreach (var rt in rtSeq)
+            SmoothedData = new List<(float, float)>();
+            for (int i = 0; i < rtSeq.Count; i++)
             {
-                intensities.Add(cubicSpline.Interpolate(rt));
-            }
-
-            var plot1 = Chart2D.Chart.Point<double, double, string>(
-                x: Peaks.Select(p => p.RetentionTime),
-                y: Peaks.Select(p => p.Intensity)).WithTraceInfo("original").WithMarkerStyle(Color: Color.fromString("red"));
-            var plot2 = Chart2D.Chart.Point<double, double, string>(
-                x: rtSeq,
-                y: intensities).WithTraceInfo("interpolate").WithMarkerStyle(Color: Color.fromString("blue"));
-            var combinedPlot = Chart.Combine(new[] { plot1, plot2 });
-            combinedPlot.Show();
-        }
-
-        public static void SplitPeak(PeakCurve pc)
-        {
-            pc.GetCubicSpline();
-            double[] stationaryPt = pc.CubicSpline.StationaryPoints();
-            var minima = new List<double>();
-            var maxima = new List<double>();
-            foreach (var point in stationaryPt)
-            {
-                if (pc.CubicSpline.Differentiate2(point) < 0)
-                {
-                    maxima.Add(point);
-                }
-                if (pc.CubicSpline.Differentiate2(point) > 0) 
-                {
-                    minima.Add(point);
-                }
+                SmoothedData.Add((rtSeq[i], (float)CubicSpline.Interpolate(rtSeq[i])));
             }
         }
 
@@ -479,14 +469,6 @@ namespace EngineLayer.DIA
             var referencePrecursors = preGroups.Select(g => g.OrderByDescending(p => p.Envelope.TotalIntensity).First()).ToList();
             var allMs1PeakCurves = new List<PeakCurve>();
 
-            //debug
-            var peak2 = GetPeakFromScan(626.997, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-            var pc2 = FindPeakCurve(peak2, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(10), 100);
-            var peak3 = GetPeakFromScan(627.331, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-            var pc3 = FindPeakCurve(peak3, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
-            var peak4 = GetPeakFromScan(627.666, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-            var pc4 = FindPeakCurve(peak4, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(5), 100);
-
             //Find precursor XIC
             foreach (var precursor in allPrecursors)
             {
@@ -500,7 +482,6 @@ namespace EngineLayer.DIA
                 }
                 if (highestPeak.PeakCurve == null)
                 {
-                    //TODO: label the peaks that have been included in a PeakCurve
                     var newPeakCurve = PeakCurve.FindPeakCurve(highestPeak, ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
                         DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
                     newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
@@ -616,16 +597,17 @@ namespace EngineLayer.DIA
             {
                 GetCubicSpline();
             }
-            var rtSeq = new List<float>();
-            for (float i = (float)StartRT; i < (float)EndRT; i += 0.05f)
+            if (SmoothedData == null)
             {
-                rtSeq.Add(i);
+                Interpolte_cubic(150);
             }
-            float[] peakArrayList = new float[rtSeq.Count*2];
-            for (int i = 0; i < rtSeq.Count; i++)
+ 
+            var rtSeq = SmoothedData.Select(p => p.Item1).ToList();
+            var peakArrayList = new float[rtSeq.Count * 2];
+            for (int i = 0; i < SmoothedData.Count; i++)
             {
-                peakArrayList[2 * i] = rtSeq[i];
-                peakArrayList[2 * i + 1] = (float)CubicSpline.Interpolate(rtSeq[i]);
+                peakArrayList[2 * i] = SmoothedData[i].Item1;
+                peakArrayList[2 * i + 1] = SmoothedData[i].Item2;
             }
             WaveletMassDetector = new WaveletMassDetector(peakArrayList, (int)(EndRT - StartRT) * 150);
             WaveletMassDetector.Run();
@@ -893,6 +875,213 @@ namespace EngineLayer.DIA
             }
             return (Math.Abs(ValleyPoints[left].Item2 - ValleyPoints[cut + 1].Item2) / leftridge.Intensity < CwtParameters.SymThreshold
                 && Math.Abs(ValleyPoints[cut + 1].Item2 - ValleyPoints[right + 1].Item2) / rightridge.Intensity < CwtParameters.SymThreshold);
+        }
+
+        public PeakCurve[] SeparatePeakByRegion(float SN)
+        {
+            var newPeakCurves = new PeakCurve[PeakRegionList.Count()];
+            int i = 0;
+            foreach (var region in PeakRegionList)
+            {
+                var newPeakCurve = new PeakCurve();
+                newPeakCurve.Peaks = new List<Peak>();
+                newPeakCurve.MsLevel = MsLevel;
+                newPeakCurve.SmoothedData = new List<(float, float)>();
+                newPeakCurves[i] = newPeakCurve;
+                i++;
+            }
+
+            //check if any region is too wide
+            foreach (var region in PeakRegionList)
+            {
+                var newPeakCurve = new PeakCurve();
+
+                if (region.rt3 - region.rt1 > CwtParameters.MaxCurveRTRange)
+                {
+                    var RTs = SmoothedData.Select(p => p.Item1).ToArray();
+                    int leftidx = BinarySearchLower(RTs, region.rt1);
+                    int rightidx = BinarySearchHigher(RTs, region.rt1);
+                    var left = SmoothedData[leftidx];
+                    var right = SmoothedData[rightidx];
+                    while ((right.Item1 - left.Item1) > CwtParameters.MaxCurveRTRange)
+                    {
+                        if (right.Item1 - region.rt2 <= CwtParameters.MaxCurveRTRange / 4f)
+                        {
+                            leftidx++;
+                        }
+                        else if (region.rt2 - left.Item1 <= CwtParameters.MaxCurveRTRange / 4f)
+                        {
+                            rightidx--;
+                        }
+                        else if (left.Item2 < right.Item2)
+                        {
+                            leftidx++;
+                        }
+                        else
+                        {
+                            rightidx--;
+                        }
+                        left = SmoothedData[leftidx];
+                        right = SmoothedData[rightidx];
+                    }
+                    var newRegion = (left.Item1, region.rt2, right.Item1);
+                    PeakRegionList.Add(newRegion);
+                    PeakRegionList.Remove(region);
+                }
+            }
+
+            // Add corresponding raw peaks
+            foreach(var peak in Peaks)
+            {
+                for (int j = 0; j < PeakRegionList.Count; j++)
+                {
+                    if (peak.RetentionTime >= PeakRegionList[j].rt1 && peak.RetentionTime <= PeakRegionList[j].rt3)
+                    {
+                        newPeakCurves[j].Peaks.Add(peak);
+                        break;
+                    }
+                }
+            }
+
+            //Add corresponding smoothed peaks
+            foreach(var point in SmoothedData)
+            {
+                for (int j = 0; j < PeakRegionList.Count; j++)
+                {
+                    if (point.Item1 >= PeakRegionList[j].rt1 && point.Item1 <= PeakRegionList[j].rt3)
+                    {
+                        newPeakCurves[j].SmoothedData.Add(point);
+                        break;
+                    }
+                }
+            }
+
+            return newPeakCurves;
+        }
+
+        public static int BinarySearchLower(float[] array, float value)
+        {
+            if (array.IsNotNullOrEmpty())
+            {
+                return 0;
+            }
+            int lower = 0;
+            int upper = array.Length - 1;
+
+            if (value - array[upper] >= 0)
+            {
+                return upper;
+            }
+            if (value - array[lower] <= 0)
+            {
+                return 0;
+            }
+
+            while (lower <= upper)
+            {
+                int middle = (lower + upper) / 2;
+                float comparisonResult = value - array[middle];
+                if (comparisonResult == 0)
+                {
+                    while (middle - 1 >= 0 && array[middle - 1] == value)
+                    {
+                        middle--;
+                    }
+                    return middle;
+                }
+                else if (comparisonResult < 0)
+                {
+                    upper = middle - 1;
+                }
+                else
+                {
+                    lower = middle + 1;
+                }
+            }
+            if (upper < 0)
+            {
+                return 0;
+            }
+            while (upper > 0 && array[upper] >= value)
+            {
+                upper--;
+            }
+            return upper;
+        }
+
+        public static int BinarySearchHigher(float[] array, float value)
+        {
+            if (array.IsNotNullOrEmpty())
+            {
+                return 0;
+            }
+            int lower = 0;
+            int upper = array.Length - 1;
+
+            if (value - array[upper] >= 0)
+            {
+                return upper;
+            }
+            if (value - array[lower] <= 0)
+            {
+                return 0;
+            }
+
+            while (lower <= upper)
+            {
+                int middle = (lower + upper) / 2;
+                float comparisonResult = value - array[middle];
+                if (comparisonResult == 0)
+                {
+                    while (middle - 1 >= 0 && array[middle - 1] == value)
+                    {
+                        middle--;
+                    }
+                    return middle;
+                }
+                else if (comparisonResult < 0)
+                {
+                    upper = middle - 1;
+                }
+                else
+                {
+                    lower = middle + 1;
+                }
+            }
+            if (lower > array.Length - 1)
+            {
+                return array.Length - 1;
+            }
+            while (lower < array.Length - 1 && array[lower] <= value)
+            {
+                lower++;
+            }
+            return lower;
+        }
+
+        public void VisualizeRaw(string chartType)
+        {
+            if (chartType == "line")
+            {
+                var plot = Chart2D.Chart.Line<double, double, string>(
+                        x: Peaks.Select(p => p.RetentionTime),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
+                plot.Show();
+            }
+            if (chartType == "point")
+            {
+                var plot = Chart2D.Chart.Point<double, double, string>(
+                        x: Peaks.Select(p => p.RetentionTime),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
+                plot.Show();
+            }
+        }
+
+        public void VisualizeCubicSpline(string chartType)
+        {
+            var plot = Chart2D.Chart.Point<float, float, string>(
+                x: SmoothedData.Select(p => p.Item1),
+                y: SmoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
         }
     }
  
