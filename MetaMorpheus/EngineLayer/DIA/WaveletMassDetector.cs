@@ -5,13 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using ThermoFisher.CommonCore.BackgroundSubtraction;
 using static Plotly.NET.StyleParam;
 
 namespace EngineLayer.DIA
 {
     public class WaveletMassDetector
     {
-        private int NPOINTS; //number of points in the data
+        private double NPOINTS; //number of points in the data
         private int WAVELET_ESL = -5;
         private int WAVELET_ESR = 5;
         public List<double>[] PeakRidges { get; set; }
@@ -23,13 +24,13 @@ namespace EngineLayer.DIA
         public double MaxCurveRTRange = 2;
         public int NoPeakPerMin = 150;
         public double SymThreshold = 0.3;
-        public List<(float rt, float intensity)>[] PeakRidge;
+        public List<(float rt, float intensity, int index)>[] PeakRidge;
 
-        public WaveletMassDetector(float[] DataPoint, int NoPoints)
+        public WaveletMassDetector(float[] DataPoint, double NoPoints)
         {
             this.DataPoint = DataPoint;
             this.NPOINTS = NoPoints;
-            double wstep = ((WAVELET_ESR - WAVELET_ESL) / NPOINTS); //range of the wavelet[-5, 5]/number of points
+            double wstep = ((WAVELET_ESR - WAVELET_ESL) / (NPOINTS - 1)); //range of the wavelet[-5, 5]/number of points; I changed NPOINTS to NPOINTS - 1
             MEXHAT = new double[(int)NPOINTS];
 
             double waveletIndex = WAVELET_ESL;
@@ -55,11 +56,11 @@ namespace EngineLayer.DIA
             //        int maxscale = (int) (Math.max(Math.min((DataPoint.get(DataPoint.size() - 1).getX() - DataPoint.get(0).getX()), parameter.MaxCurveRTRange), 0.5f) * parameter.NoPeakPerMin / (WAVELET_ESR + WAVELET_ESR));
             int maxscale = (int)(Math.Max(Math.Min((DataPoint[2 * (DataPoint.Length / 2 - 1)] - DataPoint[0]), MaxCurveRTRange), 0.5f) * NoPeakPerMin / (WAVELET_ESR + WAVELET_ESR));
 
-            PeakRidge = new List<(float rt, float intensity)>[maxscale];
+            PeakRidge = new List<(float rt, float intensity, int index)>[maxscale];
             for (int scaleLevel = 0; scaleLevel < maxscale; scaleLevel++)
             {
                 float[] wavelet = performCWT(scaleLevel * 2 + 5); //the cwt coefficient calculated at each point
-                PeakRidge[scaleLevel] = new List<(float rt, float intensity)>();
+                PeakRidge[scaleLevel] = new List<(float rt, float intensity, int index)>();
                 int lastptidx = 0;
                 int localmaxidx = -1;
                 int startptidx = 0;
@@ -70,6 +71,12 @@ namespace EngineLayer.DIA
 
                 for (int cwtidx = 1; cwtidx < wavelet.Length / 2; cwtidx++)
                 {
+                    //debug
+                    if (Math.Abs(wavelet[2 * cwtidx] - 68.1) < 0.1)
+                    {
+                        bool stop = true;
+                        var t = wavelet[2 * cwtidx];
+                    }
                     float CurrentPointY = wavelet[2 * cwtidx + 1],
                             lastptY = wavelet[2 * lastptidx + 1],
                             startptY = wavelet[2 * startptidx + 1],
@@ -82,7 +89,7 @@ namespace EngineLayer.DIA
                          //check if the peak was symetric
                             if (localmaxidx != -1 && (lastptY <= startptY || Math.Abs(lastptY - startptY) / localmaxY < SymThreshold))
                             {
-                                PeakRidge[scaleLevel].Add(new (wavelet[2 * localmaxidx], wavelet[2 * localmaxidx + 1]));
+                                PeakRidge[scaleLevel].Add(new (wavelet[2 * localmaxidx], wavelet[2 * localmaxidx + 1], localmaxidx));
                                 localmaxidx = cwtidx;
                                 startptidx = lastptidx;
                             }
@@ -114,7 +121,7 @@ namespace EngineLayer.DIA
                     {
                         if (localmaxidx != -1 && (CurrentPointY <= startptY || Math.Abs(CurrentPointY - startptY) / localmaxY < SymThreshold))
                         {
-                            var localmax = (wavelet[2 * localmaxidx], wavelet[2 * localmaxidx + 1]);
+                            var localmax = (wavelet[2 * localmaxidx], wavelet[2 * localmaxidx + 1], localmaxidx);
                             PeakRidge[scaleLevel].Add(localmax);
                         }
                     }

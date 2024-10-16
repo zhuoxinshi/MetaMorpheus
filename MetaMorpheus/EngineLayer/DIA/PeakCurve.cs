@@ -9,10 +9,8 @@ using System.Linq;
 using Plotly.NET;
 using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
-using static Plotly.NET.StyleParam;
-using System.Xml.Linq;
-using ThermoFisher.CommonCore.Data.Business;
-using ThermoFisher.CommonCore.Data;
+using MathNet.Numerics.Statistics;
+using Plotly.NET.TraceObjects;
 
 namespace EngineLayer.DIA
 {
@@ -66,6 +64,7 @@ namespace EngineLayer.DIA
         public WaveletMassDetector WaveletMassDetector { get; set; }
         public CwtParameters CwtParameters { get; set; }
         public List<(float, float)> SmoothedData { get; set; }
+        public double NL { get; set; }
 
         public double AverageMz()
         {
@@ -92,6 +91,10 @@ namespace EngineLayer.DIA
             return averagedIntensity;
         }
 
+        public void CalculateNL()
+        {
+            NL = Peaks.Min(p => p.Intensity);
+        }
         public void GetLinearSpline()
         {
             var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
@@ -141,7 +144,7 @@ namespace EngineLayer.DIA
             var RTwindow = EndRT - StartRT;
             var totalNumPoints = (int)(RTwindow * NoPeakPerMin);
             float timeInterval = (float)(RTwindow / (totalNumPoints - 1));
-            for (float i = (float)StartRT; i < (float)EndRT; i += 0.05f)
+            for (float i = (float)StartRT; i < (float)EndRT; i += timeInterval)
             {
                 rtSeq.Add(i);
             }
@@ -585,9 +588,10 @@ namespace EngineLayer.DIA
         {
             PeakRidgeList = new List<PeakRidge>();
             PeakRegionList = new List<(float rt1, float rt2, float rt3)>();
+            NoRidgeRegion = new List<List<float>>();
 
             //need a parameter
-            if (EndRT - StartRT < 0.1)
+            if (EndRT - StartRT < CwtParameters.MinPeakWidth)
             {
                 return;
             }
@@ -609,7 +613,7 @@ namespace EngineLayer.DIA
                 peakArrayList[2 * i] = SmoothedData[i].Item1;
                 peakArrayList[2 * i + 1] = SmoothedData[i].Item2;
             }
-            WaveletMassDetector = new WaveletMassDetector(peakArrayList, (int)(EndRT - StartRT) * 150);
+            WaveletMassDetector = new WaveletMassDetector(peakArrayList, rtSeq.Count);
             WaveletMassDetector.Run();
 
             int maxScale = WaveletMassDetector.PeakRidge.Length - 1;
@@ -648,7 +652,7 @@ namespace EngineLayer.DIA
                 }
 
                 var conti = true;
-                var removedRidgeList = new List<(float rt, float intensity)>();
+                var removedRidgeList = new List<(float rt, float intensity, int index)>();
                 while (conti)
                 {
                     //find the smallest value from the matrix first, if find the ridge it belongs to, add it then move to the second smallest; if not, stop looking
@@ -670,15 +674,16 @@ namespace EngineLayer.DIA
                         }
                     }
                     //if even closet is larger than MinRTRange (too far from the PeakRidge), stop looking => setting conti to false
-                    if (closest < float.MaxValue && closest <= CwtParameters.MinRTRange)
+                    if (closest < float.MaxValue && closest <= CwtParameters.MaxRTDiff)
                     {
                         PeakRidge ridge = PeakRidgeList[ExistingRideIdx]; //update the matched PeakRidge line
-                        PeakRidgeList.Remove(ridge); //remove the existing PeakRidge line from the list
+                        //PeakRidgeList.Remove(ridge); //remove the existing PeakRidge line from the list
                         ridge.lowScale = i; //update the lowest scale of the PeakRidge line
                         ridge.ContinuousLevel++; //update the continous level of the PeakRidge line
                         var nearestRidge = PeakRidgeArray[PeakRidgeInx]; //why updating the RT?
                         ridge.RT = nearestRidge.rt;
-                        PeakRidgeList.Add(ridge); //re-add the updated PeakRidge to the list
+                        ridge.Intensity = nearestRidge.intensity;
+                        //PeakRidgeList.Add(ridge); //re-add the updated PeakRidge to the list
                         removedRidgeList.Add(nearestRidge); //remove the potential PeakRidge from the array so we don't start a new PeakRidge line on it
                         for (int k = 0; k < PeakRidgeList.Count(); k++)
                         {
@@ -718,7 +723,7 @@ namespace EngineLayer.DIA
                 {
                     foreach (var ridge in PeakRidgeArray)
                     {
-                        PeakRidge newRidge = new PeakRidge(ridge.rt, ridge.intensity, i);
+                        PeakRidge newRidge = new PeakRidge(ridge.rt, peakArrayList[ridge.index * 2 + 1], i);
                         newRidge.ContinuousLevel++;
                         //newRidge.intensity = SmoothData.GetPoinByXCloset(newRidge.RT).getY();
                         //don't understand why we need to find the point in the spline again; the intensity is already in the ridge
@@ -737,6 +742,11 @@ namespace EngineLayer.DIA
                 RidgeRTs.Add((float)ApexRT);
                 NoRidgeRegion.Add(RidgeRTs);
             }
+
+            //Added code
+            //Remove the PeakRidge lines with intensity lower than NL * SNRThreshold
+            CalculateNL();
+            PeakRidgeList = PeakRidgeList.Where(r => r.Intensity > NL * CwtParameters.SNRThreshold).ToList();
 
             //if we have more than one PeakRidge line, we can have valley points now (local minimum)
             if (PeakRidgeList.Count() > 1)
@@ -802,6 +812,32 @@ namespace EngineLayer.DIA
                 int left = 0;
                 int right = PeakRidgeList.Count() - 1;
                 FindSplitPoint(left, right, ValleyPoints, Splitpoints);
+
+                //check the intensity and width of the split region, if it is too small, merge it with the previous or next region
+                //for (int i = 1; i < PeakRidgeList.Count() - 1; i++)
+                //{
+                //    if (PeakRidgeList[i].Intensity < NL * CwtParameters.SNRThreshold || ValleyPoints[i + 1].rt - ValleyPoints[i].rt < CwtParameters.MinPeakWidth)
+                //    {
+                //        if (i == 0)
+                //        {
+                //            Splitpoints[1] = false;
+                //            continue;
+                //        }
+                //        if (i == PeakRidgeList.Count - 2)
+                //        {
+                //            Splitpoints[i] = false;
+                //            continue;
+                //        }
+                //        if (PeakRidgeList[i + 1].Intensity < PeakRidgeList[i - 1].Intensity)
+                //        {
+                //            Splitpoints[i] = false;
+                //        }
+                //        else
+                //        {
+                //            Splitpoints[i + 1] = false;
+                //        }
+                //    }
+                //}
                 bool split = false;
 
                 var RidgeRTs = new List<float>();
@@ -817,6 +853,14 @@ namespace EngineLayer.DIA
                     }
                     if (Splitpoints[i])
                     {
+                        //if (maxridge.Intensity < NL * CwtParameters.SNRThreshold)
+                        //{
+                        //    continue;
+                        //}
+                        //if (ValleyPoints[i + 1].Item1 - ValleyPoints[startidx].Item1 < CwtParameters.MinPeakWidth)
+                        //{
+                        //    continue;
+                        //}
                         PeakRegionList.Add((ValleyPoints[startidx].Item1, maxridge.RT, ValleyPoints[i + 1].Item1));
                         NoRidgeRegion.Add(RidgeRTs);
 
@@ -1077,11 +1121,47 @@ namespace EngineLayer.DIA
             }
         }
 
-        public void VisualizeCubicSpline(string chartType)
+        public GenericChart VisualizeCubicSpline()
         {
+            if (CubicSpline == null)
+            {
+                GetCubicSpline();
+            }
+            if (SmoothedData == null)
+            {
+                Interpolte_cubic(150);
+            }
             var plot = Chart2D.Chart.Point<float, float, string>(
                 x: SmoothedData.Select(p => p.Item1),
                 y: SmoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
+            return plot;
+        }
+
+        public void VisualizePeakRegions()
+        {
+            if (PeakRegionList == null)
+            {
+                DetectPeakRegions();
+            }
+            var plot_spline = VisualizeCubicSpline();
+            var markedRTs = new List<float> { PeakRegionList[0].rt1 };
+            float yMin = SmoothedData.Min(p => p.Item2);
+            float yMax = SmoothedData.Max(p => p.Item2);
+            foreach (var region in PeakRegionList)
+            {
+                markedRTs.Add(region.rt3);
+            }
+            var verticalLines = new List<GenericChart>();
+            foreach (var x in markedRTs)
+            {
+                var line = Chart2D.Chart.Line<double, double, string>(
+                    new List<double> { x, x },
+                    new List<double> { yMin, yMax } 
+                ).WithLineStyle(Width: 2, Color: Color.fromString("red"));
+                verticalLines.Add(line);
+            }
+            var combinedPlot = Chart.Combine(new[] { plot_spline }.Concat(verticalLines).ToArray());
+            combinedPlot.Show();
         }
     }
  

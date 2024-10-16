@@ -27,10 +27,23 @@ namespace Test.TestDIA
             var diaParam = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 2, 100, 0.5, 0.5, 1);
             var diaEngine2 = new DIAEngine2(diaDataFile, commonParameters, diaParam);
             diaEngine2.Ms1PeakIndexing();
+            diaEngine2.ConstructMs2Group();
             diaEngine2.GetMs1PeakCurves();
 
             var windows = diaEngine2.Ms1PeakCurves.Keys.ToList();
-            var testPeakCurve = diaEngine2.Ms1PeakCurves[windows[0]].First(p => p.EndRT - p.StartRT > 3);
+            var testPeakCurve = diaEngine2.Ms1PeakCurves[windows[0]].Where(p => p.EndRT - p.StartRT > 3).ToList();
+            var testPeakCurve1 = testPeakCurve[3];
+            //testPeakCurve1.VisualizeCubicSpline();
+            //testPeakCurve1.VisualizeRaw("point");
+            testPeakCurve1.DetectPeakRegions();
+            //var plot = testPeakCurve1.VisualizePeakRegions();
+            //plot.Show();
+
+            for (int i = 0; i < testPeakCurve.Count; i++)
+            {
+                var peakCurve = testPeakCurve[i];
+                peakCurve.VisualizePeakRegions();
+            }
         }
     }
 }
