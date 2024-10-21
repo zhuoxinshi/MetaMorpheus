@@ -15,8 +15,9 @@ namespace EngineLayer.DIA
         public float SymThreshold { get; set; }
         public float SNRThreshold { get; set; }
         public float MinPeakWidth { get; set; }
+        public float SplineTimeInterval { get; set; }
 
-        public CwtParameters(float maxCurveRTRange, int noPeakPerMin, float minRTRange, float symThreshold, float sNRThreshold = 10f, float minPeakWidth = 0.1f)
+        public CwtParameters(float maxCurveRTRange, int noPeakPerMin, float minRTRange, float symThreshold, float sNRThreshold = 1.5f, float minPeakWidth = 0.1f, float splineTimeInterval = 0.005f)
         {
             MaxCurveRTRange = maxCurveRTRange;
             NoPeakPerMin = noPeakPerMin;
@@ -24,6 +25,7 @@ namespace EngineLayer.DIA
             SymThreshold = symThreshold;
             SNRThreshold = sNRThreshold;
             MinPeakWidth = minPeakWidth;
+            SplineTimeInterval = splineTimeInterval;
         }
 
     }

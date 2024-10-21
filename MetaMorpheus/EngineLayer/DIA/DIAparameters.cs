@@ -21,14 +21,19 @@ namespace EngineLayer.DIA
         public int PrecursorRankCutOff { get; set; }
         public double HighCorrThreshold { get; set; }
         public int NumHighCorrFragments { get; set; }
-        public double MaxRTRange { get; set; }
+        public double MaxRTRangeMS1 { get; set; }
+        public double MaxRTRangeMS2 { get; set; }
         public double PrecursorIntensityCutOff { get; set; }
         public double MinRTRangeForCWT { get; set; }
         public CwtParameters CwtParameters => new CwtParameters(2f, 150, 0.1f, 0.3f);
+        public bool SplitMS2Peak { get; set; } 
+        public bool SplitMS1Peak { get; set; }  
+        public float SplineTimeInterval { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, 
             double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
-            , double maxRTrange = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1)
+            , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
+            bool splitMS2Peak = true, bool splitMS1Peak = false, float splineTimeInterval = 0.05f)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -41,9 +46,13 @@ namespace EngineLayer.DIA
             PrecursorRankCutOff = precursorRankCutOff;
             NumHighCorrFragments = numHighCorrFragments;
             HighCorrThreshold = highCorrThreshold;
-            MaxRTRange = maxRTrange;
+            MaxRTRangeMS1 = maxRTrangeMS1;
+            MaxRTRangeMS2 = maxRTrangeMS2;
             PrecursorIntensityCutOff = precursorIntensityCutOff;
             MinRTRangeForCWT = minRTRangeForCWT;
+            SplitMS2Peak = splitMS2Peak;
+            SplitMS1Peak = splitMS1Peak;
+            SplineTimeInterval = splineTimeInterval;
         }
 
     }

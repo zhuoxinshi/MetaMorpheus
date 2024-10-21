@@ -15,7 +15,6 @@ namespace EngineLayer.DIA
         private double NPOINTS; //number of points in the data
         private int WAVELET_ESL = -5;
         private int WAVELET_ESR = 5;
-        public List<double>[] PeakRidges { get; set; }
         public float[] DataPoint;
         double WaveletWindow = 0.3;
         private double[] MEXHAT;

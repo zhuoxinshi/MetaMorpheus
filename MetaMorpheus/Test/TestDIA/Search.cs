@@ -23,15 +23,17 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\test2.0_corr0.5_highestPeakXIC_ms1Tol5ppm_cubicSpline_apexRT0.2_noPeakTrim_maxMissed2_overlap0.2_FragRank100_preRank10_maxRT0.5_300000_deconMS2";
+            string outputFolder = @"E:\DIA\TestSearch\test2.0_corr0.5_highestPeakXIC_ms1Tol5ppm_cubic_apexRT0.2_maxMissed1_overlap0.2_FragRank100_preRank10_maxRT0.5_300000_cutPeakMS1&2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 2, 100, 0.2, 0.5, 0.2, 100, 10, 8, precursorIntensityCutOff: 300000);
-
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 
+                maxNumMissedScan:1, binSize: 100, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance:0.2, 
+                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 1, maxRTrangeMS2: 1, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f);
             // Use reflection to set max threads
-            task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
+            //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
             //var type = task.CommonParameters.GetType();
             //var property = type.GetProperty("MaxThreadsToUsePerFile");
             //property.SetMethod.Invoke(task.CommonParameters, new object[] { 1 });

@@ -312,7 +312,7 @@ namespace Test.TestDIA
                 if (peak.PeakCurve == null)
                 {
                     var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms1PeakTable, ms1scans, ms1scans[0].IsolationRange,
-                        diaParam.MaxNumMissedScan, diaParam.Ms2PeakFindingTolerance, diaParam.PeakSearchBinSize);
+                        diaParam.MaxNumMissedScan, diaParam.Ms2PeakFindingTolerance, diaParam.PeakSearchBinSize, 2);
                     if (newPeakCurve.Peaks.Count > 0)
                     {
                         ms1PeakCurves.Add(newPeakCurve);
@@ -451,7 +451,7 @@ namespace Test.TestDIA
             var Dpsms = decoyPsms.Where((item, index) =>
                 (index >= 1 && index <= 10)).ToList();
             var listPsmsToLook = Tpsms.Concat(decoyPsms).ToList();
-            var charts = PeakCurve.VisualizePFgroups(diaDataFile, listPsmsToLook, commonParameters, diaParam);
+            var charts = PrecursorFragmentsGroup.VisualizePFgroups(diaDataFile, listPsmsToLook, commonParameters, diaParam);
             foreach(var chart in charts)
             {
                 chart.Show();

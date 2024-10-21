@@ -101,7 +101,7 @@ namespace EngineLayer.DIA
                     if (peak.PeakCurve == null)
                     {
                         var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
-                            DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
+                            DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS2);
                         if (newPeakCurve.Peaks.Count > 4)
                         {
                             ms2PeakCurves[range].Add(newPeakCurve);
@@ -132,10 +132,10 @@ namespace EngineLayer.DIA
                             {
                                 if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                                 {
-                                    var overlap = PeakCurve.CalculateRTOverlapRatio(precursor, ms2curve);
+                                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                                     if (overlap > DIAparameters.OverlapRatioCutOff)
                                     {
-                                        double corr = PeakCurve.CalculateCorr_spline(precursor, ms2curve, "cubic", 0.005);
+                                        double corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", 0.005);
                                         if (corr > DIAparameters.CorrelationCutOff)
                                         {
                                             var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
