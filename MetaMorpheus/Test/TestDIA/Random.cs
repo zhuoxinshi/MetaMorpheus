@@ -467,5 +467,17 @@ namespace Test.TestDIA
             var fasta = ProteinDbLoader.LoadProteinXML(fastaGPTMD_isd, true, DecoyType.None, GlobalVariables.AllModsKnown, false, new List<string>(), out var ok2);
         }
 
+        [Test]
+        public static void TestReadinISDFile()
+        {
+            var path = @"E:\ISD Project\ISD_240606\06-07-24_mix_sample1_5uL_ISD.mzML";
+            var path2 = @"E:\ISD Project\ISD_240606\06-07-24_mix_sample1_5uL_ISD.raw";
+            MyFileManager myFileManager = new MyFileManager(true);
+            var commonParameters = new CommonParameters();
+            var msDataFile = myFileManager.LoadFile(path, commonParameters);
+            var msDataFile2 = myFileManager.LoadFile(path2, commonParameters);
+            var ms2Scans = msDataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
+        }
+
     }
 }

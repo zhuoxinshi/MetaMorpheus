@@ -29,11 +29,13 @@ namespace EngineLayer.DIA
         public bool SplitMS2Peak { get; set; } 
         public bool SplitMS1Peak { get; set; }  
         public float SplineTimeInterval { get; set; }
+        public double MinMass { get; set; }
+        public double MaxMass { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, 
             double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
             , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
-            bool splitMS2Peak = true, bool splitMS1Peak = false, float splineTimeInterval = 0.05f)
+            bool splitMS2Peak = true, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -53,6 +55,8 @@ namespace EngineLayer.DIA
             SplitMS2Peak = splitMS2Peak;
             SplitMS1Peak = splitMS1Peak;
             SplineTimeInterval = splineTimeInterval;
+            MinMass = minMass;
+            MaxMass = maxMass;
         }
 
     }
