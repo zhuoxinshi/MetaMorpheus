@@ -42,8 +42,6 @@ namespace EngineLayer.DIA
         public MzRange IsolationRange { get; set; }
         public double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
-        public List<Peak> IsotopePeaks { get; set; }
-        public List<double> IsotopePeaksMz { get; set; }
         public double StartRT => Peaks.Select(p => p.RetentionTime).OrderBy(t => t).First();
         public double EndRT => Peaks.Select(p => p.RetentionTime).OrderByDescending(t => t).First();
         public double StartMz {  get; set; }

@@ -44,8 +44,8 @@ namespace EngineLayer.DIA
             GetMs1PeakCurves();
             GetMs2PeakCurves();
             PrecursorFragmentPairing();
-            PFgroupFilter();
-            //ConstructNewMs2Scans();
+            //PFgroupFilter();
+            ConstructNewMs2Scans();
         }
 
         public void Ms1PeakIndexing()
@@ -83,15 +83,10 @@ namespace EngineLayer.DIA
             var allPrecursors = new List<DeconvolutedMass>();
             for (int i = 0; i < allMs1Scans.Length; i++)
             {
-                //debug
-                if (allMs1Scans[i].OneBasedScanNumber == 2267)
-                {
-                    bool stop = true;
-                }
-                var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters).OrderBy(E => E.MonoisotopicMass);
+                var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters).OrderByDescending(E => E.MonoisotopicMass);
                 foreach (var envelope in envelopes)
                 {
-                    if (envelope.Charge < 6  || envelope.MonoisotopicMass < 5000)
+                    if (envelope.Charge < 6  || envelope.Peaks.Count < 3 || envelope.MonoisotopicMass < DIAparameters.MinMass)
                     {
                         continue;
                     }
@@ -104,9 +99,10 @@ namespace EngineLayer.DIA
                 }
             }
             allPrecursors = allPrecursors.OrderByDescending(p => p.HighestPeakIntensity).ToList();
-            var precursorGroups = allPrecursors.GroupBy(p => Math.Round(p.MonoisotopicMass, 1)).OrderByDescending(g => g.Key).Select(g => g.OrderBy(p => p.Charge)).ToList();
+            //var precursorGroups = allPrecursors.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 0), p.Charge}).ToList();
             foreach (var precursor in allPrecursors)
             {
+                //var precursor = group.OrderByDescending(p => p.HighestPeakIntensity).FirstOrDefault();
                 if (precursor.HighestPeakIntensity < DIAparameters.PrecursorIntensityCutOff)
                 {
                     continue;
@@ -199,6 +195,54 @@ namespace EngineLayer.DIA
             //}
         }
 
+        public void GetMs2PeakCurves_Decon()
+        {
+            var ms2PeakCurves = new Dictionary<double, List<PeakCurve>>();
+            foreach (var ms2Group in DIAScanWindowMap)
+            {
+                var ms2scans = ms2Group.Value.ToArray();
+                var allMasses = new List<DeconvolutedMass>();
+                for (int i = 0; i < ms2scans.Length; i++)
+                {
+                    var envelopes = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2scans[i], CommonParameters);
+
+                    foreach (var envelope in envelopes)
+                    {
+                        var charge = envelope.Charge;
+                        double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
+                        double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
+                        var mass = new DeconvolutedMass(envelope, charge, ms2scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                            ms2scans[i].OneBasedScanNumber, i);
+                        allMasses.Add(mass);
+                    }
+                }
+                allMasses = allMasses.OrderByDescending(p => p.HighestPeakIntensity).ToList();
+
+                var allMs2Peaks = Peak.GetAllPeaks(ms2scans, DIAparameters.PeakSearchBinSize);
+                var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparameters.PeakSearchBinSize);
+                ms2PeakCurves[ms2Group.Key] = new List<PeakCurve>();
+                foreach (var mass in allMasses)
+                {
+                    var peak = PeakCurve.GetPeakFromScan(mass.HighestPeakMz, ms2PeakTable, mass.ZeroBasedScanIndex, new PpmTolerance(0),
+                        DIAparameters.PeakSearchBinSize);
+                    if (peak.PeakCurve == null)
+                    {
+                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, null, DIAparameters.MaxNumMissedScan,
+                        DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS1);
+                        newPeakCurve.MonoisotopicMass = mass.MonoisotopicMass;
+                        newPeakCurve.Charge = mass.Charge;
+                        newPeakCurve.Envelope = mass.Envelope;
+                        if (newPeakCurve.Peaks.Count > 4)
+                        {
+                            ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
+                        }
+                    }
+                }
+            }
+            Ms2PeakCurves = ms2PeakCurves;
+        }
+
+
         public void PrecursorFragmentPairing()
         {
             PFgroups = new List<PrecursorFragmentsGroup>();
@@ -228,21 +272,6 @@ namespace EngineLayer.DIA
             //Check the fragment correlations within each pfgroup for filtering
         }
 
-        public void PFgroupFilter()
-        {
-            var allMatchedMs2 = Ms2PeakCurves.SelectMany(p => p.Value).Where(pc => pc.PFpairs.Count > 0).ToList();
-            foreach (var ms2curve in allMatchedMs2)
-            {
-                ms2curve.GetPrecursorRanks();
-            }
-            foreach (var group in PFgroups)
-            {
-                group.PFpairs = group.PFpairs.Where(pf => pf.PrecursorRank <= DIAparameters.PrecursorRankCutOff).ToList();
-                group.GetNumberOfHighCorrFragments(DIAparameters);
-            }
-            PFgroups = PFgroups.Where(pf => pf.PFpairs.Count > 0 && pf.NumHighCorrFragments >= DIAparameters.NumHighCorrFragments).ToList();
-        }
-
         public static PrecursorFragmentsGroup GroupPrecursorFragments(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
         {
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
@@ -259,22 +288,13 @@ namespace EngineLayer.DIA
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
-                                lock (ms2curve.PFpairs)
-                                {
-                                    ms2curve.PFpairs.Add(PFpair);
-                                }
                                 preFragGroup.PFpairs.Add(PFpair);
                             }
                         }
                     }
                 }
             }
-            if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
-            {
-                var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
-                preFragGroup.PFpairs = filtered.ToList();
-            }
-            if (preFragGroup.PFpairs.Count > 0)
+            if (preFragGroup.PFpairs.Count > 10)
             {
                 preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
                 return preFragGroup;
@@ -284,6 +304,45 @@ namespace EngineLayer.DIA
                 return null;
             }
         }
+
+        public void ConstructNewMs2Scans()
+        {
+            PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
+            foreach (var pfGroup in PFgroups)
+            {
+                var mzs = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedMz).ToArray();
+                var intensities = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedIntensity).ToArray();
+                var spectrum = new MzSpectrum(mzs, intensities, false);
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                            MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
+                var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, CommonParameters);
+                var charge = pfGroup.PrecursorPeakCurve.Charge;
+                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                    , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
+                PseudoMs2WithPre.Add(scanWithprecursor);
+            }
+        }
+
+        public void ConstructNewMs2Scans_Decon()
+        {
+            PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
+            foreach (var pfGroup in PFgroups)
+            {
+                //var peaks = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope.Peaks).SelectMany(p => p).OrderBy(p => p.mz).ToList();
+                var mzs = new double[] { 1 };
+                var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.Envelope.TotalIntensity) };
+                var spectrum = new MzSpectrum(mzs, intensities, false);
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                            MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
+                var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
+                var charge = pfGroup.PrecursorPeakCurve.Charge;
+                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                    , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
+                PseudoMs2WithPre.Add(scanWithprecursor);
+            }
+        }
     }
-    
+
 }
