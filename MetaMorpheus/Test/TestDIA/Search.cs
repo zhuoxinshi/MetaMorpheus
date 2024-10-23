@@ -38,5 +38,11 @@ namespace Test.TestDIA
             string myDatabase_xml = @"E:\ISD Project\ISD_240812\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { DIAfile }, "test");
         }
+
+        [Test]
+        public static void TestISDSearch()
+        {
+
+        }
     }
 }
