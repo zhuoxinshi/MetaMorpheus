@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Easy.Common.Extensions;
 using EngineLayer.DIA;
@@ -12,7 +13,7 @@ namespace EngineLayer
 {
     public class Peak
     {
-        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber, int ZeroBasedScanNumber, int index = 0, PeakCurve peakCurve = null, MzRange isolationRange = null)
+        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber, int ZeroBasedScanNumber, int index = 0, PeakCurve peakCurve = null, double voltage = 15)
         {
             Mz = mz;
             Intensity = intensity;
@@ -22,7 +23,7 @@ namespace EngineLayer
             MsLevel = msLevel;
             PeakCurve = peakCurve;
             ZeroBasedScanIndex = ZeroBasedScanNumber;
-            IsolationRange = isolationRange;
+            Voltage = voltage;
         }
 
         public double Mz { get; set; }
@@ -33,20 +34,23 @@ namespace EngineLayer
         public int Index { get; set; }
         public int MsLevel { get; set; }
         public PeakCurve PeakCurve { get; set; }
-        public MzRange IsolationRange { get; set; }
+        public double Voltage { get; set; }
 
         public static List<Peak>[] GetAllPeaks(MsDataScan[] scans)
         {
             var allPeaks = new List<Peak>[scans.Length + 1];
             int index = 0;
+            string pattern = $@"sid=(\d+)";
             for (int i = 0; i < scans.Length; i++)
             {
                 allPeaks[i] = new List<Peak>();
                 var spectrum = scans[i].MassSpectrum;
+                var match = Regex.Match(scans[i].ScanFilter, pattern);
+                double voltage = double.Parse(match.Groups[1].Value);
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
-                        scans[i].OneBasedScanNumber, 0, index, null, scans[i].IsolationRange);
+                        scans[i].OneBasedScanNumber, 0, index, null, voltage);
                     allPeaks[i].Add(newPeak);
                     index++;
                 }

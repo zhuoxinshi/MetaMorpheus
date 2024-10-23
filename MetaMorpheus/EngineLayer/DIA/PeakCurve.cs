@@ -13,6 +13,7 @@ using System.Numerics;
 using System.Threading;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace EngineLayer.DIA
 {
@@ -411,38 +412,38 @@ namespace EngineLayer.DIA
             return 0;
         }
 
-        public static Dictionary<(double min, double max), List<MsDataScan>> ConstructMs2Group(MsDataScan[] ms2Scans)
+        public static Dictionary<double, List<MsDataScan>> ConstructMs2Group(MsDataScan[] ms2Scans)
         {
-            var DIAScanWindowMap = new Dictionary<(double min, double max), List<MsDataScan>>();
+            var DIAScanWindowMap = new Dictionary<double, List<MsDataScan>>();
+            string pattern = $@"sid=(\d+)";
             foreach (var ms2 in ms2Scans)
             {
-                (double min, double max) range = new(ms2.IsolationRange.Minimum, ms2.IsolationRange.Maximum);
-                if (!DIAScanWindowMap.ContainsKey(range))
+                var match = Regex.Match(ms2.ScanFilter, pattern);
+                double voltage = double.Parse(match.Groups[1].Value);
+                if (!DIAScanWindowMap.ContainsKey(voltage))
                 {
-                    DIAScanWindowMap[range] = new List<MsDataScan>();
-                    DIAScanWindowMap[range].Add(ms2);
+                    DIAScanWindowMap[voltage] = new List<MsDataScan>();
+                    DIAScanWindowMap[voltage].Add(ms2);
                 }
                 else
                 {
-                    DIAScanWindowMap[range].Add(ms2);
+                    DIAScanWindowMap[voltage].Add(ms2);
                 }
             }
             return DIAScanWindowMap;
         }
 
-        public static Dictionary<MzRange, List<PeakCurve>> GetMs2PeakCurves(MsDataScan[] allMs2scans, List<Peak>[] allPeaks, DIAparameters DIAparam)
+        public static Dictionary<double, List<PeakCurve>> GetMs2PeakCurves(MsDataScan[] allMs2scans, List<Peak>[] allPeaks, DIAparameters DIAparam)
         {
-            var ms2PeakCurves = new Dictionary<MzRange, List<PeakCurve>>();
+            var ms2PeakCurves = new Dictionary<double, List<PeakCurve>>();
             var DIAScanWindowMap = ConstructMs2Group(allMs2scans);
             foreach (var ms2Group in DIAScanWindowMap)
             {
                 var ms2scans = ms2Group.Value.ToArray();
-                MzRange range = ms2scans[0].IsolationRange;
-                var allMs2Peaks = allPeaks.Where(v => v != null && v.FirstOrDefault().IsolationRange != null &&
-                 v.FirstOrDefault().IsolationRange.Maximum == range.Maximum && v.FirstOrDefault().IsolationRange.Minimum == range.Minimum).ToArray();
+                var allMs2Peaks = allPeaks.Where(v => v != null && v.First().Voltage == ms2Group.Key).ToArray();
                 var rankedMs2Peaks = allMs2Peaks.SelectMany(p => p).OrderByDescending(p => p.Intensity).ToList();
                 var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparam.PeakSearchBinSize, out Dictionary<int, int> scanIndexMap);
-                ms2PeakCurves[range] = new List<PeakCurve>();
+                ms2PeakCurves[ms2Group.Key] = new List<PeakCurve>();
                 foreach (var peak in rankedMs2Peaks)
                 {
                     if (peak.PeakCurve == null)
@@ -451,7 +452,7 @@ namespace EngineLayer.DIA
                             DIAparam.MaxNumMissedScan, DIAparam.Ms2PeakFindingTolerance, DIAparam.PeakSearchBinSize, DIAparam.MaxRTRange);
                         if (newPeakCurve.Peaks.Count > 4)
                         {
-                            ms2PeakCurves[range].Add(newPeakCurve);
+                            ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
                         }
                     }
                 }
@@ -517,7 +518,7 @@ namespace EngineLayer.DIA
                             var allms2PeaksForThisScan = allPeaks[scan.OneBasedScanNumber - 1];
                             var ms1curve = scan.PrecursorPeakCurve;
                             var DIApeaks = new List<Peak>();
-                            var corrList = new List<double>();
+                            //var corrList = new List<double>();
 
                             if (ms1curve.Peaks.Count > 4)
                             {
@@ -531,23 +532,23 @@ namespace EngineLayer.DIA
                                             var overlap = PeakCurve.CalculateRTOverlapRatio(ms1curve, ms2curve);
                                             if (overlap >= DIAparam.OverlapRatioCutOff)
                                             {
-                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.05);
+                                                double corr = PeakCurve.CalculatePeakCurveCorr(ms1curve, ms2curve);
                                                 if (corr > DIAparam.CorrelationCutOff)
                                                 {
                                                     DIApeaks.Add(peak);
-                                                    corrList.Add(corr);
+                                                    //corrList.Add(corr);
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                if (corrList.Count > DIAparam.FragmentRankCutOff)
-                                {
-                                    var indices = corrList.Select((value, index) => new { Value = value, Index = index })
-                                                  .OrderByDescending(x => x.Value).Take(DIAparam.FragmentRankCutOff).Select(x => x.Index).ToList();
-                                    DIApeaks = DIApeaks.Select((value, index) => new {Value = value, Index = index}).Where(p => indices.Contains(p.Index)).
-                                    OrderBy(p => p.Value.Mz).Select(p => p.Value).ToList();
-                                }
+                                //if (corrList.Count > DIAparam.FragmentRankCutOff)
+                                //{
+                                //    var indices = corrList.Select((value, index) => new { Value = value, Index = index })
+                                //                  .OrderByDescending(x => x.Value).Take(DIAparam.FragmentRankCutOff).Select(x => x.Index).ToList();
+                                //    DIApeaks = DIApeaks.Select((value, index) => new {Value = value, Index = index}).Where(p => indices.Contains(p.Index)).
+                                //    OrderBy(p => p.Value.Mz).Select(p => p.Value).ToList();
+                                //}
                                 if (DIApeaks.Count > 0)
                                 {
                                     var newSpectrum = new MzSpectrum(DIApeaks.Select(p => p.Mz).ToArray(), DIApeaks.Select(p => p.Intensity).ToArray(), false);
@@ -598,7 +599,7 @@ namespace EngineLayer.DIA
                                             var overlap = PeakCurve.CalculateRTOverlapRatio(ms1curve, ms2curve);
                                             if (overlap >= DIAparam.OverlapRatioCutOff)
                                             {
-                                                double corr = PeakCurve.CalculateCorr_spline(ms1curve, ms2curve, "cubic", 0.05);
+                                                double corr = PeakCurve.CalculatePeakCurveCorr(ms1curve, ms2curve);
                                                 if (corr > DIAparam.CorrelationCutOff)
                                                 {
                                                     var PFpair = new PrecursorFragmentPair(ms1curve, ms2curve, corr);
@@ -612,11 +613,11 @@ namespace EngineLayer.DIA
                                         }
                                     }
                                 }
-                                if (preFragGroup.PFpairs.Count > DIAparam.FragmentRankCutOff)
-                                {
-                                    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparam.FragmentRankCutOff);
-                                    preFragGroup.PFpairs = filtered.ToList();
-                                }
+                                //if (preFragGroup.PFpairs.Count > DIAparam.FragmentRankCutOff)
+                                //{
+                                //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparam.FragmentRankCutOff);
+                                //    preFragGroup.PFpairs = filtered.ToList();
+                                //}
                                 if (preFragGroup.PFpairs.Count > 0)
                                 {
                                     preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();

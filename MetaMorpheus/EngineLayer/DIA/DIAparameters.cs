@@ -23,10 +23,11 @@ namespace EngineLayer.DIA
         public int NumHighCorrFragments { get; set; }
         public double MaxRTRange { get; set; }
         public double PrecursorIntensityCutOff { get; set; }
+        public double MinMass { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan, int binSize,
             double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
-            , double maxRTrange = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000)
+            , double maxRTrange = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minMass = 0)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -41,6 +42,7 @@ namespace EngineLayer.DIA
             HighCorrThreshold = highCorrThreshold;
             MaxRTRange = maxRTrange;
             PrecursorIntensityCutOff = precursorIntensityCutOff;
+            MinMass = minMass;
         }
 
     }
