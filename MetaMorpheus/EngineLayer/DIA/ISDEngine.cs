@@ -42,10 +42,10 @@ namespace EngineLayer.DIA
             Ms1PeakIndexing();
             ConstructMs2Group();
             GetMs1PeakCurves();
-            GetMs2PeakCurves();
+            GetMs2PeakCurves_Decon();
             PrecursorFragmentPairing();
             //PFgroupFilter();
-            ConstructNewMs2Scans();
+            ConstructNewMs2Scans_Decon();
         }
 
         public void Ms1PeakIndexing()
@@ -138,6 +138,8 @@ namespace EngineLayer.DIA
                     }
                 }
             }
+            //debug
+            var ms1PeakCurve = Ms1PeakCurves.OrderBy(p => p.MonoisotopicMass).ToList();
         }
 
         public void GetMs2PeakCurves()
@@ -267,7 +269,7 @@ namespace EngineLayer.DIA
             }
             //debug
             //var rankedPFgroups = PFgroups.OrderByDescending(pf => pf.PFpairs.Count).ToList();
-
+            var groups = PFgroups.OrderBy(pf => pf.PrecursorPeakCurve.MonoisotopicMass).ToList();
             //TODO?
             //Check the fragment correlations within each pfgroup for filtering
         }
