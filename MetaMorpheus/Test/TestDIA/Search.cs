@@ -53,15 +53,15 @@ namespace Test.TestDIA
             string myDatabase = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             //string library = @"E:\ISD Project\TestIsdDataAnalysis\SpectralLibraryDDA\Task1-SearchTask\SpectralLibrary_2024-07-09-17-24-30.msp";
             DbForTask db = new DbForTask(myDatabase, false);
-            string outputFolder = @"E:\ISD Project\TestSearch\isdScanBased_corr0.5_highestPeakXIC_ms1Tol5ppm_apexRT0.5_maxMissed2_overlap0.3_maxRT3_300000";
+            string outputFolder = @"E:\ISD Project\TestSearch\isdScanBased_corr0_highestPeakXIC_ms1Tol10ppm_apexRT0.3_maxMissed10_overlap0_maxRT5_300000";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.5,
-                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrange:3, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 300000, minMass: 8000);
+                maxNumMissedScan: 10, binSize: 100, overlapRatioCutOff: 0, correlationCutOff: 0, apexRtTolerance: 0.3,
+                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrange:5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 300000, minMass: 6000);
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { filePath2 }, "test");
         }
     }

@@ -130,16 +130,80 @@ namespace TaskLayer
                 return scansWithPrecursors;
             }
 
+            var averageParam = new SpectralAveragingParameters()
+            {
+                OutlierRejectionType = OutlierRejectionType.SigmaClipping,
+                SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
+                NumberOfScansToAverage = 5,
+                ScanOverlap = 4,
+                NormalizationType = NormalizationType.RelativeToTics,
+                SpectralWeightingType = SpectraWeightingType.WeightEvenly
+            };
+
+            //average ms1
             var allscans = myMSDataFile.GetAllScansList().OrderBy(s => s.OneBasedScanNumber).ToArray();
-            var ms1scans = allscans.Where(s => s.MsnOrder == 1).ToArray();
-            var allPeaks = Peak.GetAllPeaks(allscans);
-            var allMs1Peaks = allPeaks.Where(v => v!= null && v.FirstOrDefault().MsLevel == 1).ToArray();
+            var origMs1scans = allscans.Where(s => s.MsnOrder == 1).ToArray();
+            var ms1scans = new MsDataScan[origMs1scans.Length];
+            var averagedMS1 = SpectraFileAveraging.AverageSpectraFile(origMs1scans.ToList(), averageParam).ToList();
+            for (int i = 0; i < origMs1scans.Length; i++)
+            {
+                if (i < averageParam.NumberOfScansToAverage / 2 || i >= origMs1scans.Length - averageParam.NumberOfScansToAverage / 2)
+                {
+                    ms1scans[i] = origMs1scans[i];
+                }
+                else
+                {
+                    //var newScan = new MsDataScan(averagedMS1[i - averageParam.NumberOfScansToAverage / 2].MassSpectrum, origMs1scans[i].OneBasedScanNumber, origMs1scans[i].MsnOrder, origMs1scans[i].IsCentroid,
+                    //    origMs1scans[i].Polarity, origMs1scans[i].RetentionTime, origMs1scans[i].ScanWindowRange, origMs1scans[i].ScanFilter, origMs1scans[i].MzAnalyzer,
+                    //    origMs1scans[i].TotalIonCurrent, origMs1scans[i].InjectionTime, origMs1scans[i].NoiseData, origMs1scans[i].NativeId,
+                    //    origMs1scans[i].SelectedIonMZ, origMs1scans[i].SelectedIonChargeStateGuess, origMs1scans[i].SelectedIonIntensity,
+                    //    origMs1scans[i].IsolationMz, origMs1scans[i].IsolationWidth, origMs1scans[i].DissociationType, null,
+                    //    origMs1scans[i].SelectedIonMonoisotopicGuessMz, origMs1scans[i].HcdEnergy, origMs1scans[i].ScanDescription);
+                    //ms1scans[i] = newScan;
+                    ms1scans[i] = origMs1scans[i];
+                }
+            }
+
+            //average ms2
+            var ms2scans = allscans.Where(s => s.MsnOrder == 2).ToArray();
+            var ISDScanVoltageMap = PeakCurve.ConstructMs2Group(ms2scans);
+            foreach (var ms2Group in ISDScanVoltageMap)
+            {
+                var origScans = ms2Group.Value.ToArray();
+                var scans = new MsDataScan[origScans.Length];
+                var averagedMS2 = SpectraFileAveraging.AverageSpectraFile(origScans.ToList(), averageParam).ToList();
+                for (int i = 0; i < origScans.Length; i++)
+                {
+                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= origScans.Length - averageParam.NumberOfScansToAverage / 2)
+                    {
+                        scans[i] = origScans[i];
+                    }
+                    else
+                    {
+                        //var newScan = new MsDataScan(averagedMS2[i - averageParam.NumberOfScansToAverage / 2].MassSpectrum, origScans[i].OneBasedScanNumber, origScans[i].MsnOrder, origScans[i].IsCentroid,
+                        //    origScans[i].Polarity, origScans[i].RetentionTime, origScans[i].ScanWindowRange, origScans[i].ScanFilter, origScans[i].MzAnalyzer,
+                        //    origScans[i].TotalIonCurrent, origScans[i].InjectionTime, origScans[i].NoiseData, origScans[i].NativeId,
+                        //    origScans[i].SelectedIonMZ, origScans[i].SelectedIonChargeStateGuess, origScans[i].SelectedIonIntensity,
+                        //    origScans[i].IsolationMz, origScans[i].IsolationWidth, origScans[i].DissociationType, origScans[i].OneBasedPrecursorScanNumber,
+                        //    origScans[i].SelectedIonMonoisotopicGuessMz, origScans[i].HcdEnergy, origScans[i].ScanDescription);
+                        //    scans[i] = newScan;
+                        scans[i] = origScans[i];
+                    }
+                }
+                ms2Group.Value.Clear();
+                ms2Group.Value.AddRange(scans);
+            }
+
+            var allPeaks = new List<Peak>[allscans.Length + 1];
+            Peak.GetAllPeaks(allPeaks, ms1scans);
+            var allMs1Peaks = allPeaks.Where(p => p != null).ToArray();
             var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, 100, out Dictionary<int, int> scanIndexMap);
             var DIAparam= commonParameters.DIAparameters;
-            var allMs2PeakCurves = PeakCurve.GetMs2PeakCurves(ms2Scans, allPeaks, DIAparam);
+            var allMs2PeakCurves = PeakCurve.GetMs2PeakCurves(ISDScanVoltageMap, allPeaks, DIAparam);
             //var allMs1PeakCurves = PeakCurve.GetAllMs1PeakCurves(ms1scans, allPeaks, ms1PeakTable, DIAparam);
 
-            Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
+            var allMs2Scans = ISDScanVoltageMap.Values.SelectMany(p => p).ToArray();
+            Parallel.ForEach(Partitioner.Create(0, allMs2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                 (partitionRange, loopState) =>
                 {
                     var precursors = new List<(double MonoPeakMz, int Charge, double Intensity, int PeakCount, double highestPeakMz, double? FractionalIntensity)>();
@@ -149,11 +213,11 @@ namespace TaskLayer
                         if (GlobalVariables.StopLoops) { break; }
 
                         precursors.Clear();
-                        MsDataScan ms2scan = ms2Scans[i];
+                        MsDataScan ms2scan = allMs2Scans[i];
 
                         if (ms2scan.OneBasedPrecursorScanNumber.HasValue)
                         {
-                            MsDataScan precursorSpectrum = myMSDataFile.GetOneBasedScan(ms2scan.OneBasedPrecursorScanNumber.Value);
+                            MsDataScan precursorSpectrum = ms1scans.First(s => s.OneBasedScanNumber == ms2scan.OneBasedPrecursorScanNumber);
 
                             try
                             {
@@ -220,9 +284,12 @@ namespace TaskLayer
                         }
                     }
                 });
+            //debug
+            var preCount = scansWithPrecursors.SelectMany(p => p).Count();
+
             PeakCurve.GetPrecursorPeakCurve(scansWithPrecursors, ms1scans, allPeaks, ms1PeakTable, DIAparam, scanIndexMap);
-            //var newScanWithPre = PeakCurve.GetPseudoMs2Scans(scansWithPrecursors, commonParameters, DIAparam, allPeaks);
-            var newScanWithPre = PeakCurve.GetPseudoMs2Scans_PFgroup(scansWithPrecursors, commonParameters, DIAparam, allPeaks, allMs2PeakCurves, myMSDataFile);
+            var newScanWithPre = PeakCurve.GetPseudoMs2Scans(scansWithPrecursors, commonParameters, DIAparam, allPeaks);
+            //var newScanWithPre = PeakCurve.GetPseudoMs2Scans_PFgroup(scansWithPrecursors, commonParameters, DIAparam, allPeaks, allMs2PeakCurves, myMSDataFile);
 
             return newScanWithPre;
         }

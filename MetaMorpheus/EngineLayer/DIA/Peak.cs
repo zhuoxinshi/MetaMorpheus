@@ -36,14 +36,13 @@ namespace EngineLayer
         public PeakCurve PeakCurve { get; set; }
         public double Voltage { get; set; }
 
-        public static List<Peak>[] GetAllPeaks(MsDataScan[] scans)
+        public static List<Peak>[] GetAllPeaks(List<Peak>[] allPeaks, MsDataScan[] scans)
         {
-            var allPeaks = new List<Peak>[scans.Length + 1];
             int index = 0;
             string pattern = $@"sid=(\d+)";
             for (int i = 0; i < scans.Length; i++)
             {
-                allPeaks[i] = new List<Peak>();
+                allPeaks[scans[i].OneBasedScanNumber] = new List<Peak>();
                 var spectrum = scans[i].MassSpectrum;
                 var match = Regex.Match(scans[i].ScanFilter, pattern);
                 double voltage = double.Parse(match.Groups[1].Value);
@@ -51,7 +50,7 @@ namespace EngineLayer
                 {
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
                         scans[i].OneBasedScanNumber, 0, index, null, voltage);
-                    allPeaks[i].Add(newPeak);
+                    allPeaks[scans[i].OneBasedScanNumber].Add(newPeak);
                     index++;
                 }
             }
