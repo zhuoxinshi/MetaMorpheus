@@ -45,6 +45,7 @@ namespace EngineLayer.DIA
         public double EndMz { get; set; }
         public MzRange MzRange => new MzRange(StartMz, EndMz);
         public double ApexRT => Peaks.OrderByDescending(p => p.Intensity).First().RetentionTime;
+        public double ApexIntensity => Peaks.OrderByDescending(p => p.Intensity).First().Intensity;
         public double TotalIntensity => Peaks.Sum(p => p.Intensity);
         public double AveragedMz => AverageMz();
         public double AveragedIntensity => AverageIntensity();
@@ -531,6 +532,8 @@ namespace EngineLayer.DIA
                         allMasses.Add(mass);
                     }
                 }
+                //TODO
+                //rank by highest number of matched peaks, then by total intensity, find all the isotope peaks in each scan, sum the intensity as XIC intensity
                 allMasses = allMasses.OrderByDescending(p => p.HighestPeakIntensity).ToList();
 
                 Peak.GetAllPeaks(allPeaks, ms2scans);
@@ -545,7 +548,7 @@ namespace EngineLayer.DIA
                     if (peak.PeakCurve == null)
                     {
                         var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, null, commonParam.DIAparameters.MaxNumMissedScan,
-                            commonParam.DIAparameters.Ms1PeakFindingTolerance, commonParam.DIAparameters.PeakSearchBinSize, commonParam.DIAparameters.MaxRTRange);
+                            commonParam.DIAparameters.Ms2PeakFindingTolerance, commonParam.DIAparameters.PeakSearchBinSize, commonParam.DIAparameters.MaxRTRange);
                         newPeakCurve.MonoisotopicMass = mass.MonoisotopicMass;
                         newPeakCurve.Charge = mass.Charge;
                         newPeakCurve.Envelope = mass.Envelope;
@@ -623,6 +626,10 @@ namespace EngineLayer.DIA
                             {
                                 foreach (var peak in allms2PeaksForThisScan)
                                 {
+                                    if(peak.PeakCurve.ApexIntensity > ms1curve.ApexIntensity)
+                                    {
+                                        continue;
+                                    }
                                     var ms2curve = peak.PeakCurve;
                                     if (ms2curve.ApexRT >= ms1curve.StartRT && ms2curve.ApexRT <= ms1curve.EndRT)
                                     {
@@ -659,11 +666,19 @@ namespace EngineLayer.DIA
                                                             scan.TheScan.SelectedIonMonoisotopicGuessMz, scan.TheScan.HcdEnergy, scan.TheScan.ScanDescription);
                                     var newScanWithPrecursor = new Ms2ScanWithSpecificMass(newScan, scan.PrecursorMonoisotopicPeakMz, scan.PrecursorCharge, scan.FullFilePath, commonParam);
                                     newScansWithPre[i].Add(newScanWithPrecursor);
+                                    newScanWithPrecursor.PrecursorPeakCurve = scan.PrecursorPeakCurve;
+                                    newScanWithPrecursor.DIApeaks = DIApeaks;
                                 }
                             }
                         }
                     }
                 });
+            //DEBUG
+            //var all = newScansWithPre.SelectMany(p => p).ToList();
+            //foreach (var scan in all)
+            //{
+            //    VisualizeXICgroup(scan.PrecursorPeakCurve, scan.DIApeaks);
+            //}
             return newScansWithPre;
         }
 
@@ -709,8 +724,8 @@ namespace EngineLayer.DIA
                                 }
                                 if (DIApeaks.Count > 0)
                                 {
-                                    var mzs = new double[] { 1 };
-                                    var intensities = new double[] { double.MaxValue };
+                                    var mzs = DIApeaks.Select(p => p.Mz).ToArray();
+                                    var intensities = DIApeaks.Select(p => p.Intensity).ToArray();
                                     var spectrum = new MzSpectrum(mzs, intensities, false);
                                     var neutralExperimentalFragments = DIApeaks.Select(p => p.PeakCurve.Envelope).ToArray();
                                     //MsDataScan newScan = new MsDataScan(spectrum, scan.TheScan.OneBasedScanNumber, scan.TheScan.MsnOrder, scan.TheScan.IsCentroid,
@@ -847,6 +862,24 @@ namespace EngineLayer.DIA
                     }
                 }
             }
+        }
+
+        public static void VisualizeXICgroup(PeakCurve ms1curve, List<Peak> fragments)
+        {
+            var plots = new List<GenericChart>();
+            var precursorPlot = Chart2D.Chart.Line<double, double, string>(
+                    x: ms1curve.Peaks.Select(p => p.RetentionTime),
+                    y: ms1curve.Peaks.Select(p => Math.Log10(p.Intensity))).WithTraceInfo($"pre_{Math.Round(ms1curve.AveragedMz, 3)}_{ms1curve.MonoisotopicMass}").WithMarkerStyle(Color: Color.fromString("red"));
+            plots.Add(precursorPlot);
+            foreach (var fragment in fragments)
+            {
+                var fragmentPlot = Chart2D.Chart.Line<double, double, string>(
+                        x: fragment.PeakCurve.Peaks.Select(p => p.RetentionTime),
+                        y: fragment.PeakCurve.Peaks.Select(p => Math.Log10(p.Intensity))).WithTraceInfo($"fragment_{Math.Round(fragment.Mz, 3)}").WithMarkerStyle(Color: Color.fromString("blue"));
+                plots.Add(fragmentPlot);
+            }
+            var combinedPlot = Chart.Combine(plots);
+            combinedPlot.Show();  
         }
     }
 }

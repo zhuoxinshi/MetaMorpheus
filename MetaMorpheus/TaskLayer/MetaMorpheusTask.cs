@@ -133,11 +133,11 @@ namespace TaskLayer
             var averageParam = new SpectralAveragingParameters()
             {
                 OutlierRejectionType = OutlierRejectionType.SigmaClipping,
-                SpectraFileAveragingType = SpectraFileAveragingType.AverageEverynScansWithOverlap,
+                SpectraFileAveragingType = SpectraFileAveragingType.AverageDdaScans,
                 NumberOfScansToAverage = 5,
                 ScanOverlap = 4,
                 NormalizationType = NormalizationType.RelativeToTics,
-                SpectralWeightingType = SpectraWeightingType.WeightEvenly
+                SpectralWeightingType = SpectraWeightingType.WeightEvenly,
             };
 
             //average ms1
@@ -147,21 +147,21 @@ namespace TaskLayer
             var averagedMS1 = SpectraFileAveraging.AverageSpectraFile(origMs1scans.ToList(), averageParam).ToList();
             for (int i = 0; i < origMs1scans.Length; i++)
             {
-                if (i < averageParam.NumberOfScansToAverage / 2 || i >= origMs1scans.Length - averageParam.NumberOfScansToAverage / 2)
-                {
-                    ms1scans[i] = origMs1scans[i];
-                }
-                else
-                {
-                    //var newScan = new MsDataScan(averagedMS1[i - averageParam.NumberOfScansToAverage / 2].MassSpectrum, origMs1scans[i].OneBasedScanNumber, origMs1scans[i].MsnOrder, origMs1scans[i].IsCentroid,
-                    //    origMs1scans[i].Polarity, origMs1scans[i].RetentionTime, origMs1scans[i].ScanWindowRange, origMs1scans[i].ScanFilter, origMs1scans[i].MzAnalyzer,
-                    //    origMs1scans[i].TotalIonCurrent, origMs1scans[i].InjectionTime, origMs1scans[i].NoiseData, origMs1scans[i].NativeId,
-                    //    origMs1scans[i].SelectedIonMZ, origMs1scans[i].SelectedIonChargeStateGuess, origMs1scans[i].SelectedIonIntensity,
-                    //    origMs1scans[i].IsolationMz, origMs1scans[i].IsolationWidth, origMs1scans[i].DissociationType, null,
-                    //    origMs1scans[i].SelectedIonMonoisotopicGuessMz, origMs1scans[i].HcdEnergy, origMs1scans[i].ScanDescription);
-                    //ms1scans[i] = newScan;
-                    ms1scans[i] = origMs1scans[i];
-                }
+                //if (i < averageParam.NumberOfScansToAverage / 2 || i >= origMs1scans.Length - averageParam.NumberOfScansToAverage / 2)
+                //{
+                //    ms1scans[i] = origMs1scans[i];
+                //}
+                //else
+                //{
+                    var newScan = new MsDataScan(averagedMS1[i].MassSpectrum, origMs1scans[i].OneBasedScanNumber, origMs1scans[i].MsnOrder, origMs1scans[i].IsCentroid,
+                        origMs1scans[i].Polarity, origMs1scans[i].RetentionTime, origMs1scans[i].ScanWindowRange, origMs1scans[i].ScanFilter, origMs1scans[i].MzAnalyzer,
+                        origMs1scans[i].TotalIonCurrent, origMs1scans[i].InjectionTime, origMs1scans[i].NoiseData, origMs1scans[i].NativeId,
+                        origMs1scans[i].SelectedIonMZ, origMs1scans[i].SelectedIonChargeStateGuess, origMs1scans[i].SelectedIonIntensity,
+                        origMs1scans[i].IsolationMz, origMs1scans[i].IsolationWidth, origMs1scans[i].DissociationType, null,
+                        origMs1scans[i].SelectedIonMonoisotopicGuessMz, origMs1scans[i].HcdEnergy, origMs1scans[i].ScanDescription);
+                    ms1scans[i] = newScan;
+                    //ms1scans[i] = origMs1scans[i];
+                //}
             }
 
             //average ms2
@@ -174,21 +174,21 @@ namespace TaskLayer
                 var averagedMS2 = SpectraFileAveraging.AverageSpectraFile(origScans.ToList(), averageParam).ToList();
                 for (int i = 0; i < origScans.Length; i++)
                 {
-                    if (i < averageParam.NumberOfScansToAverage / 2 || i >= origScans.Length - averageParam.NumberOfScansToAverage / 2)
-                    {
-                        scans[i] = origScans[i];
-                    }
-                    else
-                    {
-                        //var newScan = new MsDataScan(averagedMS2[i - averageParam.NumberOfScansToAverage / 2].MassSpectrum, origScans[i].OneBasedScanNumber, origScans[i].MsnOrder, origScans[i].IsCentroid,
-                        //    origScans[i].Polarity, origScans[i].RetentionTime, origScans[i].ScanWindowRange, origScans[i].ScanFilter, origScans[i].MzAnalyzer,
-                        //    origScans[i].TotalIonCurrent, origScans[i].InjectionTime, origScans[i].NoiseData, origScans[i].NativeId,
-                        //    origScans[i].SelectedIonMZ, origScans[i].SelectedIonChargeStateGuess, origScans[i].SelectedIonIntensity,
-                        //    origScans[i].IsolationMz, origScans[i].IsolationWidth, origScans[i].DissociationType, origScans[i].OneBasedPrecursorScanNumber,
-                        //    origScans[i].SelectedIonMonoisotopicGuessMz, origScans[i].HcdEnergy, origScans[i].ScanDescription);
-                        //    scans[i] = newScan;
-                        scans[i] = origScans[i];
-                    }
+                    //if (i < averageParam.NumberOfScansToAverage / 2 || i >= origScans.Length - averageParam.NumberOfScansToAverage / 2)
+                    //{
+                    //    scans[i] = origScans[i];
+                    //}
+                    //else
+                    //{
+                        var newScan = new MsDataScan(averagedMS2[i].MassSpectrum, origScans[i].OneBasedScanNumber, origScans[i].MsnOrder, origScans[i].IsCentroid,
+                            origScans[i].Polarity, origScans[i].RetentionTime, origScans[i].ScanWindowRange, origScans[i].ScanFilter, origScans[i].MzAnalyzer,
+                            origScans[i].TotalIonCurrent, origScans[i].InjectionTime, origScans[i].NoiseData, origScans[i].NativeId,
+                            origScans[i].SelectedIonMZ, origScans[i].SelectedIonChargeStateGuess, origScans[i].SelectedIonIntensity,
+                            origScans[i].IsolationMz, origScans[i].IsolationWidth, origScans[i].DissociationType, origScans[i].OneBasedPrecursorScanNumber,
+                            origScans[i].SelectedIonMonoisotopicGuessMz, origScans[i].HcdEnergy, origScans[i].ScanDescription);
+                        scans[i] = newScan;
+                        //scans[i] = origScans[i];
+                    //}
                 }
                 ms2Group.Value.Clear();
                 ms2Group.Value.AddRange(scans);
@@ -291,6 +291,8 @@ namespace TaskLayer
             var newScanWithPre = PeakCurve.GetPseudoMs2Scans(scansWithPrecursors, commonParameters, DIAparam, allPeaks);
             //var newScanWithPre = PeakCurve.GetPseudoMs2Scans_PFgroup(scansWithPrecursors, commonParameters, DIAparam, allPeaks, allMs2PeakCurves, myMSDataFile);
 
+            //debug
+            var post = newScanWithPre.SelectMany(p => p).OrderByDescending(s => s.NumPeaks).ToList();
             return newScanWithPre;
         }
 

@@ -62,6 +62,7 @@ namespace EngineLayer
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
         public double HighestPeakMz { get; set; }
         public PeakCurve PrecursorPeakCurve { get; set; }
+        public List<Peak> DIApeaks { get; set; }
 
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {
