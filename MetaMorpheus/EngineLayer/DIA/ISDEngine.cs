@@ -5,6 +5,7 @@ using MathNet.Numerics.LinearAlgebra.Storage;
 using MzLibUtil;
 using OpenMcdf.Extensions.OLEProperties;
 using Plotly.NET.CSharp;
+using SpectralAveraging;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -32,7 +33,7 @@ namespace EngineLayer.DIA
         public MsDataFile MyMSDataFile { get; set; }
         public CommonParameters CommonParameters { get; set; }
         public List<Ms2ScanWithSpecificMass> PseudoMS2Scans { get; set; }
-        public Dictionary<double, List<MsDataScan>> DIAScanWindowMap { get; set; }
+        public Dictionary<double, List<MsDataScan>> ISDScanVoltageMap { get; set; }
         public List<PrecursorFragmentsGroup> PFgroups { get; set; }
         public double CycleTime { get; set; }
         public List<Ms2ScanWithSpecificMass> PseudoMs2WithPre { get; set; }
@@ -41,7 +42,7 @@ namespace EngineLayer.DIA
         {
             Ms1PeakIndexing();
             ConstructMs2Group();
-            AverageMs2Scans();
+            //AverageMs2Scans();
             GetMs1PeakCurves();
             GetMs2PeakCurves();
             PrecursorFragmentPairing();
@@ -57,28 +58,66 @@ namespace EngineLayer.DIA
         }
         public void ConstructMs2Group()
         {
-            DIAScanWindowMap = new Dictionary<double, List<MsDataScan>>();
+            ISDScanVoltageMap = new Dictionary<double, List<MsDataScan>>();
             var ms2Scans = MyMSDataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
             string pattern = $@"sid=(\d+)";
             foreach (var ms2 in ms2Scans)
             {
                 var match = Regex.Match(ms2.ScanFilter, pattern);
                 double voltage = double.Parse(match.Groups[1].Value);
-                if (!DIAScanWindowMap.ContainsKey(voltage))
+                if (!ISDScanVoltageMap.ContainsKey(voltage))
                 {
-                    DIAScanWindowMap[voltage] = new List<MsDataScan>();
-                    DIAScanWindowMap[voltage].Add(ms2);
+                    ISDScanVoltageMap[voltage] = new List<MsDataScan>();
+                    ISDScanVoltageMap[voltage].Add(ms2);
                 }
                 else
                 {
-                    DIAScanWindowMap[voltage].Add(ms2);
+                    ISDScanVoltageMap[voltage].Add(ms2);
                 }
             }
         }
 
         public void AverageMs2Scans()
         {
+            var averageParam = new SpectralAveragingParameters()
+            {
+                OutlierRejectionType = OutlierRejectionType.SigmaClipping,
+                SpectraFileAveragingType = SpectraFileAveragingType.AverageDdaScans,
+                NumberOfScansToAverage = 5,
+                ScanOverlap = 4,
+                NormalizationType = NormalizationType.RelativeToTics,
+                SpectralWeightingType = SpectraWeightingType.WeightEvenly,
+            };
 
+            foreach (var ms2Group in ISDScanVoltageMap)
+            {
+                var origScans = ms2Group.Value.ToArray();
+                var scansForAveraging = new List<MsDataScan>();
+                for (int i = 0; i < origScans.Length; i++)
+                {
+                    var newScan = new MsDataScan(origScans[i].MassSpectrum, origScans[i].OneBasedScanNumber, 1, origScans[i].IsCentroid,
+                        origScans[i].Polarity, origScans[i].RetentionTime, origScans[i].ScanWindowRange, origScans[i].ScanFilter, origScans[i].MzAnalyzer,
+                        origScans[i].TotalIonCurrent, origScans[i].InjectionTime, origScans[i].NoiseData, origScans[i].NativeId,
+                        origScans[i].SelectedIonMZ, origScans[i].SelectedIonChargeStateGuess, origScans[i].SelectedIonIntensity,
+                        origScans[i].IsolationMz, origScans[i].IsolationWidth, origScans[i].DissociationType, origScans[i].OneBasedPrecursorScanNumber,
+                        origScans[i].SelectedIonMonoisotopicGuessMz, origScans[i].HcdEnergy, origScans[i].ScanDescription);
+                    scansForAveraging.Add(newScan);
+                }
+                var scans = new MsDataScan[origScans.Length];
+                var averagedMS2 = SpectraFileAveraging.AverageSpectraFile(scansForAveraging, averageParam).ToList();
+                for (int i = 0; i < origScans.Length; i++)
+                {
+                    var newScan = new MsDataScan(averagedMS2[i].MassSpectrum, origScans[i].OneBasedScanNumber, origScans[i].MsnOrder, origScans[i].IsCentroid,
+                        origScans[i].Polarity, origScans[i].RetentionTime, origScans[i].ScanWindowRange, origScans[i].ScanFilter, origScans[i].MzAnalyzer,
+                        origScans[i].TotalIonCurrent, origScans[i].InjectionTime, origScans[i].NoiseData, origScans[i].NativeId,
+                        origScans[i].SelectedIonMZ, origScans[i].SelectedIonChargeStateGuess, origScans[i].SelectedIonIntensity,
+                        origScans[i].IsolationMz, origScans[i].IsolationWidth, origScans[i].DissociationType, origScans[i].OneBasedPrecursorScanNumber,
+                        origScans[i].SelectedIonMonoisotopicGuessMz, origScans[i].HcdEnergy, origScans[i].ScanDescription);
+                    scans[i] = newScan;
+                }
+                ms2Group.Value.Clear();
+                ms2Group.Value.AddRange(scans);
+            }
         }
 
         public void GetMs1PeakCurves()
@@ -151,7 +190,7 @@ namespace EngineLayer.DIA
         public void GetMs2PeakCurves()
         {
             var ms2PeakCurves = new Dictionary<double, List<PeakCurve>>();
-            foreach (var ms2Group in DIAScanWindowMap)
+            foreach (var ms2Group in ISDScanVoltageMap)
             {
                 var ms2scans = ms2Group.Value.ToArray();
                 var allMs2Peaks = Peak.GetAllPeaks(ms2scans, DIAparameters.PeakSearchBinSize);
@@ -206,7 +245,7 @@ namespace EngineLayer.DIA
         public void GetMs2PeakCurves_Decon()
         {
             var ms2PeakCurves = new Dictionary<double, List<PeakCurve>>();
-            foreach (var ms2Group in DIAScanWindowMap)
+            foreach (var ms2Group in ISDScanVoltageMap)
             {
                 var ms2scans = ms2Group.Value.ToArray();
                 var allMasses = new List<DeconvolutedMass>();
@@ -285,6 +324,10 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
+                //if (ms2curve.ApexIntensity > precursor.ApexIntensity)
+                //{
+                //    continue;
+                //}
                 if (ms2curve.ApexRT >= precursor.StartRT && ms2curve.ApexRT <= precursor.EndRT)
                 {
                     if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
@@ -292,7 +335,7 @@ namespace EngineLayer.DIA
                         var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
-                            double corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
+                            double corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", 0.005);
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
