@@ -41,6 +41,7 @@ namespace EngineLayer.DIA
         {
             Ms1PeakIndexing();
             ConstructMs2Group();
+            AverageMs2Scans();
             GetMs1PeakCurves();
             GetMs2PeakCurves();
             PrecursorFragmentPairing();
@@ -73,6 +74,11 @@ namespace EngineLayer.DIA
                     DIAScanWindowMap[voltage].Add(ms2);
                 }
             }
+        }
+
+        public void AverageMs2Scans()
+        {
+
         }
 
         public void GetMs1PeakCurves()
