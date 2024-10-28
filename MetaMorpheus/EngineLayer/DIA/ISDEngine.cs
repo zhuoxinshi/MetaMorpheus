@@ -42,10 +42,10 @@ namespace EngineLayer.DIA
             Ms1PeakIndexing();
             ConstructMs2Group();
             GetMs1PeakCurves();
-            GetMs2PeakCurves_Decon();
+            GetMs2PeakCurves();
             PrecursorFragmentPairing();
             //PFgroupFilter();
-            ConstructNewMs2Scans_Decon();
+            ConstructNewMs2Scans();
         }
 
         public void Ms1PeakIndexing()

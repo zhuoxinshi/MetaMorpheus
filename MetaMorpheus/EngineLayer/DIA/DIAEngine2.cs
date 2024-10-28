@@ -62,7 +62,7 @@ namespace EngineLayer.DIA
             var ms2Scans = MyMSDataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
             foreach (var ms2 in ms2Scans)
             {
-                (double min, double max) range = new(ms2.IsolationRange.Minimum, ms2.IsolationRange.Maximum);
+                (double min, double max) range = new(Math.Round(ms2.IsolationRange.Minimum, 0), Math.Round(ms2.IsolationRange.Maximum, 0));
                 if (!DIAScanWindowMap.ContainsKey(range))
                 {
                     DIAScanWindowMap[range] = new List<MsDataScan>();
@@ -137,6 +137,10 @@ namespace EngineLayer.DIA
                         }
                     }
                 }
+                if (Ms1PeakCurves[ms1window].Count == 0)
+                {
+                    Ms1PeakCurves.Remove(ms1window);
+                }
             }
         }
 
@@ -190,15 +194,15 @@ namespace EngineLayer.DIA
             Ms2PeakCurves = ms2PeakCurves;
 
             //debug
-            var testMs2PeakCurve = Ms2PeakCurves.Values.SelectMany(v => v).ToList();
-            foreach (var a in testMs2PeakCurve)
-            {
-                Random rnd = new Random();
-                int r = rnd.Next(testMs2PeakCurve.Count - 1);
-                var pc = testMs2PeakCurve[r];
-                pc.VisualizeBspline(out List<float> rtSeq).Show();
-                pc.VisualizePeakRegions();
-            }
+            //var testMs2PeakCurve = Ms2PeakCurves.Values.SelectMany(v => v).ToList();
+            //foreach (var a in testMs2PeakCurve)
+            //{
+            //    Random rnd = new Random();
+            //    int r = rnd.Next(testMs2PeakCurve.Count - 1);
+            //    var pc = testMs2PeakCurve[r];
+            //    pc.VisualizeBspline(out List<float> rtSeq).Show();
+            //    pc.VisualizePeakRegions();
+            //}
         }
 
         //public void GetMs2PeakCurves2()
@@ -254,7 +258,7 @@ namespace EngineLayer.DIA
         public void PrecursorFragmentPairing()
         {
             PFgroups = new List<PrecursorFragmentsGroup>();
-            foreach (var ms2group in Ms2PeakCurves)
+            foreach (var ms2group in Ms1PeakCurves)
             {
                 var precursorsInRange = Ms1PeakCurves[ms2group.Key].ToArray();
 
@@ -264,7 +268,7 @@ namespace EngineLayer.DIA
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursorsInRange[i];
-                        var preFragGroup = GroupPrecursorFragments(precursor, ms2group.Value, DIAparameters);
+                        var preFragGroup = GroupPrecursorFragments(precursor, Ms2PeakCurves[ms2group.Key], DIAparameters);
                         
                         if (preFragGroup != null)
                         {

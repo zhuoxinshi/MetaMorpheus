@@ -32,11 +32,13 @@ namespace EngineLayer.DIA
         public double MinMass { get; set; }
         public double MaxMass { get; set; }
         public string Type { get; set; }
+        public bool TopDown { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, 
             double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
             , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
-            bool splitMS2Peak = true, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999, string type = "DIA")
+            bool splitMS2Peak = true, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999, string type = "DIA", 
+            bool topdown = false)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -59,6 +61,7 @@ namespace EngineLayer.DIA
             MinMass = minMass;
             MaxMass = maxMass;
             Type = type;
+            TopDown = topdown;
         }
 
     }
