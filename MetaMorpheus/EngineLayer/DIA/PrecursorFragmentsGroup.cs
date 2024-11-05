@@ -34,17 +34,17 @@ namespace EngineLayer.DIA
         
         public void Visualize()
         {
-            var plots = new List<GenericChart>();
             var normalizedIntensity = PrecursorPeakCurve.Peaks.Select(p => Math.Log10(p.Intensity));
             var precursorPlot = Chart2D.Chart.Line<double, double, string>(
                     x: PrecursorPeakCurve.Peaks.Select(p => p.RetentionTime),
                     y: normalizedIntensity).WithTraceInfo($"precursor_{Math.Round(PrecursorPeakCurve.AveragedMz, 3)}").WithMarkerStyle(Color: Color.fromString("red"));
-            foreach(var pf in PFpairs)
+            var plots = new List<GenericChart> { precursorPlot };
+            foreach (var pf in PFpairs)
             {
                 var norm2 = pf.FragmentPeakCurve.Peaks.Select(p => Math.Log10(p.Intensity));
                 var fragmentPlot2 = Chart2D.Chart.Line<double, double, string>(
                         x: pf.FragmentPeakCurve.Peaks.Select(p => p.RetentionTime),
-                        y: norm2).WithTraceInfo($"fragment_{Math.Round(pf.FragmentPeakCurve.AveragedMz, 3)}_{pf.Correlation}_{pf.FragmentRank}")
+                        y: norm2).WithTraceInfo($"fragment_{Math.Round(pf.FragmentPeakCurve.AveragedMz, 3)}_{Math.Round(pf.Correlation, 2)}_{pf.FragmentRank}")
                         .WithMarkerStyle(Color: Color.fromString("blue"));
                 plots.Add(fragmentPlot2);
             }

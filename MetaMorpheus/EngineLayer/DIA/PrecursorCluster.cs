@@ -49,40 +49,40 @@ namespace EngineLayer.DIA
             return newCurve;
         }
 
-        //public static List<PeakCurve> GetMs1PeakCurves(MsDataScan[] allMs1Scans, DIAparameters DIAparameters, CommonParameters commonParameters)
-        //{
-        //    //Get all precursors
-        //    var allPrecursors = new List<Precursor>();
-        //    for (int i = 0; i < allMs1Scans.Length; i++)
-        //    {
-        //        var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], commonParameters.PrecursorDeconvolutionParameters);
-        //        foreach (var envelope in envelopes)
-        //        {
-        //            var charge = envelope.Charge;
-        //            double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
-        //            double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-        //            var precursor = new Precursor(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-        //                allMs1Scans[i].OneBasedScanNumber, i);
-        //            allPrecursors.Add(precursor);
-        //        }
-        //    }
-        //    var pre = allPrecursors.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 2), p.Charge });
-        //    var allPrecursorClusters = new List<PrecursorCluster>();
-        //    foreach (var group in pre)
-        //    {
-        //        var precursors = group.ToList();
-        //        double totalIntensity = group.ToList().Sum(p => p.Envelope.TotalIntensity);
-        //        var newPC = new PrecursorCluster( group.Key.mass, group.Key.Charge, totalIntensity, precursors);
-        //        allPrecursorClusters.Add(newPC);
-        //    }
-        //    var filteredPC = allPrecursorClusters.Where(pc => pc.EnvelopeCount >= 5).ToList();
-        //    var allPeakCurvesForGrouping = new List<PeakCurve>();
-        //    foreach(var pc in filteredPC)
-        //    {
-        //        allPeakCurvesForGrouping.Add(pc.GetPeakCurveForGrouping());
-        //    }
-        //    return allPeakCurvesForGrouping;
-        //}
+        public static List<PeakCurve> GetMs1PeakCurves(MsDataScan[] allMs1Scans, DIAparameters DIAparameters, CommonParameters commonParameters)
+        {
+            //Get all precursors
+            var allPrecursors = new List<DeconvolutedMass>();
+            for (int i = 0; i < allMs1Scans.Length; i++)
+            {
+                var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], commonParameters.PrecursorDeconvolutionParameters);
+                foreach (var envelope in envelopes)
+                {
+                    var charge = envelope.Charge;
+                    double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
+                    double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
+                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                        allMs1Scans[i].OneBasedScanNumber, i);
+                    allPrecursors.Add(precursor);
+                }
+            }
+            var pre = allPrecursors.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 2), p.Charge });
+            var allPrecursorClusters = new List<PrecursorCluster>();
+            foreach (var group in pre)
+            {
+                var precursors = group.ToList();
+                double totalIntensity = group.ToList().Sum(p => p.Envelope.TotalIntensity);
+                var newPC = new PrecursorCluster(group.Key.mass, group.Key.Charge, totalIntensity, precursors);
+                allPrecursorClusters.Add(newPC);
+            }
+            var filteredPC = allPrecursorClusters.Where(pc => pc.EnvelopeCount >= 5).ToList();
+            var allPeakCurvesForGrouping = new List<PeakCurve>();
+            foreach (var pc in filteredPC)
+            {
+                allPeakCurvesForGrouping.Add(pc.GetPeakCurveForGrouping());
+            }
+            return allPeakCurvesForGrouping;
+        }
 
         public static List<Peak> FindEnvelopeFromScan(List<Peak> targetPeaks, List<Peak>[] peakTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
         {
@@ -169,7 +169,7 @@ namespace EngineLayer.DIA
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }

@@ -49,14 +49,41 @@ namespace EngineLayer.DIA
             return overlap;
         }
 
+        public static double CalculateRTOverlapRatio_scanCycle(PeakCurve curve1, PeakCurve curve2)
+        {
+            double overlap = 0;
+            var ms1rtrange = curve1.EndCycle - curve1.StartCycle;
+            var ms2rtrange = curve2.EndCycle - curve2.StartCycle;
+            if (curve1.StartCycle >= curve2.StartCycle && curve1.StartCycle <= curve2.EndCycle && curve1.EndCycle >= curve2.EndCycle)
+            {
+                overlap = (curve2.EndCycle - curve1.StartCycle) / ms1rtrange;
+            }
+            else if (curve1.EndCycle >= curve2.StartRT && curve1.EndCycle <= curve2.EndCycle && curve1.StartCycle <= curve2.StartRT)
+            {
+                overlap = (curve1.EndCycle - curve2.StartCycle) / ms1rtrange;
+            }
+            else if (curve1.StartCycle <= curve2.StartCycle && curve1.EndCycle >= curve2.EndCycle)
+            {
+                overlap = ms2rtrange / ms1rtrange;
+            }
+            else if (curve1.StartCycle >= curve2.StartCycle && curve1.EndCycle <= curve2.EndCycle)
+            {
+                overlap = 1;
+            }
+            return overlap;
+        }
+
         public static double CalculateCorr_spline(PeakCurve peakCurve1, PeakCurve peakCurve2, string splineType, double timeInterval)
         {
             if (peakCurve2.Peaks.Count < 5 || peakCurve1.Peaks.Count < 5)
             {
                 return 0;
             }
-            var startRT = Math.Max(peakCurve1.StartRT, peakCurve2.StartRT);
-            var endRT = Math.Min(peakCurve1.EndRT, peakCurve2.EndRT);
+            //change
+            //var startRT = Math.Max(peakCurve1.StartRT, peakCurve2.StartRT);
+            //var endRT = Math.Min(peakCurve1.EndRT, peakCurve2.EndRT);
+            var startRT = peakCurve1.StartRT;
+            var endRT = peakCurve1.EndRT;
 
             if (splineType == "Bspline")
             {
@@ -258,61 +285,65 @@ namespace EngineLayer.DIA
         {
             var peakList1 = peakCurve1.Peaks.ToArray();
             var peakList2 = peakCurve2.Peaks.ToArray();
+            var scanCycles1 = peakList1.Select(p => p.ZeroBasedScanIndex).ToArray();
+            var scanCycles2 = peakList2.Select(p => p.ZeroBasedScanIndex).ToArray();
 
-            var intensityPair = new List<(double, double)>();
-            //for plot
-            var rtPair = new List<(double, double)>();
-
-            if (peakList1.Length < peakList2.Length)
-            {
-                foreach (var peak in peakList1)
-                {
-                    var indexList = peakList2.Select(p => p.ZeroBasedScanIndex).ToArray();
-                    var index = Array.BinarySearch(indexList, peak.ZeroBasedScanIndex);
-                    if (index > 0)
-                    {
-                        intensityPair.Add((peak.Intensity, peakList2[index].Intensity));
-                        rtPair.Add((peak.RetentionTime, peakList2[index].RetentionTime));
-                    }
-                }
-            }
-            else
-            {
-                foreach (var peak in peakList2)
-                {
-                    var indexList = peakList1.Select(p => p.ZeroBasedScanIndex).ToArray();
-                    var index = Array.BinarySearch(indexList, peak.ZeroBasedScanIndex);
-                    if (index > 0)
-                    {
-                        intensityPair.Add((peakList1[index].Intensity, peak.Intensity));
-                        rtPair.Add((peakList1[index].RetentionTime, peak.RetentionTime));
-                    }
-                }
-            }
-
-            if (intensityPair.Count >= 5)
-            {
-                double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensityPair.Select(pair => pair.Item1), intensityPair.Select(pair => pair.Item2));
-
-                //plot
-                //if (intensityPair.Count >= 5 && corr > 0.7)
-                //{
-                //    var plot1 = Chart2D.Chart.Point<double, double, string>(
-                //    x: rtPair.Select(pair => pair.Item1),
-                //    y: intensityPair.Select(pair => pair.Item1/intensityPair.Sum(p => p.Item1))).WithTraceInfo("precursor").WithMarkerStyle(Color: Color.fromString("blue"));
-                //    var plot2 = Chart2D.Chart.Point<double, double, string>(
-                //        x: rtPair.Select(pair => pair.Item2),
-                //        y: intensityPair.Select(pair => pair.Item2 / intensityPair.Sum(p => p.Item2))).WithTraceInfo("fragment").WithMarkerStyle(Color: Color.fromString("red"));
-                //    var combinedPlot = Chart.Combine(new[] { plot1, plot2 }).WithTitle($"corr {corr}");
-                //    combinedPlot.Show();
-                //}
-
-                return corr;
-            }
-            else
+            var start = (int)Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var end = (int)Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            int numPoints = end - start  + 1;
+            if (numPoints < 6)
             {
                 return 0;
             }
+
+            var list1 = new List<double>();
+            var list2 = new List<double>();
+
+            for (int i = start; i <= end; i++)
+            {
+                var index1 = Array.BinarySearch(scanCycles1, i);
+                var index2 = Array.BinarySearch(scanCycles2, i);
+                if (index1 < 0 || index2 < 0)
+                {
+                    continue;
+                }
+                else
+                {
+                    list1.Add(peakList1[index1].Intensity);
+                    list2.Add(peakList2[index2].Intensity);
+                }
+            }
+            if (list1.Count < 6)
+            {
+                return 0;
+            }
+            double corr = MathNet.Numerics.Statistics.Correlation.Pearson(list1, list2);
+            return corr;
+        }
+
+        public static double CalculateCorr_spline_scanCycle(PeakCurve peakCurve1, PeakCurve peakCurve2, double interval)
+        {
+            var start = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var end = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var numPoints = (int)((end - start) / interval) + 1;
+            if (numPoints < 6)
+            {
+                return 0;
+            }
+
+            var effectivePoints1 = peakCurve1.ScanCycleSoomthedData.Where(p => p.Item1 > start - interval && p.Item1 < end + interval).ToArray();
+            var effectivePoints2 = peakCurve2.ScanCycleSoomthedData.Where(p => p.Item1 > start - interval && p.Item1 < end + interval).ToArray();
+
+            var list1 = new double[numPoints];
+            var list2 = new double[numPoints];
+            for(int i = 0; i< numPoints; i++)
+            {
+                list1[i] = effectivePoints1[i].Item2;
+                list2[i] = effectivePoints2[i].Item2;
+            }
+            double corr = MathNet.Numerics.Statistics.Correlation.Pearson(list1, list2);
+
+            return corr;
         }
     }
 }

@@ -44,10 +44,13 @@ namespace EngineLayer.DIA
         public int Charge { get; set; }
         public double StartRT => Peaks.Select(p => p.RetentionTime).OrderBy(t => t).First();
         public double EndRT => Peaks.Select(p => p.RetentionTime).OrderByDescending(t => t).First();
+        public double StartCycle => Peaks.Select(p => p.ZeroBasedScanIndex).OrderBy(t => t).First();
+        public double EndCycle => Peaks.Select(p => p.ZeroBasedScanIndex).OrderByDescending(t => t).First();
         public double StartMz {  get; set; }
         public double EndMz { get; set; }
         public MzRange MzRange => new MzRange(StartMz, EndMz);
         public double ApexRT => Peaks.OrderByDescending(p => p.Intensity).First().RetentionTime;
+        public int ApexScanCycle => Peaks.OrderByDescending(p => p.Intensity).First().ZeroBasedScanIndex;
         public double ApexIntensity => Peaks.Max(p => p.Intensity);
         public double TotalIntensity => Peaks.Sum(p => p.Intensity);
         public double AveragedMz => AverageMz();
@@ -65,6 +68,7 @@ namespace EngineLayer.DIA
         public WaveletMassDetector WaveletMassDetector { get; set; }
         public CwtParameters CwtParameters { get; set; }
         public List<(float, float)> SmoothedData { get; set; }
+        public List<(double, double)> ScanCycleSoomthedData { get; set; }
         public double NL { get; set; }
 
         public double AverageMz()
@@ -95,6 +99,24 @@ namespace EngineLayer.DIA
         public void CalculateNL()
         {
             NL = Peaks.Min(p => p.Intensity);
+        }
+
+        public void GetScanCycleSmoothedData(double splineInterval)
+        {
+            ScanCycleSoomthedData = new List<(double, double)>();
+            var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
+            var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
+            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
+            var linearSpline = LinearSpline.InterpolateSorted(scanCycleArray, intensityArray);
+            var timePoints = new List<double>();
+            for (double i = scanCycleArray[0]; i <= scanCycleArray[scanCycleArray.Length - 1] + splineInterval; i += splineInterval)
+            {
+                timePoints.Add(i);
+            }
+            for (int i = 0; i < timePoints.Count; i++)
+            {
+                ScanCycleSoomthedData.Add((timePoints[i], linearSpline.Interpolate(timePoints[i])));
+            }
         }
         public void GetLinearSpline()
         {
@@ -497,7 +519,7 @@ namespace EngineLayer.DIA
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }
@@ -1071,7 +1093,7 @@ namespace EngineLayer.DIA
             {
                 var plot = Chart2D.Chart.Line<double, double, string>(
                         x: Peaks.Select(p => p.RetentionTime),
-                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend:true).WithMarkerStyle(Color: Color.fromString("red"));
                 plot.Show();
             }
             if (chartType == "point")
@@ -1110,6 +1132,14 @@ namespace EngineLayer.DIA
                 x: smoothedData.Select(p => p.Item1),
                 y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("green"));
             return plot;
+        }
+
+        public void VisualizeScanCycleSmoothedData()
+        {
+            var plot = Chart2D.Chart.Point<double, double, string>(
+                x: ScanCycleSoomthedData.Select(p => p.Item1),
+                y: ScanCycleSoomthedData.Select(p => p.Item2)).WithTraceInfo("ScanCycleSmoothed").WithMarkerStyle(Color: Color.fromString("blue"));
+            plot.Show();
         }
 
         public void VisualizePeakRegions()

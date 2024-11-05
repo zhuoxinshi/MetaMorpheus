@@ -12,6 +12,7 @@ namespace EngineLayer.DIA
     {
         public int Charge { get; set; }
         public double RetentionTime { get; set; }
+        public int MsLevel { get; set; }
         public double HighestPeakMz { get; set; }
         public double HighestPeakIntensity { get; set; }
         public double MonoisotopicMass { get; set; }
@@ -20,13 +21,18 @@ namespace EngineLayer.DIA
         public int ZeroBasedScanIndex {  get; set; }
         public IsotopicEnvelope Envelope { get; set; }
         public int MassIndex => Envelope.MassIndex;
-        public int Index;
+        public EnvelopeCurve EnvelopeCurve { get; set; }
+        public double TotalIntensity => Envelope.TotalIntensity;
+        public List<Peak> Isotopes { get; set; }
+        public double AdjustedTotalIntensity { get; set; }
 
-        public DeconvolutedMass(IsotopicEnvelope envelope, int charge, double rt, double highestPeakMz, double highestPeakIntensity, double monoisotopicMass, int scanNumber, int zeroBasedScanNum)
+        public DeconvolutedMass(IsotopicEnvelope envelope, int charge, double rt, int msLevel, double highestPeakMz, double highestPeakIntensity, double monoisotopicMass, int scanNumber, 
+            int zeroBasedScanNum)
         {
             Envelope = envelope;
             Charge = charge;
             RetentionTime = rt;
+            MsLevel = msLevel;
             HighestPeakMz = highestPeakMz;
             HighestPeakIntensity = highestPeakIntensity;
             MonoisotopicMass = monoisotopicMass;
@@ -40,7 +46,6 @@ namespace EngineLayer.DIA
         //    precursorList.Add(precursor);
         //    int numScans = allPrecursors.Max(p => p.ZeroBasedScanIndex) + 1;
 
-            
-        //}
+        
     }
 }
