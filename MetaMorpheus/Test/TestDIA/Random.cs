@@ -12,6 +12,7 @@ using EngineLayer.DIA;
 using MzLibUtil;
 using Plotly.NET;
 using UsefulProteomicsDatabases;
+using System.IO.Compression;
 
 namespace Test.TestDIA
 {
@@ -479,5 +480,18 @@ namespace Test.TestDIA
             var ms2Scans = msDataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
         }
 
+        [Test]
+        public static void TestSearchUmpireOutput()
+        {
+            var path = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT_Q1.mzML";
+            var task = new SearchTask();
+            string outputFolder = @"E:\DIA\FragPipe\DIA\MMsearch";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+            string myDatabase = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
+            task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { path }, "test");
+        }
     }
 }

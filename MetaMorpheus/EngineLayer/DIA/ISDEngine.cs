@@ -45,14 +45,14 @@ namespace EngineLayer.DIA
             Ms1PeakIndexing();
             ConstructMs2Group();
             //AverageMs2Scans();
-            //GetMs1PeakCurves();
-            //GetMs2PeakCurves();
-            GetMs1PeakEnvelopeCurve();
-            GetMs2PeakEnvelopeCurve();
+            GetMs1PeakCurves();
+            GetMs2PeakCurves();
+            //GetMs1PeakEnvelopeCurve();
+            //GetMs2PeakEnvelopeCurve();
             PrecursorFragmentPairing();
             //PFgroupFilter();
-            //ConstructNewMs2Scans();
-            ConstructNewMs2Scans_peakEnvelopeCurve();
+            ConstructNewMs2Scans();
+            //ConstructNewMs2Scans_peakEnvelopeCurve();
         }
 
         public void Ms1PeakIndexing()
@@ -190,11 +190,15 @@ namespace EngineLayer.DIA
                 }
             }
             //debug
-            //foreach(var curve in Ms1PeakCurves)
+            //for (int i = 0; i < 100; i++)
             //{
-            //    curve.VisualizeRaw("line");
+            //    Random rnd = new Random();
+            //    int r = rnd.Next(Ms1PeakCurves.Count - 1);
+            //    var pc = Ms1PeakCurves[r];
+            //    pc.VisualizeBspline(out List<float> rtSeq).Show();
+            //    pc.VisualizePeakRegions();
             //}
-            var ms1PeakCurve = Ms1PeakCurves.OrderBy(p => p.MonoisotopicMass).ToList();
+            //var ms1PeakCurve = Ms1PeakCurves.OrderBy(p => p.MonoisotopicMass).ToList();
         }
 
         public void GetMs2PeakCurves()
@@ -243,7 +247,7 @@ namespace EngineLayer.DIA
 
             //debug
             //var testMs2PeakCurve = Ms2PeakCurves.Values.SelectMany(v => v).ToList();
-            //foreach (var a in testMs2PeakCurve)
+            //for (int i = 0; i<100; i++)
             //{
             //    Random rnd = new Random();
             //    int r = rnd.Next(testMs2PeakCurve.Count - 1);
@@ -293,40 +297,56 @@ namespace EngineLayer.DIA
                         if (newPeakCurve.Peaks.Count > 4)
                         {
                             ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
-                            newPeakCurve.VisualizeRaw("point");
                         }
                     }
                 }
             }
             Ms2PeakCurves = ms2PeakCurves;
+            //debug
+            //var testMs2PeakCurve = Ms2PeakCurves.Values.SelectMany(v => v).ToList();
+            //for (int i = 0; i<100; i++)
+            //{
+            //    Random rnd = new Random();
+            //    int r = rnd.Next(testMs2PeakCurve.Count - 1);
+            //    var pc = testMs2PeakCurve[r];
+            //    pc.VisualizeBspline(out List<float> rtSeq).Show();
+            //    pc.VisualizePeakRegions();
+            //}
         }
 
 
         public void PrecursorFragmentPairing()
         {
             PFgroups = new List<PrecursorFragmentsGroup>();
-            foreach (var ms2group in Ms2PeakCurves)
-            {
+            //foreach (var ms2group in Ms2PeakCurves)
+            //{
                 var precursorsInRange = Ms1PeakCurves.ToArray();
+                var allMs2Curves = Ms2PeakCurves.Values.SelectMany(v => v).ToList();
 
-                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 },
+            Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursorsInRange[i];
-                        var preFragGroup = GroupPrecursorFragments(precursor, ms2group.Value, DIAparameters);
+                        var preFragGroup = GroupPrecursorFragments(precursor, allMs2Curves, DIAparameters);
 
                         if (preFragGroup != null)
                         {
-                            PFgroups.Add(preFragGroup);
+                            lock (PFgroups)
+                            {
+                                PFgroups.Add(preFragGroup);
+                            }
                         }
                     }
                 });
-            }
+            //}
             //debug
-            //foreach(var group in PFgroups)
+            //for (int i = 0; i < 100; i++)
             //{
+            //    Random rnd = new Random();
+            //    int r = rnd.Next(PFgroups.Count - 1);
+            //    var group = PFgroups[r];
             //    group.Visualize();
             //}
             var rankedPFgroups = PFgroups.OrderByDescending(pf => pf.PFpairs.Count).ToList();
@@ -351,7 +371,8 @@ namespace EngineLayer.DIA
                         var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
-                            double corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, DIAparameters.ScanCycleSplineTimeInterval);
+                            //double corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, DIAparameters.ScanCycleSplineTimeInterval);
+                            double corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
@@ -465,7 +486,6 @@ namespace EngineLayer.DIA
                 }
                 var newPC = new PeakCurve(fakePeaks, 1, null, precursor.MonoisotopicMass, precursor.Charge, startMz: targetList.Min(), endMz: targetList.Max());
                 Ms1PeakCurves.Add(newPC);
-                //newPC.VisualizeRaw("point");
             }
         }
 
@@ -507,7 +527,6 @@ namespace EngineLayer.DIA
                         Ms1PeakCurves.Add(newEC.FakePeakCurve);
                         newEC.Index = index;
                         index++;
-                        //newEC.FakePeakCurve.VisualizeRaw("point");
                     }
                 }
             }
@@ -565,7 +584,6 @@ namespace EngineLayer.DIA
                     //}
                     //var newPC = new PeakCurve(fakePeaks, 1, null, mass.MonoisotopicMass, mass.Charge, startMz: targetList.Min(), endMz: targetList.Max());
                     //ms2PeakCurves[ms2Group.Key].Add(newPC);
-                    //newPC.VisualizeRaw("point");
 
                     if (mass.EnvelopeCurve == null)
                     {
@@ -574,7 +592,6 @@ namespace EngineLayer.DIA
                         if (newEC.FakePeakCurve.Peaks.Count > 4)
                         {
                             ms2PeakCurves[ms2Group.Key].Add(newEC.FakePeakCurve);
-                            //newEC.FakePeakCurve.VisualizeRaw("point");
                         }
                     }
                 }
@@ -627,17 +644,17 @@ namespace EngineLayer.DIA
                     newPEC.IsolationRange = null;
                     newPEC.GetFakePeakCurve();
                     index++;
-                    //newPEC.FakePeakCurve.VisualizeRaw("point");
                     Ms1PeakCurves.Add(newPEC.FakePeakCurve);
                     newPEC.FakePeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
                 }
             }
-            //foreach (var curve in Ms1PeakCurves)
+            //debug
+            //for (int i = 0; i < 100; i++)
             //{
             //    Random rnd = new Random();
             //    int r = rnd.Next(Ms1PeakCurves.Count - 1);
             //    var pc = Ms1PeakCurves[r];
-            //    pc.VisualizeRaw("line");
+            //    pc.VisualizeRaw("point");
             //}
         }
 
@@ -683,7 +700,6 @@ namespace EngineLayer.DIA
                         newPEC.MsLevel = 2;
                         newPEC.IsolationRange = null;
                         newPEC.GetFakePeakCurve();
-                        //newPEC.FakePeakCurve.VisualizeRaw("point");
                         ms2PeakCurves[ms2Group.Key].Add(newPEC.FakePeakCurve);
                         newPEC.FakePeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
                     }
@@ -691,13 +707,14 @@ namespace EngineLayer.DIA
             }
             Ms2PeakCurves = ms2PeakCurves;
             var ms2PC = Ms2PeakCurves.Values.SelectMany(v => v).ToList();
-            foreach (var curve in ms2PC)
-            {
-                Random rnd = new Random();
-                int r = rnd.Next(ms2PC.Count - 1);
-                var pc = ms2PC[r];
-                pc.VisualizeRaw("line");
-            }
+            //debug
+            //for (int i = 0; i <100; i++)
+            //{
+            //    Random rnd = new Random();
+            //    int r = rnd.Next(ms2PC.Count - 1);
+            //    var pc = ms2PC[r];
+            //    pc.VisualizeRaw("line");
+            //}
         }
 
         public void ConstructNewMs2Scans_peakEnvelopeCurve()

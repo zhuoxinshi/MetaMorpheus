@@ -25,23 +25,23 @@ namespace Test.TestDIA
         {
             string filePath1 = @"E:\ISD Project\TestIsdDataAnalysis\data\06-11-24_mix_sample1_2uL_ISD_RT45.01-48.09.mzML";
             string filePath2 = @"E:\ISD Project\Data for test\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100-calib-averaged.mzML";
-            string snip = @"E:\ISD Project\ISD_240812\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100_RT28.01-32.69.mzML";
+            string snip = @"E:\ISD Project\ISD_240606\06-09-24_mix_sample10_5uL_ISD_shorter-gradient_RT27.6-32.44.mzML";
 
             string tomlFile = @"E:\ISD Project\ISD_240606\2024-10-24-15-44-25\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             //var file = @"E:\ISD Project\ISD_240606\06-07-24_mix_sample1_5uL_ISD.mzML";
 
-            string myDatabase = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task3-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
+            string myDatabase = @"E:\ISD Project\ISD_240927\60only-RT29-33\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             //string library = @"E:\ISD Project\TestIsdDataAnalysis\SpectralLibraryDDA\Task1-SearchTask\SpectralLibrary_2024-07-09-17-24-30.msp";
             DbForTask db = new DbForTask(myDatabase, false);
-            string outputFolder = @"E:\ISD Project\TestSearch\isdEngine_FD-RT28.83-32.69_corr0.5-cubic_highestPeakXIC_ms1Tol10ppm_apexCycle3_maxMissed2_overlap0.3_peakEnvelopeCurve_scanCycle";
+            string outputFolder = @"E:\ISD Project\TestSearch\isdEngine_FD60only-RT29.03-33.52_corr0.5_highestPeakXIC_ms1Tol10ppm_apexRT0.3_maxMissed2_overlap0.3";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
-                fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 1, maxRTrangeMS2: 1, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 2, maxRTrangeMS2: 2, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, minMass: 12000, type: "ISD", apexCycleTolerance: 3,
                 scanCycleSplineInterval: 0.05, cutPeaks: true);
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { snip }, "test");
