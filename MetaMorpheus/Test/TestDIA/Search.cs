@@ -52,16 +52,16 @@ namespace Test.TestDIA
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\test2.0-TD_corr0.5_highestPeakXIC_ms1Tol5ppm_cubic_apexRT0.2_maxMissed2_overlap0.3_FragRank2000_maxRT1.5_300000";
+            string outputFolder = @"E:\DIA\TestSearch\test2.0-TD-5pro_corr0.5_highestPeakXIC_ms1Tol5ppm_cubic_apexRT0.2_maxMissed2_overlap0.3_FragRank2000_maxRT1.5_300000";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20),
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(5),
                 maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.2,
                 fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 1.5, maxRTrangeMS2: 1.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA", minMass: 8000, minCharge: 4);
-            string DIAfile = @"E:\DIA\Data\DIA_241108\11-08-24_td-DIA_5pro-sample10_65min_50mz_25stpHCD_AGC400_500ms_micro1_RT20.5-22.98.mzML";
+            string DIAfile = @"E:\DIA\Data\DIA_241108\11-08-24_td-DIA_5pro-sample10_105min_30mz_25stpHCD_AGC400_500ms_micro1_RT42.76-45.9.mzML";
             string myDatabase = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { DIAfile }, "test");
         }

@@ -37,9 +37,11 @@ namespace EngineLayer
             var allPeaks = new List<Peak>();
             int index = 0;
             int zeroBasedScanIndex = 0;
+            //scanIndexMap = new Dictionary<int, int>();
             for (int i = 0; i < scans.Length; i++)
             {
                 var spectrum = scans[i].MassSpectrum;
+                //scanIndexMap.Add(scans[i].OneBasedScanNumber, zeroBasedScanIndex);
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,

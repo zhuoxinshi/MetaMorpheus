@@ -44,10 +44,10 @@ namespace EngineLayer.DIA
             Ms1PeakIndexing();
             ConstructMs2Group();
             GetMs1PeakCurves();
-            GetMs2PeakCurves();
+            GetMs2PeakCurves2();
             PrecursorFragmentPairing();
             PFgroupFilter();
-            ConstructNewMs2Scans();
+            ConstructNewMs2Scans2();
         }
 
         public void Ms1PeakIndexing()
@@ -125,7 +125,7 @@ namespace EngineLayer.DIA
                         DIAparameters.PeakSearchBinSize);
                     if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorIntensityCutOff)
                     {
-                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
+                        var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
                         DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS1);
                         newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
                         newPeakCurve.Charge = precursor.Charge;
@@ -164,7 +164,7 @@ namespace EngineLayer.DIA
         {
 
         }
-
+        
         public void GetMs2PeakCurves()
         {
             var ms2PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
@@ -180,7 +180,7 @@ namespace EngineLayer.DIA
                 {
                     if (peak.PeakCurve == null)
                     {
-                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
+                        var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
                             DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS2);
                         if (DIAparameters.SplitMS2Peak)
                         {
@@ -285,7 +285,7 @@ namespace EngineLayer.DIA
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursorsInRange[i];
-                        var preFragGroup = GroupPrecursorFragments_scanCycle(precursor, Ms2PeakCurves[ms2group.Key], DIAparameters);
+                        var preFragGroup = GroupPrecursorFragments(precursor, Ms2PeakCurves[ms2group.Key], DIAparameters);
                         
                         if (preFragGroup != null)
                         {
@@ -335,25 +335,25 @@ namespace EngineLayer.DIA
             }
         }
 
-        //public void ConstructNewMs2Scans2()
-        //{
-        //    PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
-        //    foreach (var pfGroup in PFgroups)
-        //    {
-        //        //var peaks = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope.Peaks).SelectMany(p => p).OrderBy(p => p.mz).ToList();
-        //        var mzs = new double[] { 1 };
-        //        var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.Envelope.TotalIntensity) };
-        //        var spectrum = new MzSpectrum(mzs, intensities, false);
-        //        var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
-        //                    MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
-        //        var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
-        //        var charge = pfGroup.PrecursorPeakCurve.Charge;
-        //        var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
-        //        Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
-        //            , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
-        //        PseudoMs2WithPre.Add(scanWithprecursor);
-        //    }
-        //}
+        public void ConstructNewMs2Scans2()
+        {
+            PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
+            foreach (var pfGroup in PFgroups)
+            {
+                //var peaks = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope.Peaks).SelectMany(p => p).OrderBy(p => p.mz).ToList();
+                var mzs = new double[] { 1 };
+                var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.Envelope.TotalIntensity) };
+                var spectrum = new MzSpectrum(mzs, intensities, false);
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                            MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
+                var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
+                var charge = pfGroup.PrecursorPeakCurve.Charge;
+                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                    , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
+                PseudoMs2WithPre.Add(scanWithprecursor);
+            }
+        }
 
         public static PrecursorFragmentsGroup GroupPrecursorFragments(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
         {

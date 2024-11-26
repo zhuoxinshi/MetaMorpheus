@@ -38,12 +38,19 @@ namespace EngineLayer.DIA
         public bool TopDown { get; set; }
         public Tolerance PrecursorMassTolerance => new PpmTolerance(200);
         public bool CutPeaks { get; set; }
+        public bool AverageMs2Scans { get; set; }
+        public XICType Ms1XICType {  get; set; } 
+        public XICType Ms2XICType { get; set; }
+        public PFGroupingType PFGroupingType { get; set; }
+        public PseudoMs2ConstructionType PseudoMs2ConstructionType { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, 
             double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
             , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
-            bool splitMS2Peak = true, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999, string type = "DIA", 
-            bool topdown = false, int apexCycleTolerance = 2, double scanCycleSplineInterval = 0.025, bool cutPeaks = false, double minCharge = 1)
+            bool splitMS2Peak = false, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999, string type = "DIA", 
+            bool topdown = false, int apexCycleTolerance = 2, double scanCycleSplineInterval = 0.025, bool cutPeaks = false, double minCharge = 1, bool averageMs2Scans = false, 
+            XICType ms1XICType = XICType.Peak, XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, 
+            PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -71,6 +78,11 @@ namespace EngineLayer.DIA
             ScanCycleSplineTimeInterval = scanCycleSplineInterval;
             CutPeaks = cutPeaks;
             MinCharge = minCharge;
+            AverageMs2Scans = averageMs2Scans;
+            Ms1XICType = ms1XICType;
+            Ms2XICType = ms2XICType;
+            PFGroupingType = pfGroupingType;
+            PseudoMs2ConstructionType = pseudoMs2Type;
         }
 
     }

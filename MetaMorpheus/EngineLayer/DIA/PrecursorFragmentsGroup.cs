@@ -1,4 +1,5 @@
 ﻿using MassSpectrometry;
+using MzLibUtil;
 using Plotly.NET;
 using System;
 using System.Collections.Generic;
@@ -114,5 +115,64 @@ namespace EngineLayer.DIA
             }
             return chartList;
         }
+
+        public PeakCurve SearchFragment(double mz, Tolerance tolerance)
+        {
+            var mzs = PFpairs.Select(pair => pair.FragmentPeakCurve.AveragedMz).ToArray();
+            int index = Array.BinarySearch(mzs, mz);
+            if (index >= 0)
+            {
+                return PFpairs[index].FragmentPeakCurve;
+            }
+            index = ~index;
+            if (index == 0)
+            {
+                if (tolerance.Within(mzs[index], mz))
+                {
+                    return PFpairs[index].FragmentPeakCurve;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else if (index == mzs.Length - 1)
+            {
+                if (tolerance.Within(mzs[index], mz))
+                {
+                    return PFpairs[index].FragmentPeakCurve;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else 
+            {
+                if (Math.Abs(mzs[index] - mz) < Math.Abs(mzs[index + 1] - mz))
+                {
+                    if (tolerance.Within(mzs[index], mz))
+                    {
+                        return PFpairs[index].FragmentPeakCurve;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+                else
+                {
+                    if (tolerance.Within(mzs[index + 1], mz))
+                    {
+                        return PFpairs[index + 1].FragmentPeakCurve;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            }
+        }
+
     }
 }

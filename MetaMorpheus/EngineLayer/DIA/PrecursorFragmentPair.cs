@@ -5,7 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Easy.Common;
+using MathNet.Numerics;
+using MathNet.Numerics.Distributions;
+using MathNet.Numerics.Integration;
 using MathNet.Numerics.Statistics;
+using Readers;
 using ThermoFisher.CommonCore.Data.Interfaces;
 
 namespace EngineLayer.DIA
@@ -321,8 +325,9 @@ namespace EngineLayer.DIA
             return corr;
         }
 
-        public static double CalculateCorr_spline_scanCycle(PeakCurve peakCurve1, PeakCurve peakCurve2, double interval)
+        public static double CalculateCorr_spline_scanCycle(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
+            double interval = peakCurve1.ScanCycleSmoothedData[1].Item1 - peakCurve1.ScanCycleSmoothedData[0].Item1;
             var start = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
             var end = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
             var numPoints = (int)((end - start) / interval) + 1;
@@ -331,8 +336,9 @@ namespace EngineLayer.DIA
                 return 0;
             }
 
-            var effectivePoints1 = peakCurve1.ScanCycleSoomthedData.Where(p => p.Item1 > start - interval && p.Item1 < end + interval).ToArray();
-            var effectivePoints2 = peakCurve2.ScanCycleSoomthedData.Where(p => p.Item1 > start - interval && p.Item1 < end + interval).ToArray();
+            var effectivePoints1 = peakCurve1.ScanCycleSmoothedData.Where(p => p.Item1 > start - interval && p.Item1 < end + interval).ToArray();
+            var effectivePoints2 = peakCurve2.ScanCycleSmoothedData.Where(p => p.Item1 > start - interval && p.Item1 < end + interval).ToArray();
+            numPoints = Math.Min(effectivePoints1.Length, effectivePoints2.Length);
 
             var list1 = new double[numPoints];
             var list2 = new double[numPoints];
@@ -344,6 +350,96 @@ namespace EngineLayer.DIA
             double corr = MathNet.Numerics.Statistics.Correlation.Pearson(list1, list2);
 
             return corr;
+        }
+
+        public static double CalculateOverlapAreaRatio(PeakCurve peakCurve1, PeakCurve peakCurve2)
+        {
+            var start = Math.Min(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var end = Math.Max(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var overlapStart = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var overlapEnd = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+
+            if (peakCurve1.NormalizedPeaks == null)
+            {
+                peakCurve1.GetNormalizedPeaks();
+            }
+            if (peakCurve2.NormalizedPeaks == null)
+            {
+                peakCurve2.GetNormalizedPeaks();
+            }
+
+            var overlapArea = new List<(int, double)>();
+            var totalArea = new List<(int, double)>();
+            var scanCycles1 = peakCurve1.NormalizedPeaks.Select(p => p.Item1).ToArray();
+            var scanCycles2 = peakCurve2.NormalizedPeaks.Select(p => p.Item1).ToArray();
+
+            for (int i = start; i <= end; i++)
+            {
+                var index1 = Array.BinarySearch(scanCycles1, i);
+                var index2 = Array.BinarySearch(scanCycles2, i);
+
+                if (index1 < 0 || index2 < 0)
+                {
+                    overlapArea.Add((i, 0));
+                    if (index1 >= 0)
+                    {
+                        totalArea.Add((i, peakCurve1.NormalizedPeaks[index1].Item2));
+                    } 
+                    if (index2 >= 0)
+                    {
+                        totalArea.Add((i, peakCurve2.NormalizedPeaks[index2].Item2));
+                    }
+                }
+                else
+                {
+                    totalArea.Add((i, Math.Max(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
+                    overlapArea.Add((i, Math.Min(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
+                }
+            }
+            double overlapAUC = CalculateArea(overlapArea);
+            double totalAUC = CalculateArea(totalArea);
+            double ratio = overlapAUC / totalAUC;
+            return ratio;
+        }
+
+        public static double CalculateArea(List<(int, double)> data)
+        {
+            double area = 0;
+            for (int i = 1; i < data.Count; i++)
+            {
+                int x1 = data[i - 1].Item1;
+                int x2 = data[i].Item1;
+                double y1 = data[i - 1].Item2;
+                double y2 = data[i].Item2;
+                area += (x2 - x1) * (y1 + y2) / 2;
+            }
+            return area;
+        }
+
+        public static double CalculateOverlapRatioGaussian(Ms1Feature feature1, Ms1Feature feature2)
+        {
+            double start = Math.Min(feature1.RetentionTimeBegin, feature2.RetentionTimeBegin);
+            double end = Math.Max(feature1.RetentionTimeEnd, feature2.RetentionTimeEnd);
+            double overlapStart = Math.Max(feature1.RetentionTimeBegin, feature2.RetentionTimeBegin);
+            double overlapEnd = Math.Min(feature1.RetentionTimeEnd, feature2.RetentionTimeEnd);
+
+            double sd1 = (feature1.RetentionTimeEnd - feature1.RetentionTimeBegin)/4;
+            double sd2 = (feature2.RetentionTimeEnd - feature2.RetentionTimeBegin)/4;
+            double mean1 = feature1.RetentionTimeApex;
+            double mean2 = feature2.RetentionTimeApex;
+            Func<double, double> gaussian1 = x =>
+            (1 / (Math.Sqrt(2 * Math.PI) * sd1)) * Math.Exp(-Math.Pow(x - mean1, 2) / (2 * Math.Pow(sd1, 2)));
+            Func<double, double> gaussian2 = x =>
+            (1 / (Math.Sqrt(2 * Math.PI) * sd2)) * Math.Exp(-Math.Pow(x - mean2, 2) / (2 * Math.Pow(sd2, 2)));
+
+            Func<double, double> minPDF = x => Math.Min(gaussian1(x), gaussian2(x));
+            Func<double, double> maxPDF = x => Math.Max(gaussian1(x), gaussian2(x));
+
+            var overlapArea = GaussLegendreRule.Integrate(minPDF, overlapStart, overlapEnd, 1000);
+            var totalArea = GaussLegendreRule.Integrate(maxPDF, start, end, 1000);
+            double ratio = overlapArea/totalArea;
+
+            return ratio;
         }
     }
 }

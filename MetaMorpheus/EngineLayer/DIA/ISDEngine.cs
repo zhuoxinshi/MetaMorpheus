@@ -6,11 +6,14 @@ using MathNet.Numerics.LinearAlgebra.Storage;
 using MzLibUtil;
 using OpenMcdf.Extensions.OLEProperties;
 using Plotly.NET.CSharp;
+using Proteomics.AminoAcidPolymer;
+using Readers;
 using SpectralAveraging;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -39,26 +42,35 @@ namespace EngineLayer.DIA
         public List<PrecursorFragmentsGroup> PFgroups { get; set; }
         public double CycleTime { get; set; }
         public List<Ms2ScanWithSpecificMass> PseudoMs2WithPre { get; set; }
+        public Dictionary<int, int> Ms1ScanIndexMap { get; set; }
 
         public void GetPseudoMS2Scans()
         {
-            Ms1PeakIndexing();
-            ConstructMs2Group();
-            //AverageMs2Scans();
-            GetMs1PeakCurves();
-            GetMs2PeakCurves();
-            //GetMs1PeakEnvelopeCurve();
-            //GetMs2PeakEnvelopeCurve();
-            PrecursorFragmentPairing();
-            //PFgroupFilter();
-            ConstructNewMs2Scans();
-            //ConstructNewMs2Scans_peakEnvelopeCurve();
+            //Ms1PeakIndexing();
+            //ConstructMs2Group();
+
+            //if (DIAparameters.AverageMs2Scans)
+            //{
+            //    AverageMs2Scans();
+            //}
+            ////AverageMs2Scans();
+            //GetMs1PeakCurves();
+            //GetMs2PeakCurves();
+            ////GetMs1PeakEnvelopeCurve();
+            ////GetMs2PeakEnvelopeCurve();
+            //PrecursorFragmentPairing();
+            ////PFgroupFilter();
+            //ConstructNewMs2Scans();
+            ////ConstructNewMs2Scans_peakEnvelopeCurve();
+
+            UseExternalFeatures();
         }
 
         public void Ms1PeakIndexing()
         {
             var ms1Scans = MyMSDataFile.GetMS1Scans().ToArray();
             var allMs1Peaks = Peak.GetAllPeaks(ms1Scans, DIAparameters.PeakSearchBinSize);
+            //Ms1ScanIndexMap = scanIndexMap;
             Ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, DIAparameters.PeakSearchBinSize);
         }
         public void ConstructMs2Group()
@@ -161,7 +173,7 @@ namespace EngineLayer.DIA
                     DIAparameters.PeakSearchBinSize);
                 if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorIntensityCutOff)
                 {
-                    var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
+                    var newPeakCurve = PeakCurve.FindPeakCurve(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
                     DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS1);
                     newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
                     newPeakCurve.Charge = precursor.Charge;
@@ -185,6 +197,12 @@ namespace EngineLayer.DIA
                             newPeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
                             newPeakCurve.Index = index;
                             index++;
+                            
+                            //debug
+                            if(Math.Abs(newPeakCurve.AveragedMz - 864.60) < 0.01 && newPeakCurve.Charge == 16)
+                            {
+                                newPeakCurve.VisualizeRaw("line");
+                            }
                         }
                     }
                 }
@@ -199,6 +217,8 @@ namespace EngineLayer.DIA
             //    pc.VisualizePeakRegions();
             //}
             //var ms1PeakCurve = Ms1PeakCurves.OrderBy(p => p.MonoisotopicMass).ToList();
+            var p = Ms1PeakCurves.Where(p => Math.Abs(p.AveragedMz - 864.60) < 0.01 && p.Charge == 16).First();
+            p.VisualizeRaw("line");
         }
 
         public void GetMs2PeakCurves()
@@ -215,7 +235,7 @@ namespace EngineLayer.DIA
                 {
                     if (peak.PeakCurve == null)
                     {
-                        var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
+                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
                             DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS2);
                         if (DIAparameters.SplitMS2Peak)
                         {
@@ -315,7 +335,7 @@ namespace EngineLayer.DIA
         }
 
 
-        public void PrecursorFragmentPairing()
+        public void PrecursorFragmentPairing( )
         {
             PFgroups = new List<PrecursorFragmentsGroup>();
             //foreach (var ms2group in Ms2PeakCurves)
@@ -329,7 +349,7 @@ namespace EngineLayer.DIA
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursorsInRange[i];
-                        var preFragGroup = GroupPrecursorFragments(precursor, allMs2Curves, DIAparameters);
+                        var preFragGroup = GroupPrecursorFragments_scanCycle(precursor, allMs2Curves, DIAparameters);
 
                         if (preFragGroup != null)
                         {
@@ -748,16 +768,17 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
-                //if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
-                //{
+                if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
+                {
                     if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
                     {
                         var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio_scanCycle(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
-                            double corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, DIAparameters.ScanCycleSplineTimeInterval);
+                            double corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve);
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
+                                var overlapAreaRatio = PrecursorFragmentPair.CalculateOverlapAreaRatio(precursor, ms2curve);
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
                                 //lock (ms2curve.PFpairs)
                                 //{
@@ -767,7 +788,7 @@ namespace EngineLayer.DIA
                             }
                         }
                     }
-                //}
+                }
             }
             if (preFragGroup.PFpairs.Count > 0)
             {
@@ -778,6 +799,104 @@ namespace EngineLayer.DIA
             {
                 return null;
             }
+        }
+
+        public static PrecursorFragmentsGroup GroupPrecursorFragments_area(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in ms2curves)
+            {
+                if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
+                {
+                    if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                    {
+                        var overlap = PrecursorFragmentPair.CalculateOverlapAreaRatio(precursor, ms2curve);
+                        if (overlap > DIAparameters.OverlapRatioCutOff)
+                        {
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, 0);
+                                //lock (ms2curve.PFpairs)
+                                //{
+                                //    ms2curve.PFpairs.Add(PFpair);
+                                //}
+                            preFragGroup.PFpairs.Add(PFpair);
+                        }
+                    }
+                }
+            }
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public void UseExternalFeatures()
+        {
+            var ms1FeatureFile = @"E:\toppic-windows-1.6.5\ISD\test1\id_08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100_MS1_ms1.feature";
+            var featureFile60 = @"E:\toppic-windows-1.6.5\ISD\test1\id_08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100_60_ms1.feature";
+            var featureFile80 = @"E:\toppic-windows-1.6.5\ISD\test1\id_08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100_80_ms1.feature";
+            var featureFile100 = @"E:\toppic-windows-1.6.5\ISD\test1\id_08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100_100_ms1.feature";
+            var allMs1Features = new Ms1FeatureFile(ms1FeatureFile);
+            var all60Features = new Ms1FeatureFile(featureFile60);
+            var all80Features = new Ms1FeatureFile(featureFile80);
+            var all100Features = new Ms1FeatureFile(featureFile100);
+
+            var ms1features = allMs1Features.Where(f => f.RetentionTimeBegin <= 32.69*60 && f.RetentionTimeEnd >= 28.01*60).ToList();
+            var features60 = all60Features.Where(f => f.RetentionTimeBegin <= 32.69*60 && f.RetentionTimeEnd >= 28.01*60).ToList();
+            var features80 = all80Features.Where(f => f.RetentionTimeBegin <= 32.69*60 && f.RetentionTimeEnd >= 28.01*60).ToList();
+            var features100 = all100Features.Where(f => f.RetentionTimeBegin <= 32.69*60 && f.RetentionTimeEnd >= 28.01*60).ToList();
+            var ms2features = new List<Ms1Feature> { features60, features80, features100 };
+
+            PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
+            foreach(var ms1 in ms1features)
+            {
+                var fragments = new List<Ms1Feature>();
+                foreach(var ms2 in ms2features)
+                {
+                    if (OverlapRatio(ms1, ms2) > 0.3 && Math.Abs(ms1.RetentionTimeApex - ms2.RetentionTimeApex) < 0.3*60)
+                    {
+                        double overlap = PrecursorFragmentPair.CalculateOverlapRatioGaussian(ms1, ms2);
+                        if (overlap > 0.2)
+                        {
+                            fragments.Add(ms2);
+                        }
+                    }
+                }
+                fragments = fragments.OrderBy(f => f.Mass).ToList();
+                var mzs = new double[] { 1 };
+                var intensities = new double[] { fragments.Sum(f => f.Intensity) };
+                var spectrum = new MzSpectrum(mzs, intensities, false);
+                var newMs2Scan = new MsDataScan(spectrum, ms1.Id, 2, true, Polarity.Positive, ms1.RetentionTimeApex, new MzRange(mzs.Min(), mzs.Max()), null,
+                MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
+                var neutralExperimentalFragments = new List<IsotopicEnvelope>();
+                if (fragments.Count > 0)
+                {
+                    foreach (var ms2 in fragments)
+                    {
+                        var envelope = new IsotopicEnvelope(new List<(double, double)> { (ms2.Mass.ToMz(ms2.ChargeStateMax), ms2.Intensity)}, ms2.Mass, ms2.ChargeStateMax, 
+                            ms2.Intensity, 0.1, 1);
+                        neutralExperimentalFragments.Add(envelope);
+                    }
+                    var newMs2WithMass = new Ms2ScanWithSpecificMass(newMs2Scan, ms1.Mass.ToMz(ms1.ChargeStateMax), ms1.ChargeStateMax, MyMSDataFile.FilePath,
+                    CommonParameters, neutralExperimentalFragments.ToArray());
+                    PseudoMs2WithPre.Add(newMs2WithMass);
+                }
+            }
+        }
+
+        public static double OverlapRatio(Ms1Feature feature1, Ms1Feature feature2)
+        {
+            var start = Math.Min(feature1.RetentionTimeBegin, feature2.RetentionTimeBegin);
+            var end = Math.Max(feature1.RetentionTimeEnd, feature2.RetentionTimeEnd);
+            var overlapStart = Math.Max(feature1.RetentionTimeBegin, feature2.RetentionTimeBegin);
+            var overlapEnd = Math.Min(feature1.RetentionTimeEnd, feature2.RetentionTimeEnd);
+            double ratio = (overlapEnd - overlapStart) / (end - start);
+
+            return ratio;
         }
     }
 

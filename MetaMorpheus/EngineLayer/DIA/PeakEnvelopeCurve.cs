@@ -37,15 +37,15 @@ namespace EngineLayer.DIA
             FakePeakCurve = new PeakCurve(fakePeaks, MsLevel, IsolationRange, MonoisotopicMass, Charge, index: Index);
         }
 
-        public static PeakEnvelopeCurve GetPeakEnvelopeCurve((double mz, double intensity)[] targetPeaks, double[] theorIntensityRatio, int highestPeakIndex, List<Peak>[] peakTable, 
-            MsDataScan[] scans, int zeroBasedScanIndex, DIAparameters diaParam)
+        public static PeakEnvelopeCurve GetPeakEnvelopeCurve((double mz, double intensity)[] targetPeaks, double[] theorIntensityRatio, int highestPeakIndex, List<Peak>[] peakTable,
+            MsDataScan[] scans, int zeroBasedScanIndex, DIAparameters diaParam, Tolerance peakFindingTolerance, double maxRTRange)
         {
             var peakEnvelopeList = new List<PeakEnvelope> ();
             var newPEC = new PeakEnvelopeCurve(peakEnvelopeList);
 
             //this scan
-            var firstEnvelope = PeakEnvelope.FindEnvelopeFromScan(targetPeaks, theorIntensityRatio, highestPeakIndex, peakTable, zeroBasedScanIndex, 
-                diaParam.Ms1PeakFindingTolerance, diaParam.PeakSearchBinSize);
+            var firstEnvelope = PeakEnvelope.FindEnvelopeFromScan(targetPeaks, theorIntensityRatio, highestPeakIndex, peakTable, zeroBasedScanIndex,
+                peakFindingTolerance, diaParam.PeakSearchBinSize);
             if (firstEnvelope != null)
             {
                 peakEnvelopeList.Add(firstEnvelope);
@@ -59,7 +59,7 @@ namespace EngineLayer.DIA
             int missedScans = 0;
             for (int i = zeroBasedScanIndex + 1; i < scans.Length; i++)
             {
-                var peakEnvelope = PeakEnvelope.FindEnvelopeFromScan(targetPeaks, theorIntensityRatio, highestPeakIndex, peakTable, i, diaParam.Ms1PeakFindingTolerance, diaParam.PeakSearchBinSize);
+                var peakEnvelope = PeakEnvelope.FindEnvelopeFromScan(targetPeaks, theorIntensityRatio, highestPeakIndex, peakTable, i, peakFindingTolerance, diaParam.PeakSearchBinSize);
                 if (peakEnvelope != null && peakEnvelope.PeakEnvelopeCurve == null)
                 {
                     peakEnvelopeList.Add(peakEnvelope);
@@ -73,7 +73,7 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
-                if (scans[i].RetentionTime - newPEC.ApexRT > diaParam.MaxRTRangeMS1)
+                if (scans[i].RetentionTime - newPEC.ApexRT > maxRTRange)
                 {
                     break;
                 }
@@ -83,7 +83,7 @@ namespace EngineLayer.DIA
             missedScans = 0;
             for (int i = zeroBasedScanIndex - 1; i >= 0; i--)
             {
-                var peakEnvelope = PeakEnvelope.FindEnvelopeFromScan(targetPeaks, theorIntensityRatio, highestPeakIndex, peakTable, i, diaParam.Ms1PeakFindingTolerance, diaParam.PeakSearchBinSize);
+                var peakEnvelope = PeakEnvelope.FindEnvelopeFromScan(targetPeaks, theorIntensityRatio, highestPeakIndex, peakTable, i, peakFindingTolerance, diaParam.PeakSearchBinSize);
                 if (peakEnvelope != null && peakEnvelope.PeakEnvelopeCurve == null)
                 {
                     peakEnvelopeList.Add(peakEnvelope);
@@ -97,7 +97,7 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
-                if (newPEC.ApexRT - scans[i].RetentionTime > diaParam.MaxRTRangeMS1)
+                if (newPEC.ApexRT - scans[i].RetentionTime > maxRTRange)
                 {
                     break;
                 }
