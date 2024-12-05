@@ -432,8 +432,8 @@ namespace EngineLayer.DIA
                 oneBasedScanNumber++;
                 var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, CommonParameters);
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
-                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
-                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                var monoMz = pfGroup.PrecursorPeakCurve.MonoisotopicMass.ToMz(charge);
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge
                     , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
                 PseudoMs2WithPre.Add(scanWithprecursor);
             }
@@ -452,8 +452,8 @@ namespace EngineLayer.DIA
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
-                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
-                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                var monoMz = pfGroup.PrecursorPeakCurve.MonoisotopicMass.ToMz(charge);
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge
                     , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
                 PseudoMs2WithPre.Add(scanWithprecursor);
             }
@@ -653,7 +653,8 @@ namespace EngineLayer.DIA
                 var theorIntensityRatio = targetPeaks.Select(p => p.intensity / targetPeaks.Sum(p => p.intensity)).ToArray();
                 var highestPeak = targetPeaks.OrderByDescending(p => p.intensity).FirstOrDefault();
                 var highestPeakIndex = Array.IndexOf(targetPeaks, highestPeak);
-                var newPEC = PeakEnvelopeCurve.GetPeakEnvelopeCurve(targetPeaks, theorIntensityRatio, highestPeakIndex, Ms1PeakTable, allMs1Scans, precursor.ZeroBasedScanIndex, DIAparameters);
+                var newPEC = PeakEnvelopeCurve.GetPeakEnvelopeCurve(targetPeaks, theorIntensityRatio, highestPeakIndex, Ms1PeakTable, allMs1Scans, precursor.ZeroBasedScanIndex, DIAparameters,
+                        DIAparameters.Ms1PeakFindingTolerance, DIAparameters.MaxRTRangeMS1);
                 if (newPEC != null && newPEC.PeakEnvelopes.Count > 4)
                 {
                     allPeakEnvelopeCurves.Add(newPEC);
@@ -712,7 +713,8 @@ namespace EngineLayer.DIA
                     var theorIntensityRatio = targetPeaks.Select(p => p.intensity / targetPeaks.Sum(p => p.intensity)).ToArray();
                     var highestPeak = targetPeaks.OrderByDescending(p => p.intensity).FirstOrDefault();
                     var highestPeakIndex = Array.IndexOf(targetPeaks, highestPeak);
-                    var newPEC = PeakEnvelopeCurve.GetPeakEnvelopeCurve(targetPeaks, theorIntensityRatio, highestPeakIndex, ms2PeakTable, ms2scans, mass.ZeroBasedScanIndex, DIAparameters);
+                    var newPEC = PeakEnvelopeCurve.GetPeakEnvelopeCurve(targetPeaks, theorIntensityRatio, highestPeakIndex, ms2PeakTable, ms2scans, mass.ZeroBasedScanIndex, DIAparameters,
+                        DIAparameters.Ms2PeakFindingTolerance, DIAparameters.MaxRTRangeMS2);
                     if (newPEC != null && newPEC.PeakEnvelopes.Count > 4)
                     {
                         newPEC.MonoisotopicMass = mass.MonoisotopicMass;

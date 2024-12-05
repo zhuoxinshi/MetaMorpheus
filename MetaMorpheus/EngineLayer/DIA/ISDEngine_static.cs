@@ -1,4 +1,5 @@
-﻿using MassSpectrometry;
+﻿using Chemistry;
+using MassSpectrometry;
 using MzLibUtil;
 using Plotly.NET.TraceObjects;
 using System;
@@ -19,16 +20,17 @@ namespace EngineLayer.DIA
 
             //Get ms1 XICs
             var ms1Scans = dataFile.GetMS1Scans().ToArray();
-            var allMs1PeakCurves = GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1);
+            var allMs1PeakCurves = GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1,
+                out List<Peak>[] peaksByScan);
 
             //Get ms2 XICs
-            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
+            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
             var allMs2PeakCurves = new Dictionary<double, List<PeakCurve>>();
             foreach(var ms2Group in isdScanVoltageMap)
             {
                 allMs2PeakCurves[ms2Group.Key] = GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
-                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2);
+                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2);
             }
 
             //precursor fragment grouping
@@ -54,7 +56,7 @@ namespace EngineLayer.DIA
             return pseudoMs2Scans;
         }
 
-        public static Dictionary<double, List<MsDataScan>> ConstructMs2Groups(List<MsDataScan> ms2Scans)
+        public static Dictionary<double, List<MsDataScan>> ConstructMs2Groups(MsDataScan[] ms2Scans)
         {
             var isdScanVoltageMap = new Dictionary<double, List<MsDataScan>>();
             string pattern = $@"sid=(\d+)";
@@ -76,29 +78,34 @@ namespace EngineLayer.DIA
         }
 
         public static List<PeakCurve> GetAllPeakCurves(MsDataScan[] scans, CommonParameters commonParameters, DIAparameters diaParam, XICType xicType,
-            Tolerance peakFindingTolerance, double maxRTRange)
+            Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allPeaksByScan)
         {
             switch (xicType)
             {
                 case XICType.Peak:
-                    return GetAllPeakCurves_Peak(scans, diaParam, peakFindingTolerance, maxRTRange);
+                    var peakCurves1 = GetAllPeakCurves_Peak(scans, diaParam, peakFindingTolerance, maxRTRange, out allPeaksByScan);
+                    return peakCurves1;
 
                 case XICType.DeconHighestPeak:
-                    return GetAllPeakCurves_DeconHighestPeak(scans, commonParameters, diaParam, peakFindingTolerance, maxRTRange);
+                    var peakCurves2 = GetAllPeakCurves_DeconHighestPeak(scans, commonParameters, diaParam, peakFindingTolerance, maxRTRange, out allPeaksByScan);
+                    return peakCurves2;
 
                 case XICType.isoEnvelopeTotal:
-                    return GetAllPeakCurves_isoEnvelopeTotal(scans, commonParameters, diaParam, peakFindingTolerance, maxRTRange);
+                    var peakCurves3 = GetAllPeakCurves_isoEnvelopeTotal(scans, commonParameters, diaParam, peakFindingTolerance, maxRTRange, out allPeaksByScan);
+                    return peakCurves3;
 
                 default: throw new MzLibException("XICType");
             }
         }
 
-        public static List<PeakCurve> GetAllPeakCurves_Peak(MsDataScan[] scans, DIAparameters diaParam, Tolerance peakFindingTolerance, double maxRTRange)
+        public static List<PeakCurve> GetAllPeakCurves_Peak(MsDataScan[] scans, DIAparameters diaParam, Tolerance peakFindingTolerance, double maxRTRange
+            , out List<Peak>[] allPeaksByScan, out List<Peak>[] peakTable)
         {
             var allPeakCurves = new List<PeakCurve>();
-            var allPeaks = Peak.GetAllPeaks(scans, diaParam.PeakSearchBinSize);
+            allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var rankedPeaks = allPeaks.OrderByDescending(p => p.Intensity).ToList();
-            var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
+            peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             foreach (var peak in rankedPeaks)
             {
                 if (peak.PeakCurve == null)
@@ -134,10 +141,11 @@ namespace EngineLayer.DIA
         }
 
         public static List<PeakCurve> GetAllPeakCurves_DeconHighestPeak(MsDataScan[] scans, CommonParameters commonParameters, DIAparameters diaParam, 
-            Tolerance peakFindingTolerance, double maxRTRange)
+            Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allPeaksByScan)
         {
             var allPeakCurves = new List<PeakCurve>();
-            var allPeaks = Peak.GetAllPeaks(scans, diaParam.PeakSearchBinSize);
+            allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             int index = 1;
             var allPrecursors = new List<DeconvolutedMass>();
@@ -219,11 +227,12 @@ namespace EngineLayer.DIA
         }
 
         public static List<PeakCurve> GetAllPeakCurves_isoEnvelopeTotal(MsDataScan[] scans, CommonParameters commonParameters, DIAparameters diaParam, 
-            Tolerance peakFindingTolerance, double maxRTRange)
+            Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allPeaksByScan, out List<Peak>[] peakTable)
         {
             var allPeakCurves = new List<PeakCurve>();
-            var allPeaks = Peak.GetAllPeaks(scans, diaParam.PeakSearchBinSize);
-            var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
+            allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
+            peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             var allPrecursors = new List<DeconvolutedMass>[scans.Length];
             for (int i = 0; i < scans.Length; i++)
             {
@@ -283,14 +292,14 @@ namespace EngineLayer.DIA
 
         public static PrecursorFragmentsGroup PFgrouping(PeakCurve precursor, List<PeakCurve> fragments, DIAparameters diaParam)
         {
-            var groups = new List<PrecursorFragmentsGroup>();
-
             switch (diaParam.PFGroupingType)
             {
                 case PFGroupingType.RetentionTime:
                     return ISDEngine.GroupPrecursorFragments(precursor, fragments, diaParam);
                 case PFGroupingType.ScanCycle:
                     return ISDEngine.GroupPrecursorFragments_scanCycle(precursor, fragments, diaParam);
+                case PFGroupingType.OverlapRatio:
+                    return ISDEngine.GroupPrecursorFragments_area(precursor, fragments, diaParam);
                 default: return null;
             }
 ;
@@ -317,9 +326,9 @@ namespace EngineLayer.DIA
                         MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null, oneBasedPrecursorScanNumber: pfGroup.PrecursorPeakCurve.Index);
             var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, commonParameters);
             var charge = pfGroup.PrecursorPeakCurve.Charge;
-            var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
+            var monoMz = pfGroup.PrecursorPeakCurve.MonoisotopicMass.ToMz(charge);
             //should highestPeakMz used in ms2withmass???
-            Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+            Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge
                 , dataFile.FilePath, commonParameters, neutralExperimentalFragments);
 
             return scanWithprecursor;
@@ -334,8 +343,8 @@ namespace EngineLayer.DIA
                         MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
             var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
             var charge = pfGroup.PrecursorPeakCurve.Charge;
-            var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
-            Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+            var monoMz = pfGroup.PrecursorPeakCurve.MonoisotopicMass.ToMz(charge);
+            Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge
                 , dataFile.FilePath, commonParameters, neutralExperimentalFragments);
 
             return scanWithprecursor;

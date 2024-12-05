@@ -1,4 +1,5 @@
 ﻿using Chemistry;
+using EngineLayer.DIA;
 using MassSpectrometry;
 using System;
 using System.Collections.Generic;
@@ -9,13 +10,15 @@ namespace EngineLayer
     public class Ms2ScanWithSpecificMass
     {
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, string fullFilePath, CommonParameters commonParam, 
-            IsotopicEnvelope[] neutralExperimentalFragments = null, double? precursorIntensity = null, int? envelopePeakCount = null, double? precursorFractionalIntensity = null)
+            IsotopicEnvelope[] neutralExperimentalFragments = null, double? precursorIntensity = null, int? envelopePeakCount = null, double? precursorFractionalIntensity = null,
+            IsotopicEnvelope precursorEnvelope = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
             PrecursorMass = PrecursorMonoisotopicPeakMz.ToMass(precursorCharge);
             PrecursorIntensity = precursorIntensity ?? 1;
             PrecursorEnvelopePeakCount = envelopePeakCount ?? 1;
+            PrecursorEnvelope = precursorEnvelope;
             PrecursorFractionalIntensity = precursorFractionalIntensity ?? -1;
             FullFilePath = fullFilePath;
             ChildScans = new List<Ms2ScanWithSpecificMass>();
@@ -59,6 +62,8 @@ namespace EngineLayer
 
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
         public double HighestPrecursorPeakMz { get; set; }
+        public PeakCurve PrecursorPeakCurve { get; set; }
+        public IsotopicEnvelope PrecursorEnvelope { get; set; }
 
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {
