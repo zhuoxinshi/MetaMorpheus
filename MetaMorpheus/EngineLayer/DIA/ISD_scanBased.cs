@@ -204,7 +204,7 @@ namespace EngineLayer.DIA
                             // assign precursor for this MS2 scan
                             var scan = new Ms2ScanWithSpecificMass(ms2scan, precursor.MonoPeakMz,
                                 precursor.Charge, fullFilePath, commonParameters, neutralExperimentalFragments,
-                                precursor.Intensity, precursor.PeakCount, precursor.FractionalIntensity, precursorEnvelope: precursor.envelope);
+                                precursor.Intensity, precursor.PeakCount, precursor.FractionalIntensity, precursor.highestPeakMz);
                             scan.HighestPrecursorPeakMz = precursor.highestPeakMz;
 
                             scansWithPrecursors[i].Add(scan);

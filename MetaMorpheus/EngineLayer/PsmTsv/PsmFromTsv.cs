@@ -12,6 +12,7 @@ using Omics.Fragmentation;
 using Omics.Fragmentation.Peptide;
 using Omics.SpectrumMatch;
 using LocalizationLevel = EngineLayer.GlycoSearch.LocalizationLevel;
+using System.Data;
 
 namespace EngineLayer
 {
@@ -30,6 +31,7 @@ namespace EngineLayer
         public double? PrecursorIntensity { get; }
         public double PrecursorMz { get; }
         public double PrecursorMass { get; }
+        public double PrecursorHighestPeakMz { get; }
         public double Score { get; }
         public string ProteinAccession { get; }
         public double? SpectralAngle { get; }
@@ -131,6 +133,7 @@ namespace EngineLayer
             PrecursorIntensity = (parsedHeader[PsmTsvHeader.PrecursorIntensity] < 0) ? null : Double.TryParse(spl[parsedHeader[PsmTsvHeader.PrecursorIntensity]].Trim(), out double value) ? value : null;
             PrecursorMz = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorMz]].Trim(), CultureInfo.InvariantCulture);
             PrecursorMass = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorMass]].Trim(), CultureInfo.InvariantCulture);
+            PrecursorHighestPeakMz = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorHighestPeakMz]].Trim(), CultureInfo.InvariantCulture);
             BaseSeq = RemoveParentheses(spl[parsedHeader[PsmTsvHeader.BaseSequence]].Trim());
             FullSequence = spl[parsedHeader[PsmTsvHeader.FullSequence]];
             PeptideMonoMass = spl[parsedHeader[PsmTsvHeader.PeptideMonoMass]].Trim();

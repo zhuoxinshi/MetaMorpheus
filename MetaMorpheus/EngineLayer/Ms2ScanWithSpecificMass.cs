@@ -11,15 +11,15 @@ namespace EngineLayer
     {
         public Ms2ScanWithSpecificMass(MsDataScan mzLibScan, double precursorMonoisotopicPeakMz, int precursorCharge, string fullFilePath, CommonParameters commonParam, 
             IsotopicEnvelope[] neutralExperimentalFragments = null, double? precursorIntensity = null, int? envelopePeakCount = null, double? precursorFractionalIntensity = null,
-            IsotopicEnvelope precursorEnvelope = null)
+            double? precursorHighestPeakMz = null)
         {
             PrecursorMonoisotopicPeakMz = precursorMonoisotopicPeakMz;
             PrecursorCharge = precursorCharge;
             PrecursorMass = PrecursorMonoisotopicPeakMz.ToMass(precursorCharge);
             PrecursorIntensity = precursorIntensity ?? 1;
             PrecursorEnvelopePeakCount = envelopePeakCount ?? 1;
-            PrecursorEnvelope = precursorEnvelope;
             PrecursorFractionalIntensity = precursorFractionalIntensity ?? -1;
+            PrecursorHighestPeakMz = precursorHighestPeakMz ?? -1;
             FullFilePath = fullFilePath;
             ChildScans = new List<Ms2ScanWithSpecificMass>();
             NativeId = mzLibScan.NativeId;
@@ -47,6 +47,7 @@ namespace EngineLayer
         public double PrecursorIntensity { get; }
         public int PrecursorEnvelopePeakCount { get; }
         public double PrecursorFractionalIntensity { get; }
+        public double PrecursorHighestPeakMz { get; }
         public string FullFilePath { get; }
         public IsotopicEnvelope[] ExperimentalFragments { get; private set; }
         public List<Ms2ScanWithSpecificMass> ChildScans { get; set; } // MS2/MS3 scans that are children of this MS2 scan
@@ -63,7 +64,6 @@ namespace EngineLayer
         public double TotalIonCurrent => TheScan.TotalIonCurrent;
         public double HighestPrecursorPeakMz { get; set; }
         public PeakCurve PrecursorPeakCurve { get; set; }
-        public IsotopicEnvelope PrecursorEnvelope { get; set; }
 
         public static IsotopicEnvelope[] GetNeutralExperimentalFragments(MsDataScan scan, CommonParameters commonParam)
         {

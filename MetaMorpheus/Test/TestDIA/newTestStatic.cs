@@ -281,6 +281,10 @@ namespace Test.TestDIA
             var allScans = dataFile.GetAllScansList();
             var ms1scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
             var ms2scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            var psmsFile = @"E:\ISD Project\CE_241213\snip_highestPeak\Task1-SearchTask\AllPSMs.psmtsv";
+            var psms = PsmTsvReader.ReadTsv(psmsFile, out List<string> warnings);
+            var psmsContainTheIon = psms.Where(p => p.MatchedIons.Select(i => Math.Round(i.Mz, 2)).Contains(1017.07)).ToList();
+            var highestPeakMzs = psmsContainTheIon.Select(psm => psm.PrecursorHighestPeakMz).GroupBy(p => Math.Round(p, 2)).OrderBy(p => p.Key).ToList();
 
             var pc1017 = PeakCurve.PeakTracing(1017.58, 1, ms2scans, new PpmTolerance(10), 100, 2, 8);
         }
