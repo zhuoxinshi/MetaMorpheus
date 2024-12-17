@@ -60,17 +60,35 @@ namespace EngineLayer
             var maxScanNum = scans[scans.Length - 1].OneBasedScanNumber;
             var peaksByScan = new List<Peak>[maxScanNum + 1];
             int index = 0;
-            string pattern = $@"sid=(\d+)";
             for (int i = 0; i < scans.Length; i++)
             {
                 peaksByScan[scans[i].OneBasedScanNumber] = new List<Peak>();
                 var spectrum = scans[i].MassSpectrum;
-                var match = Regex.Match(scans[i].ScanFilter, pattern);
-                double voltage = double.Parse(match.Groups[1].Value);
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
-                        scans[i].OneBasedScanNumber, 0, index, null);
+                        scans[i].OneBasedScanNumber, i, index, null);
+                    peaksByScan[scans[i].OneBasedScanNumber].Add(newPeak);
+                    index++;
+                }
+            }
+            return peaksByScan;
+        }
+
+        public static List<Peak>[] GetAllPeaksByScan(MsDataScan[] scans, int numScansPerCycle)
+        {
+            var maxScanNum = scans[scans.Length - 1].OneBasedScanNumber;
+            var peaksByScan = new List<Peak>[maxScanNum + 1];
+            int index = 0;
+            for (int i = 0; i < scans.Length; i++)
+            {
+                peaksByScan[scans[i].OneBasedScanNumber] = new List<Peak>();
+                var spectrum = scans[i].MassSpectrum;
+                var zeroBasedScanIndex = (scans[i].OneBasedScanNumber - 1)/numScansPerCycle;
+                for (int j = 0; j < spectrum.XArray.Length; j++)
+                {
+                    Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
+                        scans[i].OneBasedScanNumber, zeroBasedScanIndex, index, null);
                     peaksByScan[scans[i].OneBasedScanNumber].Add(newPeak);
                     index++;
                 }

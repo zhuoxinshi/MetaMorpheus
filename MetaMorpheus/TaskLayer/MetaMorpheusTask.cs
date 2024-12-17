@@ -324,21 +324,32 @@ namespace TaskLayer
         {
             if (commonParameters.DIAparameters != null)
             {
-                if (commonParameters.DIAparameters.Type == "DIA")
+                switch (commonParameters.DIAparameters.AnalysisType)
                 {
-                    var diaEngine = new DIAEngine2(myMSDataFile, commonParameters, commonParameters.DIAparameters);
-                    diaEngine.GetPseudoMS2Scans();
-                    var scansWithPre = diaEngine.PseudoMs2WithPre;
-                    return scansWithPre;
+                    case AnalysisType.DIAEngine:
+                        var diaEngine = new DIAEngine2(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        diaEngine.GetPseudoMS2Scans();
+                        var scansWithPre1 = diaEngine.PseudoMs2WithPre;
+                        return scansWithPre1;
+
+                    case AnalysisType.ISDEngine:
+                        var isdEngine = new ISDEngine(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        isdEngine.GetPseudoMS2Scans();
+                        var scansWithPre2 = isdEngine.PseudoMs2WithPre;
+                        return scansWithPre2;
+
+                    case AnalysisType.ISDEngine_static:
+                        var scansWithPre3 = ISDEngine_static.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        return scansWithPre3;
+
+                    case AnalysisType.ISD_scanBased:
+                        var scansWithPre4 = ISD_scanBased.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        return scansWithPre4;
+
+                    case AnalysisType.ISD_slow:
+                        var scansWithPre5 = ISD_slow.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        return scansWithPre5;
                 }
-                if (commonParameters.DIAparameters.Type == "ISD")
-                {
-                    var isdEngine = new ISDEngine(myMSDataFile, commonParameters, commonParameters.DIAparameters);
-                    isdEngine.GetPseudoMS2Scans();
-                    var scansWithPre = isdEngine.PseudoMs2WithPre;
-                    return scansWithPre;
-                }
-                
             }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);
 

@@ -14,7 +14,7 @@ namespace EngineLayer.DIA
 {
     public class ISD_scanBased
     {
-        public static List<Ms2ScanWithSpecificMass> GetPseudoMs2Scans_scanBased(MsDataFile dataFile, CommonParameters commonParameters, DIAparameters diaParam)
+        public static List<Ms2ScanWithSpecificMass> GetPseudoMs2Scans(MsDataFile dataFile, CommonParameters commonParameters, DIAparameters diaParam)
         {
             var pseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
 
@@ -29,6 +29,7 @@ namespace EngineLayer.DIA
 
             //calculate number of scans per cycle
             int scansPerCycle = ms1Scans[1].OneBasedScanNumber - ms1Scans[0].OneBasedScanNumber;
+            diaParam.NumScansPerCycle = scansPerCycle;
 
             //get ms2withmass and ms2 peakCurves
             var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
@@ -44,12 +45,13 @@ namespace EngineLayer.DIA
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out ms2Peaks);
                 ms2PeakLists[ms2Group.Key] = ms2Peaks;
             }
-            var allMs2Peaks = new List<Peak>[ms2Scans.Length + 1];
-            for (int i = 1; i < ms2Scans.Length + 1; i++)
+            var maxScanNumMs2 = ms2Scans[ms2Scans.Length - 1].OneBasedScanNumber;
+            var allMs2Peaks = new List<Peak>[maxScanNumMs2 + 1];
+            for (int i = 1; i < allMs2Peaks.Length + 1; i++)
             {
                 foreach(var ms2PeakList in ms2PeakLists)
                 {
-                    if (ms2PeakList.Value[i].Count > 0)
+                    if (i < ms2PeakList.Value.Length && ms2PeakList.Value[i] != null)
                     {
                         allMs2Peaks[i] = ms2PeakList.Value[i];
                     }
@@ -67,6 +69,9 @@ namespace EngineLayer.DIA
                     pfGroups.Add(group);
                 }
             }
+
+            //Combine fragments for the same precursor
+            //pfGroups = CombinePFGroups(pfGroups);
 
             //construct new ms2Scans
             foreach (var pfGroup in pfGroups)
@@ -218,16 +223,29 @@ namespace EngineLayer.DIA
             int zeroBasedScanIndex = (ms2WithMass.OneBasedScanNumber - 1) / numScansPerCycle;
             var precursorPeak = PeakCurve.GetPeakFromScan(ms2WithMass.HighestPrecursorPeakMz, ms1PeakTable, zeroBasedScanIndex, diaParam.Ms1PeakFindingTolerance,
                 diaParam.PeakSearchBinSize);
-            if (precursorPeak.PeakCurve == null)
+            if (precursorPeak.PeakCurve == null || precursorPeak.PeakCurve.Peaks.Count < 5)
             {
                 return null;
             }
-            var fragmentsPCs = ms2PeaksByScan[ms2WithMass.OneBasedScanNumber].Select(f => f.PeakCurve).ToList();
+            var fragmentsPCs = ms2PeaksByScan[ms2WithMass.OneBasedScanNumber].Where(f => f.PeakCurve != null).
+                Select(f => f.PeakCurve).Where(p => p.Peaks.Count > 4).ToList();
 
             var group = ISDEngine_static.PFgrouping(precursorPeak.PeakCurve, fragmentsPCs, diaParam);
             return group;
         }
 
-
+        public static List<PrecursorFragmentsGroup> CombinePFGroups(List<PrecursorFragmentsGroup> pfGroups)
+        {
+            var newGroups = new List<PrecursorFragmentsGroup>();
+            var groupByPrecursorPC = pfGroups.GroupBy(g => g.PrecursorPeakCurve).ToList();
+            foreach(var group in groupByPrecursorPC)
+            {
+                var allFragments = group.SelectMany(g => g.PFpairs).Select(pair => pair.FragmentPeakCurve).Distinct().ToList();
+                var precursor = group.Key;
+                var newGroup = new PrecursorFragmentsGroup(precursor, allFragments);
+                newGroups.Add(newGroup);
+            }
+            return newGroups;
+        }
     }
 }

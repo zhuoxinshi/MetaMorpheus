@@ -79,7 +79,7 @@ namespace Test.TestDIA
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.2,
                 fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 1.5, maxRTrangeMS2: 1.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA", topdown:true,
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA", 
                 apexCycleTolerance:2, scanCycleSplineInterval: 0.05);
             string DIAfile = @"E:\DIA\TopDIA\20231117_DIA_720_800_rep2.mzML";
             string dataBase = @"E:\DIA\TopDIA\Ecoli.fasta";

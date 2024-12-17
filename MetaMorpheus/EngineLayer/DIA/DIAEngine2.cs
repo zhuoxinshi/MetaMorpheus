@@ -381,11 +381,11 @@ namespace EngineLayer.DIA
                     }
                 }
             }
-            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
-            //{
-            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
-            //    preFragGroup.PFpairs = filtered.ToList();
-            //}
+            if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+            {
+                var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+                preFragGroup.PFpairs = filtered.ToList();
+            }
             if (preFragGroup.PFpairs.Count > 0)
             {
                 preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();

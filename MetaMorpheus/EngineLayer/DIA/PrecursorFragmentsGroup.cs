@@ -17,6 +17,18 @@ namespace EngineLayer.DIA
             PFpairs = new List<PrecursorFragmentPair>();
         }
 
+        public PrecursorFragmentsGroup(PeakCurve precursorPeakCurve, List<PeakCurve> fragments)
+        {
+            var pfPairs = new List<PrecursorFragmentPair>();
+            foreach(var fragment in fragments)
+            {
+                var pair = new PrecursorFragmentPair(precursorPeakCurve, fragment);
+                pfPairs.Add(pair);
+            }
+            PrecursorPeakCurve = precursorPeakCurve;
+            PFpairs = pfPairs;
+        } 
+
         public PeakCurve PrecursorPeakCurve { get; set; }
         public List<PrecursorFragmentPair> PFpairs { get; set; }
         public int Index => PrecursorPeakCurve.Index;

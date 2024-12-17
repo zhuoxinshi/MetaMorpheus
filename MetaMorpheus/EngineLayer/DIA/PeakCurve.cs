@@ -37,6 +37,11 @@ namespace EngineLayer.DIA
             PFpairs = new List<PrecursorFragmentPair>();
         }
 
+        public PeakCurve(List<Peak> peaks)
+        {
+            Peaks = peaks;
+        }
+
         public List<Peak> Peaks { get; set; }
         public int MsLevel {  get; set; }
         public MzRange IsolationRange { get; set; }
@@ -198,6 +203,24 @@ namespace EngineLayer.DIA
             this.CubicSpline = cubicSpline;
         }
 
+        public void GetCubicSpline_scanCycle()
+        {
+            var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
+            var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
+            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
+            var cubicSpline = CubicSpline.InterpolateAkima(scanCycleArray, intensityArray);
+            this.CubicSpline = cubicSpline;
+        }
+
+        public void GetLinearSpline_scanCycle()
+        {
+            var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
+            var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
+            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
+            var linearSpline = LinearSpline.InterpolateSorted(scanCycleArray, intensityArray);
+            this.LinearSpline = linearSpline;
+        }
+
         public List<(float, float)> Interpolte_cubic(float timeInterval)
         {
             if (CubicSpline == null)
@@ -314,7 +337,7 @@ namespace EngineLayer.DIA
         }
 
         public static PeakCurve FindPeakCurve(Peak targetPeak, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
-            , Tolerance mzTolerance, int binSize, double maxRTrange)
+            , Tolerance tolerance, int binSize, double maxRTrange, double splineInterval = 0.025)
         {
             var xic = new List<Peak>();
             xic.Add(targetPeak);
@@ -325,7 +348,7 @@ namespace EngineLayer.DIA
             int missedScans = 0;
             for (int t = targetPeak.ZeroBasedScanIndex + 1; t < scans.Length; t++)
             {
-                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
+                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, tolerance, binSize);
 
                 if (peak == null)
                 {
@@ -360,7 +383,7 @@ namespace EngineLayer.DIA
             missedScans = 0;
             for (int t = targetPeak.ZeroBasedScanIndex - 1; t >= 0; t--)
             {
-                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
+                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, tolerance, binSize);
 
                 if (peak == null)
                 {
@@ -1273,6 +1296,14 @@ namespace EngineLayer.DIA
             }  
         }
 
+        public static PeakCurve PeakTracing(double mz, int zeroBasedScanIndex, MsDataScan[] scans, Tolerance tolerance, int binSize, int maxMissedScans, double maxRTRange)
+        {
+            var allPeaks = Peak.GetAllPeaks(scans, binSize);
+            var peakTable = Peak.GetPeakTable(allPeaks, binSize);
+            var peak = GetPeakFromScan(mz, peakTable, zeroBasedScanIndex, tolerance, binSize);
+            var peakCurve = FindPeakCurve(peak, peakTable, scans, null, maxMissedScans, tolerance, binSize, maxRTRange);
+            return peakCurve;
+        }
         
 
     }

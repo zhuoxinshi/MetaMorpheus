@@ -23,6 +23,10 @@ namespace EngineLayer.DIA
             var allMs1PeakCurves = GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1,
                 out List<Peak>[] peaksByScan);
 
+            //calculate number of scans per cycle
+            int scansPerCycle = ms1Scans[1].OneBasedScanNumber - ms1Scans[0].OneBasedScanNumber;
+            diaParam.NumScansPerCycle = scansPerCycle;
+
             //Get ms2 XICs
             var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
@@ -99,13 +103,20 @@ namespace EngineLayer.DIA
         }
 
         public static List<PeakCurve> GetAllPeakCurves_Peak(MsDataScan[] scans, DIAparameters diaParam, Tolerance peakFindingTolerance, double maxRTRange
-            , out List<Peak>[] allPeaksByScan, out List<Peak>[] peakTable)
+            , out List<Peak>[] allPeaksByScan)
         {
             var allPeakCurves = new List<PeakCurve>();
-            allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            if (diaParam.NumScansPerCycle != 0)
+            {
+                allPeaksByScan = Peak.GetAllPeaksByScan(scans, diaParam.NumScansPerCycle);
+            }
+            else
+            {
+                allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            }
             var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var rankedPeaks = allPeaks.OrderByDescending(p => p.Intensity).ToList();
-            peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
+            var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             foreach (var peak in rankedPeaks)
             {
                 if (peak.PeakCurve == null)
@@ -144,7 +155,14 @@ namespace EngineLayer.DIA
             Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allPeaksByScan)
         {
             var allPeakCurves = new List<PeakCurve>();
-            allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            if (diaParam.NumScansPerCycle != 0)
+            {
+                allPeaksByScan = Peak.GetAllPeaksByScan(scans, diaParam.NumScansPerCycle);
+            }
+            else
+            {
+                allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            }
             var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             int index = 1;
@@ -154,15 +172,20 @@ namespace EngineLayer.DIA
                 var envelopes = Deconvoluter.Deconvolute(scans[i], commonParameters.PrecursorDeconvolutionParameters).OrderByDescending(E => E.MonoisotopicMass);
                 foreach (var envelope in envelopes)
                 {
-                    if (envelope.Charge < 6 || envelope.Peaks.Count < 3 || envelope.MonoisotopicMass < diaParam.MinMass)
+                    if (envelope.Charge < 6 || envelope.Peaks.Count < 3 || envelope.MonoisotopicMass < diaParam.MinMass || envelope.MonoisotopicMass > diaParam.MaxMass)
                     {
                         continue;
                     }
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
+                    int zeroBasedScanIndex = i;
+                    if (diaParam.NumScansPerCycle != 0)
+                    {
+                        zeroBasedScanIndex = (scans[i].OneBasedScanNumber - 1) / diaParam.NumScansPerCycle;
+                    }
                     var precursor = new DeconvolutedMass(envelope, charge, scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                        scans[i].OneBasedScanNumber, i);
+                        scans[i].OneBasedScanNumber, zeroBasedScanIndex);
                     allPrecursors.Add(precursor);
                 }
             }
@@ -183,6 +206,7 @@ namespace EngineLayer.DIA
                     peakFindingTolerance, diaParam.PeakSearchBinSize, maxRTRange);
                     newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
                     newPeakCurve.Charge = precursor.Charge;
+                    newPeakCurve.Envelope = precursor.Envelope;
                     if (diaParam.SplitMS1Peak)
                     {
                         newPeakCurve.DetectPeakRegions();
@@ -227,12 +251,19 @@ namespace EngineLayer.DIA
         }
 
         public static List<PeakCurve> GetAllPeakCurves_isoEnvelopeTotal(MsDataScan[] scans, CommonParameters commonParameters, DIAparameters diaParam, 
-            Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allPeaksByScan, out List<Peak>[] peakTable)
+            Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allPeaksByScan)
         {
             var allPeakCurves = new List<PeakCurve>();
-            allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            if (diaParam.NumScansPerCycle != 0)
+            {
+                allPeaksByScan = Peak.GetAllPeaksByScan(scans, diaParam.NumScansPerCycle);
+            }
+            else
+            {
+                allPeaksByScan = Peak.GetAllPeaksByScan(scans);
+            }
             var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
-            peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
+            var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             var allPrecursors = new List<DeconvolutedMass>[scans.Length];
             for (int i = 0; i < scans.Length; i++)
             {
@@ -298,8 +329,12 @@ namespace EngineLayer.DIA
                     return ISDEngine.GroupPrecursorFragments(precursor, fragments, diaParam);
                 case PFGroupingType.ScanCycle:
                     return ISDEngine.GroupPrecursorFragments_scanCycle(precursor, fragments, diaParam);
-                case PFGroupingType.OverlapRatio:
+                case PFGroupingType.OverlapAreaRatio:
                     return ISDEngine.GroupPrecursorFragments_area(precursor, fragments, diaParam);
+                case PFGroupingType.Area_correlation:
+                    return ISDEngine.GroupPrecursorFragments_area_correlation(precursor, fragments, diaParam);
+                case PFGroupingType.OverlapFirst:
+                    return ISDEngine.GroupPrecursorFragments_overlapFirst(precursor, fragments, diaParam);
                 default: return null;
             }
 ;
@@ -337,7 +372,7 @@ namespace EngineLayer.DIA
         public static Ms2ScanWithSpecificMass GetPseudoMs2Scan_neutralMass(PrecursorFragmentsGroup pfGroup, CommonParameters commonParameters, MsDataFile dataFile)
         {
             var mzs = new double[] { 1 };
-            var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.Envelope.TotalIntensity) };
+            var intensities = new double[] { Double.MaxValue };
             var spectrum = new MzSpectrum(mzs, intensities, false);
             var newMs2Scan = new MsDataScan(spectrum, pfGroup.PrecursorPeakCurve.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
                         MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
@@ -349,6 +384,8 @@ namespace EngineLayer.DIA
 
             return scanWithprecursor;
         }
+
+        
     }
 }
     

@@ -23,6 +23,12 @@ namespace EngineLayer.DIA
             Correlation = corr;
         }
 
+        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag)
+        {
+            PrecursorPeakCurve = pre;
+            FragmentPeakCurve = frag;
+        }
+
         public PeakCurve PrecursorPeakCurve { get; set; }
         public PeakCurve FragmentPeakCurve { get; set; }    
         public double Correlation { get; set; }
@@ -62,7 +68,7 @@ namespace EngineLayer.DIA
             {
                 overlap = (curve2.EndCycle - curve1.StartCycle) / ms1rtrange;
             }
-            else if (curve1.EndCycle >= curve2.StartRT && curve1.EndCycle <= curve2.EndCycle && curve1.StartCycle <= curve2.StartRT)
+            else if (curve1.EndCycle >= curve2.StartCycle && curve1.EndCycle <= curve2.EndCycle && curve1.StartCycle <= curve2.StartCycle)
             {
                 overlap = (curve1.EndCycle - curve2.StartCycle) / ms1rtrange;
             }
@@ -74,6 +80,17 @@ namespace EngineLayer.DIA
             {
                 overlap = 1;
             }
+            return overlap;
+        }
+
+        public static double CalculateRTOverlapRatio_scanCycle2(PeakCurve curve1, PeakCurve curve2)
+        {
+            var start = Math.Min(curve1.StartCycle, curve2.StartCycle);
+            var end = Math.Max(curve1.EndCycle, curve2.EndCycle);
+            var overlapStart = Math.Max(curve1.StartCycle, curve2.StartCycle);
+            var overlapEnd = Math.Min(curve1.EndCycle, curve2.EndCycle);
+
+            double overlap = (overlapEnd - overlapStart)/(end - start);
             return overlap;
         }
 
@@ -173,6 +190,62 @@ namespace EngineLayer.DIA
                 {
                     intensities1.Add(peakCurve1.CubicSpline.Interpolate(rt));
                     intensities2.Add(peakCurve2.CubicSpline.Interpolate(rt));
+                }
+                double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
+                return corr;
+            }
+            return 0;
+        }
+
+        public static double CalculateCorr_spline_scanCycle(PeakCurve peakCurve1, PeakCurve peakCurve2, string splineType, double cycleInterval)
+        {
+            if (peakCurve2.Peaks.Count < 5 || peakCurve1.Peaks.Count < 5)
+            {
+                return 0;
+            }
+            var startCycle = peakCurve1.StartCycle;
+            var endCycle = peakCurve1.EndCycle;
+            var cycleSeq = new List<double>();
+            for (double i = startCycle; i < endCycle; i += cycleInterval)
+            {
+                cycleSeq.Add(i);
+            }
+            var intensities1 = new List<double>();
+            var intensities2 = new List<double>();
+
+            if (splineType == "linear")
+            {
+                if (peakCurve1.LinearSpline == null)
+                {
+                    peakCurve1.GetLinearSpline();
+                }
+                if (peakCurve2.LinearSpline == null)
+                {
+                    peakCurve2.GetLinearSpline();
+                }
+                foreach (var cycle in cycleSeq)
+                {
+                    intensities1.Add(peakCurve1.LinearSpline.Interpolate(cycle));
+                    intensities2.Add(peakCurve2.LinearSpline.Interpolate(cycle));
+                }
+                double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
+                return corr;
+            }
+
+            if (splineType == "cubic")
+            {
+                if (peakCurve1.CubicSpline == null)
+                {
+                    peakCurve1.GetCubicSpline_scanCycle();
+                }
+                if (peakCurve2.CubicSpline == null)
+                {
+                    peakCurve2.GetCubicSpline_scanCycle();
+                }
+                foreach (var cycle in cycleSeq)
+                {
+                    intensities1.Add(peakCurve1.CubicSpline.Interpolate(cycle));
+                    intensities2.Add(peakCurve2.CubicSpline.Interpolate(cycle));
                 }
                 double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
                 return corr;
@@ -325,7 +398,7 @@ namespace EngineLayer.DIA
             return corr;
         }
 
-        public static double CalculateCorr_spline_scanCycle(PeakCurve peakCurve1, PeakCurve peakCurve2)
+        public static double CalculateCorr_scanCycleSpline_preCalculated(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
             double interval = peakCurve1.ScanCycleSmoothedData[1].Item1 - peakCurve1.ScanCycleSmoothedData[0].Item1;
             var start = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
@@ -385,6 +458,56 @@ namespace EngineLayer.DIA
                     {
                         totalArea.Add((i, peakCurve1.NormalizedPeaks[index1].Item2));
                     } 
+                    if (index2 >= 0)
+                    {
+                        totalArea.Add((i, peakCurve2.NormalizedPeaks[index2].Item2));
+                    }
+                }
+                else
+                {
+                    totalArea.Add((i, Math.Max(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
+                    overlapArea.Add((i, Math.Min(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
+                }
+            }
+            double overlapAUC = CalculateArea(overlapArea);
+            double totalAUC = CalculateArea(totalArea);
+            double ratio = overlapAUC / totalAUC;
+            return ratio;
+        }
+
+        public static double CalculateOverlapAreaRatio_spline(PeakCurve peakCurve1, PeakCurve peakCurve2)
+        {
+            var start = Math.Min(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var end = Math.Max(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var overlapStart = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var overlapEnd = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+
+            if (peakCurve1.NormalizedPeaks == null)
+            {
+                peakCurve1.GetNormalizedPeaks();
+            }
+            if (peakCurve2.NormalizedPeaks == null)
+            {
+                peakCurve2.GetNormalizedPeaks();
+            }
+
+            var overlapArea = new List<(int, double)>();
+            var totalArea = new List<(int, double)>();
+            var scanCycles1 = peakCurve1.NormalizedPeaks.Select(p => p.Item1).ToArray();
+            var scanCycles2 = peakCurve2.NormalizedPeaks.Select(p => p.Item1).ToArray();
+
+            for (int i = start; i <= end; i++)
+            {
+                var index1 = Array.BinarySearch(scanCycles1, i);
+                var index2 = Array.BinarySearch(scanCycles2, i);
+
+                if (index1 < 0 || index2 < 0)
+                {
+                    overlapArea.Add((i, 0));
+                    if (index1 >= 0)
+                    {
+                        totalArea.Add((i, peakCurve1.NormalizedPeaks[index1].Item2));
+                    }
                     if (index2 >= 0)
                     {
                         totalArea.Add((i, peakCurve2.NormalizedPeaks[index2].Item2));

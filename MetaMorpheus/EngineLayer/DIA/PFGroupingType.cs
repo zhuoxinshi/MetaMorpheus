@@ -10,6 +10,8 @@ namespace EngineLayer.DIA
     {
         RetentionTime,
         ScanCycle,
-        OverlapRatio
+        OverlapAreaRatio,
+        Area_correlation,
+        OverlapFirst
     }
 }

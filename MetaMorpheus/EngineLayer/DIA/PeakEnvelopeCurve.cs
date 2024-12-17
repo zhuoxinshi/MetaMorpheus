@@ -35,6 +35,11 @@ namespace EngineLayer.DIA
                 fakePeaks.Add(fakePeak);
             }
             FakePeakCurve = new PeakCurve(fakePeaks, MsLevel, IsolationRange, MonoisotopicMass, Charge, index: Index);
+            var allPeaks = PeakEnvelopes.SelectMany(pe => pe.IsotopicPeaks).ToList();
+            foreach(var peak in allPeaks)
+            {
+                peak.PeakCurve = FakePeakCurve;
+            }
         }
 
         public static PeakEnvelopeCurve GetPeakEnvelopeCurve((double mz, double intensity)[] targetPeaks, double[] theorIntensityRatio, int highestPeakIndex, List<Peak>[] peakTable,
