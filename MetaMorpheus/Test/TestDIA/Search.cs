@@ -23,7 +23,7 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\scanBased2_pfGroup_corr0.5_highestPeakXIC_ms1Tol5ppm_cubicSpline0.05_apexRT0.25_noPeakTrim_maxMissed1_overlap0.2_Frank150_Prank10_maxRT0.5";
+            string outputFolder = @"E:\DIA\TestSearch\debug_scanBased2_corr0.5_highestPeakXIC_ms1Tol5ppm_cubicSpline0.05_apexRT0.25_noPeakTrim_maxMissed1_overlap0.2_Frank150_Prank10_maxRT0.5";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
