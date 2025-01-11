@@ -411,10 +411,6 @@ namespace EngineLayer.DIA
                 }
                 else if (peak != null)
                 {
-                    if(peak.RetentionTime - newPeakCurve.ApexRT > maxRTrange)
-                    {
-                        break;
-                    }
                     //if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
                     if(peak.PeakCurve == null)
                     {
@@ -432,6 +428,10 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
+                if (newPeakCurve.EndRT - newPeakCurve.ApexRT > maxRTrange)
+                {
+                    break;
+                }
             }
 
             // go left
@@ -446,10 +446,6 @@ namespace EngineLayer.DIA
                 }
                 else if (peak != null)
                 {
-                    if (newPeakCurve.ApexRT - peak.RetentionTime > maxRTrange)
-                    {
-                        break;
-                    }
                     //if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
                     if (peak.PeakCurve == null)
                     {
@@ -464,6 +460,10 @@ namespace EngineLayer.DIA
                 }
 
                 if (missedScans > maxMissedScans)
+                {
+                    break;
+                }
+                if (newPeakCurve.ApexRT - newPeakCurve.StartRT > maxRTrange)
                 {
                     break;
                 }
