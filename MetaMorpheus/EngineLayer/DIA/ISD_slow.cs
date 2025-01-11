@@ -52,7 +52,7 @@ namespace EngineLayer.DIA
             //construct new ms2Scans
             foreach (var pfGroup in pfGroups)
             {
-                var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, diaParam, dataFile);
+                var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, diaParam.PseudoMs2ConstructionType, dataFile.FilePath);
                 pseudoMs2Scans.Add(newScans);
             }
             return pseudoMs2Scans;

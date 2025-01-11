@@ -114,7 +114,7 @@ namespace EngineLayer.DIA
             }
 
             //cut peaks
-            if (diaParam.CutPeaks)
+            if (diaParam.CutMs1Peaks)
             {
                 var NL = peakEnvelopeList.Select(p => p.TotalIntensity).OrderBy(p => p).First();
                 //DiscriminationFactorToCutPeak is a parameter, default 0.6 in FlashLFQ

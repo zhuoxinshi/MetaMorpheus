@@ -350,6 +350,14 @@ namespace TaskLayer
                     case AnalysisType.ISD_slow:
                         var scansWithPre5 = ISD_slow.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
                         return scansWithPre5;
+
+                    case AnalysisType.DIAEngine_static:
+                        var scansWithPre6 = DIAEngine_static.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        return scansWithPre6;
+
+                    case AnalysisType.DIA_scanBased:
+                        var scansWithPre7 = DIA_scanBased.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
+                        return scansWithPre7;
                 }
             }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);

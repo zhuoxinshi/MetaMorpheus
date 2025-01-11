@@ -32,10 +32,11 @@ namespace EngineLayer.DIA
         public double ScanCycleSplineTimeInterval { get; set; }
         public double MinMass { get; set; }
         public double MaxMass { get; set; }
-        public double MinCharge { get; set; }
+        public int MinCharge { get; set; }
         public string Type { get; set; }
         public Tolerance PrecursorMassTolerance => new PpmTolerance(200);
-        public bool CutPeaks { get; set; }
+        public bool CutMs1Peaks { get; set; }
+        public bool CutMs2Peaks { get; set; }
         public bool AverageMs2Scans { get; set; }
         public XICType Ms1XICType {  get; set; } 
         public XICType Ms2XICType { get; set; }
@@ -46,13 +47,14 @@ namespace EngineLayer.DIA
         public CorrelationType CorrelationType { get; set; }
         public int NumScansPerCycle { get; set; }
 
-        public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance,int maxNumMissedScan, int binSize, 
-            double overlapRatioCutOff, double correlationCutOff, double apexRtTolerance, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
+        public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan = 2, int binSize = 100, 
+            double overlapRatioCutOff = 0.3, double correlationCutOff = 0.5, double apexRtTolerance = 0.1, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
             , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
             bool splitMS2Peak = false, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999, string type = "DIA", int apexCycleTolerance = 2, 
-            double scanCycleSplineInterval = 0.025, bool cutPeaks = false, double minCharge = 1, bool averageMs2Scans = false, XICType ms1XICType = XICType.DeconHighestPeak, 
+            double scanCycleSplineInterval = 0.025, int minCharge = 1, bool averageMs2Scans = false, XICType ms1XICType = XICType.DeconHighestPeak, 
             XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak, 
-            AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle)
+            AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,
+            bool cutMs1Peaks = false, bool cutMs2Peaks = false)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -77,7 +79,8 @@ namespace EngineLayer.DIA
             Type = type;
             ApexCycleTolerance = apexCycleTolerance;
             ScanCycleSplineTimeInterval = scanCycleSplineInterval;
-            CutPeaks = cutPeaks;
+            CutMs1Peaks = cutMs1Peaks;
+            CutMs2Peaks = cutMs2Peaks;
             MinCharge = minCharge;
             AverageMs2Scans = averageMs2Scans;
             Ms1XICType = ms1XICType;

@@ -11,6 +11,7 @@ namespace EngineLayer.DIA
         Peak,
         DeconHighestPeak,
         isoEnvelopeTotal,
-        isoEnvelopeHighestPeak
+        isoEnvelopeHighestPeak,
+        Peak_cutPeak
     }
 }

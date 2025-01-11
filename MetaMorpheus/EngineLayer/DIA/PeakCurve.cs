@@ -13,6 +13,8 @@ using MathNet.Numerics.Statistics;
 using MathNet.Numerics.Distributions;
 using ThermoFisher.CommonCore.BackgroundSubtraction;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using MathNet.Numerics.LinearAlgebra;
 
 namespace EngineLayer.DIA
 {
@@ -78,6 +80,7 @@ namespace EngineLayer.DIA
         public Normal GaussianFit { get; set; }
         public List<(double, double)> GaussianFitData { get; set; }
         public double NL { get; set; }
+        public PrecursorFragmentsGroup PFGroup {  get; set; }
 
         public double AverageMz()
         {
@@ -111,6 +114,10 @@ namespace EngineLayer.DIA
 
         public void GetScanCycleSmoothedData(double splineInterval)
         {
+            if (ScanCycleSmoothedData != null)
+            {
+                return;
+            }
             ScanCycleSmoothedData = new List<(double, double)>();
             var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
             var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
@@ -248,8 +255,56 @@ namespace EngineLayer.DIA
             return smoothedData;
         }
 
+        public double[] GetSGfilterSmoothedData(int windowSize, int polyOrder)
+        {
+            var rawData = Peaks.Select(p => p.Intensity).ToArray();
+            int halfWindow = windowSize / 2;
+            var coefficients = ComputeSGCoefficients(windowSize, polyOrder);
+
+            int n = rawData.Length;
+            double[] smoothedData = new double[n];
+
+            for (int i = 0; i < n; i++)
+            {
+                double sum = 0;
+                for (int j = -halfWindow; j <= halfWindow; j++)
+                {
+                    int index = i + j;
+
+                    if (index < 0) index = -index;
+                    if (index >= n) index = 2 * n - index - 1;
+
+                    sum += coefficients[j + halfWindow] * rawData[index];
+                }
+                smoothedData[i] = sum;
+            }
+
+            return smoothedData;
+        }
+
+        private static double[] ComputeSGCoefficients(int windowSize, int polyOrder)
+        {
+            int halfWindow = windowSize / 2;
+            var designMatrix = Matrix<double>.Build.Dense(windowSize, polyOrder + 1);
+
+            for (int i = -halfWindow; i <= halfWindow; i++)
+            {
+                for (int j = 0; j <= polyOrder; j++)
+                {
+                    designMatrix[i + halfWindow, j] = Math.Pow(i, j);
+                }
+            }
+
+            var pseudoInverse = designMatrix.TransposeThisAndMultiply(designMatrix).Inverse() * designMatrix.Transpose();
+            return pseudoInverse.Row(0).ToArray(); // Coefficients for smoothing
+        }
+
         public void GetPrecursorRanks()
         {
+            if (PFpairs == null || PFpairs.Count == 0)
+            {
+                return;
+            }
             // Sort PFpairs by correlation in descending order and assign ranks
             var rankedPairs = PFpairs.OrderByDescending(p => p.Correlation)
                 .Select((p, index) => new { PFpair = p, Rank = index + 1 }).ToList();
@@ -439,6 +494,10 @@ namespace EngineLayer.DIA
                 }
                 else if (peak != null)
                 {
+                    if (peak.RetentionTime - targetPeak.RetentionTime > maxRTrange)
+                    {
+                        break;
+                    }
                     //if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
                     if (peak.PeakCurve == null)
                     {
@@ -452,10 +511,6 @@ namespace EngineLayer.DIA
                 }
 
                 if (missedScans > maxMissedScans)
-                {
-                    break;
-                }
-                if (newPeakCurve.EndRT - newPeakCurve.ApexRT > maxRTrange)
                 {
                     break;
                 }
@@ -473,6 +528,10 @@ namespace EngineLayer.DIA
                 }
                 else if (peak != null)
                 {
+                    if (peak.RetentionTime - targetPeak.RetentionTime > maxRTrange)
+                    {
+                        break;
+                    }
                     //if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
                     if (peak.PeakCurve == null)
                     {
@@ -486,10 +545,6 @@ namespace EngineLayer.DIA
                 }
 
                 if (missedScans > maxMissedScans)
-                {
-                    break;
-                }
-                if (newPeakCurve.ApexRT - newPeakCurve.StartRT > maxRTrange)
                 {
                     break;
                 }
@@ -1150,22 +1205,24 @@ namespace EngineLayer.DIA
             return lower;
         }
 
-        public void VisualizeRaw(string chartType)
+        public GenericChart VisualizeRaw(string chartType)
         {
+            var maxIntensity = Peaks.Max(p => p.Intensity);
             if (chartType == "line")
             {
                 var plot = Chart2D.Chart.Line<double, double, string>(
                         x: Peaks.Select(p => p.RetentionTime),
-                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend:true).WithMarkerStyle(Color: Color.fromString("red"));
-                plot.Show();
+                        y: Peaks.Select(p => p.Intensity/maxIntensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend:true).WithMarkerStyle(Color: Color.fromString("red"));
+                return plot;
             }
             if (chartType == "point")
             {
                 var plot = Chart2D.Chart.Point<double, double, string>(
                         x: Peaks.Select(p => p.RetentionTime),
-                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
-                plot.Show();
+                        y: Peaks.Select(p => p.Intensity/maxIntensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+                return plot;
             }
+            return null;
         }
 
         public GenericChart VisualizeCubicSpline()
@@ -1197,12 +1254,12 @@ namespace EngineLayer.DIA
             return plot;
         }
 
-        public void VisualizeScanCycleSmoothedData()
+        public GenericChart VisualizeScanCycleSmoothedData()
         {
             var plot = Chart2D.Chart.Point<double, double, string>(
                 x: ScanCycleSmoothedData.Select(p => p.Item1),
                 y: ScanCycleSmoothedData.Select(p => p.Item2)).WithTraceInfo("ScanCycleSmoothed").WithMarkerStyle(Color: Color.fromString("blue"));
-            plot.Show();
+            return plot;
         }
 
         public void VisualizePeakRegions()
@@ -1268,7 +1325,24 @@ namespace EngineLayer.DIA
 
                 if (discriminationFactor > DiscriminationFactorToCutPeak)
                 {
-                    Peaks.RemoveAll(p => p.RetentionTime < valleyPeak.RetentionTime);
+                    //decide which peak the valley point belongs to 
+                    var discriminationLeft = (Peaks[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                    var discriminationRight = (Peaks[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+
+                    var peaksToRemove = new List<Peak>();
+                    if (discriminationLeft > discriminationRight)
+                    {
+                        peaksToRemove = Peaks.Where(p => p.RetentionTime <= valleyPeak.RetentionTime).ToList();
+                    }
+                    else
+                    {
+                        peaksToRemove = Peaks.Where(p => p.RetentionTime < valleyPeak.RetentionTime).ToList();
+                    }
+                    foreach (var peak in peaksToRemove)
+                    {
+                        peak.PeakCurve = null;
+                        Peaks.Remove(peak);
+                    }
                     break;
                 }
             }
@@ -1290,7 +1364,24 @@ namespace EngineLayer.DIA
 
                 if (discriminationFactor > DiscriminationFactorToCutPeak)
                 {
-                    Peaks.RemoveAll(p => p.RetentionTime > valleyPeak.RetentionTime);
+                    //decide which peak the valley point belongs to 
+                    var discriminationLeft = (Peaks[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                    var discriminationRight = (Peaks[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+
+                    var peaksToRemove = new List<Peak>();
+                    if (discriminationLeft > discriminationRight)
+                    {
+                        peaksToRemove = Peaks.Where(p => p.RetentionTime > valleyPeak.RetentionTime).ToList();
+                    }
+                    else
+                    {
+                        peaksToRemove = Peaks.Where(p => p.RetentionTime >= valleyPeak.RetentionTime).ToList();
+                    }
+                    foreach (var peak in peaksToRemove)
+                    {
+                        peak.PeakCurve = null;
+                        Peaks.Remove(peak);
+                    }
                     break;
                 }
             }  
@@ -1301,11 +1392,25 @@ namespace EngineLayer.DIA
             var allPeaks = Peak.GetAllPeaks(scans, binSize);
             var peakTable = Peak.GetPeakTable(allPeaks, binSize);
             var peak = GetPeakFromScan(mz, peakTable, zeroBasedScanIndex, tolerance, binSize);
+            if (peak == null)
+            {
+                return null;
+            }
             var peakCurve = FindPeakCurve(peak, peakTable, scans, null, maxMissedScans, tolerance, binSize, maxRTRange);
             return peakCurve;
         }
         
-
+        public GenericChart Visualize(double[] timepoints, double[] intensities)
+        {
+            var plot = Chart2D.Chart.Line<double, double, string>(
+                        x: Peaks.Select(p => p.RetentionTime),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+            var plot2 = Chart2D.Chart.Line<double, double, string>(
+                        x: timepoints,
+                        y: intensities).WithTraceInfo("smoothed").WithMarkerStyle(Color: Color.fromString("blue"));
+            var combinedPlot = Chart.Combine(new[] { plot, plot2 });
+            return combinedPlot;
+        }
     }
  
     }

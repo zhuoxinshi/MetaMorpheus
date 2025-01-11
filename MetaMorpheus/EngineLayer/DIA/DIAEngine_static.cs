@@ -1,15 +1,19 @@
-﻿using MassSpectrometry;
+﻿using Chemistry;
+using MassSpectrometry;
 using MzLibUtil;
+using Plotly.NET.TraceObjects;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using TopDownProteomics.ProForma;
 
 namespace EngineLayer.DIA
 {
-    public class DIA_scanBased
+    public class DIAEngine_static
     {
         public static List<Ms2ScanWithSpecificMass> GetPseudoMs2Scans(MsDataFile dataFile, CommonParameters commonParameters, DIAparameters diaParam)
         {
@@ -22,60 +26,49 @@ namespace EngineLayer.DIA
 
             //construct DIAScanWindowMap
             var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
-            var diaScanWindowMap = DIAEngine_static.ConstructMs2Groups(ms2Scans);
+            var DIAScanWindowMap = ConstructMs2Groups(ms2Scans);
 
-            //Get ms1 peakCurves
-            var maxScanNum = ms1Scans[ms1Scans.Length - 1].OneBasedScanNumber;
-            var ms1PeakList = new List<Peak>[maxScanNum + 1];
+            //Get ms1 XICs
             var allMs1PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
-            foreach (var ms1window in diaScanWindowMap.Keys)
+            foreach (var ms1window in DIAScanWindowMap.Keys)
             {
                 var ms1Range = new MzRange(ms1window.min, ms1window.max);
-                allMs1PeakCurves[ms1window] = ISDEngine_static.GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance,
-                    diaParam.MaxRTRangeMS1, out ms1PeakList, diaParam.CutMs1Peaks, ms1Range);
+                allMs1PeakCurves[ms1window] = ISDEngine_static.GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, 
+                    diaParam.MaxRTRangeMS1, out List<Peak>[] allPeaksByScan, diaParam.CutMs1Peaks, ms1Range);
                 if (allMs1PeakCurves[ms1window].Count == 0)
                 {
-                    diaScanWindowMap.Remove(ms1window);
+                    DIAScanWindowMap.Remove(ms1window);
                 }
             }
-            var allMs1Peaks = ms1PeakList.Where(v => v != null).SelectMany(p => p).ToList();
-            var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, diaParam.PeakSearchBinSize);
-            
-            //get ms2withmass and ms2 peakCurves
-            var ms2WithMass = ISD_scanBased.GetMs2ScansWithMass(ms1Scans, ms2Scans, dataFile.FilePath, commonParameters, diaParam);
+
+            //Get ms2 XICs
             var allMs2PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
-            var ms2PeakLists = new Dictionary<(double min, double max), List<Peak>[]>();
-            foreach (var ms2Group in diaScanWindowMap)
+            foreach (var ms2Group in DIAScanWindowMap)
             {
-                var maxNum = ms2Group.Value.Last().OneBasedScanNumber;
-                var ms2Peaks = new List<Peak>[maxNum + 1];
                 allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
-                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out ms2Peaks);
-                ms2PeakLists[ms2Group.Key] = ms2Peaks;
-            }
-            var maxScanNumMs2 = ms2Scans[ms2Scans.Length - 1].OneBasedScanNumber;
-            var allMs2Peaks = new List<Peak>[maxScanNumMs2 + 1];
-            for (int i = 1; i < allMs2Peaks.Length + 1; i++)
-            {
-                foreach (var ms2PeakList in ms2PeakLists)
-                {
-                    if (i < ms2PeakList.Value.Length && ms2PeakList.Value[i] != null)
-                    {
-                        allMs2Peaks[i] = ms2PeakList.Value[i];
-                    }
-                }
+                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2);
             }
 
             //precursor fragment grouping
             var pfGroups = new List<PrecursorFragmentsGroup>();
-            var allMs2WithMass = ms2WithMass.Where(v => v != null).SelectMany(s => s).ToList();
-            foreach (var ms2 in allMs2WithMass)
+            foreach (var ms2group in allMs2PeakCurves)
             {
-                var group = ISD_scanBased.PFgrouping_scanBased(ms2, ms1PeakTable, scansPerCycle, allMs2Peaks, diaParam);
-                if (group != null)
+                var precursorsInRange = allMs1PeakCurves[ms2group.Key].ToArray();
+
+                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 },
+                (partitionRange, loopState) =>
                 {
-                    pfGroups.Add(group);
-                }
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        var precursor = precursorsInRange[i];
+                        var preFragGroup = ISDEngine_static.PFgrouping(precursor, allMs2PeakCurves[ms2group.Key], diaParam);
+
+                        if (preFragGroup != null)
+                        {
+                            pfGroups.Add(preFragGroup);
+                        }
+                    }
+                });
             }
 
             //precursor fragment rank filtering
@@ -100,5 +93,23 @@ namespace EngineLayer.DIA
             return pseudoMs2Scans;
         }
 
+        public static Dictionary<(double min, double max), List<MsDataScan>> ConstructMs2Groups(MsDataScan[] ms2Scans)
+        {
+            var DIAScanWindowMap = new Dictionary<(double min, double max), List<MsDataScan>>();
+            foreach (var ms2 in ms2Scans)
+            {
+                (double min, double max) range = new(Math.Round(ms2.IsolationRange.Minimum, 0), Math.Round(ms2.IsolationRange.Maximum, 0));
+                if (!DIAScanWindowMap.ContainsKey(range))
+                {
+                    DIAScanWindowMap[range] = new List<MsDataScan>();
+                    DIAScanWindowMap[range].Add(ms2);
+                }
+                else
+                {
+                    DIAScanWindowMap[range].Add(ms2);
+                }
+            }
+            return DIAScanWindowMap;
+        }
     }
 }

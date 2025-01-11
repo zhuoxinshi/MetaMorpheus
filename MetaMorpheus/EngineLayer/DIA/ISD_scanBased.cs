@@ -18,18 +18,18 @@ namespace EngineLayer.DIA
         {
             var pseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
 
-            //Get ms1 peakCurves
+            //calculate number of scans per cycle
             var ms1Scans = dataFile.GetMS1Scans().ToArray();
+            int scansPerCycle = ms1Scans[1].OneBasedScanNumber - ms1Scans[0].OneBasedScanNumber;
+            diaParam.NumScansPerCycle = scansPerCycle;
+
+            //Get ms1 peakCurves
             var maxScanNum = ms1Scans[ms1Scans.Length - 1].OneBasedScanNumber;
             var ms1PeakList = new List<Peak>[maxScanNum + 1];
             var allMs1PeakCurves = ISDEngine_static.GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance,
-                diaParam.MaxRTRangeMS1, out ms1PeakList);
+                diaParam.MaxRTRangeMS1, out ms1PeakList, diaParam.CutMs1Peaks);
             var allMs1Peaks = ms1PeakList.Where(v => v != null).SelectMany(p => p).ToList();
             var ms1PeakTable = Peak.GetPeakTable(allMs1Peaks, diaParam.PeakSearchBinSize);
-
-            //calculate number of scans per cycle
-            int scansPerCycle = ms1Scans[1].OneBasedScanNumber - ms1Scans[0].OneBasedScanNumber;
-            diaParam.NumScansPerCycle = scansPerCycle;
 
             //get ms2withmass and ms2 peakCurves
             var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
@@ -42,7 +42,7 @@ namespace EngineLayer.DIA
                 var maxNum = ms2Group.Value.Last().OneBasedScanNumber;
                 var ms2Peaks = new List<Peak>[maxNum + 1];
                 allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
-                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out ms2Peaks);
+                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out ms2Peaks, diaParam.CutMs2Peaks);
                 ms2PeakLists[ms2Group.Key] = ms2Peaks;
             }
             var maxScanNumMs2 = ms2Scans[ms2Scans.Length - 1].OneBasedScanNumber;
@@ -76,7 +76,7 @@ namespace EngineLayer.DIA
             //construct new ms2Scans
             foreach (var pfGroup in pfGroups)
             {
-                var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, diaParam, dataFile);
+                var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, diaParam.PseudoMs2ConstructionType, dataFile.FilePath);
                 pseudoMs2Scans.Add(newScans);
             }
             return pseudoMs2Scans;

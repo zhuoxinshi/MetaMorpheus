@@ -404,7 +404,7 @@ namespace EngineLayer.DIA
                                     corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
                                     break;
                                 case CorrelationType.CubicSpline_scanCycle:
-                                    corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
+                                    corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
                                     break;
                                 default: 
                                     corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
@@ -413,6 +413,10 @@ namespace EngineLayer.DIA
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
+                                lock (ms2curve.PFpairs)
+                                {
+                                    ms2curve.PFpairs.Add(PFpair);
+                                }
                                 preFragGroup.PFpairs.Add(PFpair);
                             }
                         }
@@ -424,7 +428,7 @@ namespace EngineLayer.DIA
             //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
             //    preFragGroup.PFpairs = filtered.ToList();
             //}
-            if (preFragGroup.PFpairs.Count > 10)
+            if (preFragGroup.PFpairs.Count > 0)
             {
                 preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
                 return preFragGroup;
@@ -889,7 +893,25 @@ namespace EngineLayer.DIA
                         var overlap = PrecursorFragmentPair.CalculateOverlapAreaRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
-                            double corr = PrecursorFragmentPair.CalculateCorr_scanCycleSpline_preCalculated(precursor, ms2curve);
+                            double corr = double.NaN;
+                            switch (DIAparameters.CorrelationType)
+                            {
+                                case CorrelationType.NoSpline:
+                                    corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
+                                    break;
+                                case CorrelationType.CubicSpline_scanCycle_preCalc:
+                                    corr = PrecursorFragmentPair.CalculateCorr_scanCycleSpline_preCalculated(precursor, ms2curve);
+                                    break;
+                                case CorrelationType.CubicSpline_RT:
+                                    corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
+                                    break;
+                                case CorrelationType.CubicSpline_scanCycle:
+                                    corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
+                                    break;
+                                default:
+                                    corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
+                                    break;
+                            }
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);

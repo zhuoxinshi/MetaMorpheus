@@ -44,10 +44,10 @@ namespace EngineLayer.DIA
             Ms1PeakIndexing();
             ConstructMs2Group();
             GetMs1PeakCurves();
-            GetMs2PeakCurves2();
+            GetMs2PeakCurves();
             PrecursorFragmentPairing();
             PFgroupFilter();
-            ConstructNewMs2Scans2();
+            ConstructNewMs2Scans();
         }
 
         public void Ms1PeakIndexing()
@@ -125,7 +125,7 @@ namespace EngineLayer.DIA
                         DIAparameters.PeakSearchBinSize);
                     if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorIntensityCutOff)
                     {
-                        var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
+                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
                         DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS1);
                         newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
                         newPeakCurve.Charge = precursor.Charge;
@@ -180,7 +180,7 @@ namespace EngineLayer.DIA
                 {
                     if (peak.PeakCurve == null)
                     {
-                        var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
+                        var newPeakCurve = PeakCurve.FindPeakCurve(peak, ms2PeakTable, ms2scans, ms2scans[0].IsolationRange,
                             DIAparameters.MaxNumMissedScan, DIAparameters.Ms2PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS2);
                         if (DIAparameters.SplitMS2Peak)
                         {
@@ -303,8 +303,7 @@ namespace EngineLayer.DIA
 
         public void PFgroupFilter()
         {
-            var allMatchedMs2 = Ms2PeakCurves.SelectMany(p => p.Value).Where(pc => pc.PFpairs.Count > 0).ToList();
-            foreach(var ms2curve in allMatchedMs2)
+            foreach(var ms2curve in Ms2PeakCurves.Values.SelectMany(p => p))
             {
                 ms2curve.GetPrecursorRanks();
             }
@@ -328,8 +327,8 @@ namespace EngineLayer.DIA
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, CommonParameters);
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
-                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
-                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                var monoMz = pfGroup.PrecursorPeakCurve.MonoisotopicMass.ToMz(charge);
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge
                     , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
                 PseudoMs2WithPre.Add(scanWithprecursor);
             }
@@ -348,8 +347,8 @@ namespace EngineLayer.DIA
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
-                var highestPeakMz = pfGroup.PrecursorPeakCurve.AveragedMz;
-                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, highestPeakMz, charge
+                var monoMz = pfGroup.PrecursorPeakCurve.MonoisotopicMass.ToMz(charge);
+                Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge
                     , MyMSDataFile.FilePath, CommonParameters, neutralExperimentalFragments);
                 PseudoMs2WithPre.Add(scanWithprecursor);
             }
@@ -362,12 +361,12 @@ namespace EngineLayer.DIA
             {
                 if (ms2curve.ApexRT >= precursor.StartRT && ms2curve.ApexRT <= precursor.EndRT)
                 {
-                    if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                    if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                     {
                         var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
-                            double corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
+                            double corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
@@ -404,13 +403,13 @@ namespace EngineLayer.DIA
             {
                 if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
                 {
-                    if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                    if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                     {
-                        var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio_scanCycle(precursor, ms2curve);
+                        var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
                             //double corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, DIAparameters.ScanCycleSplineTimeInterval);
-                            double corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
+                            double corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);

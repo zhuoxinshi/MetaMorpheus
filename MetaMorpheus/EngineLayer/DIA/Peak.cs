@@ -11,7 +11,7 @@ namespace EngineLayer
 {
     public class Peak
     {
-        public Peak(double mz, double rt, double intensity, int msLevel, int scanNumber, int ZeroBasedScanNumber, int index = 0, PeakCurve peakCurve = null)
+        public Peak(double mz = 0, double rt = 0, double intensity = 0, int msLevel = 0, int scanNumber = 0, int ZeroBasedScanNumber = 0, int index = 0, PeakCurve peakCurve = null)
         {
             Mz = mz;
             Intensity = intensity;

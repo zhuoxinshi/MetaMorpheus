@@ -13,6 +13,7 @@ using MzLibUtil;
 using Plotly.NET;
 using UsefulProteomicsDatabases;
 using System.IO.Compression;
+using Nett;
 
 namespace Test.TestDIA
 {
@@ -492,6 +493,23 @@ namespace Test.TestDIA
             }
             string myDatabase = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { path }, "test");
+        }
+
+        [Test]
+        public static void TestNumPeaks()
+        {
+            var path = @"E:\DIA\Data\DIA-bottom-up_241218\12-18-24_bu-ISD100_5pro_mix1_labelCorrected.mzML";
+            string tomlFile = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            var myFileManagers = new MyFileManager(true);
+            var dataFile = myFileManagers.LoadFile(path, task.CommonParameters);
+
+            var ms1scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 1).ToArray();
+            var ms2scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var plot = Chart2D.Chart.Point<int, int, string>(
+                x: ms1scans.Select(s => s.MassSpectrum.Size),
+                y: ms2scans.Select(s => s.MassSpectrum.Size)).WithTraceInfo().WithMarkerStyle(Color: Color.fromString("green"));
+            plot.Show();
         }
     }
 }
