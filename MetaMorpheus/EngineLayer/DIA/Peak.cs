@@ -90,7 +90,7 @@ namespace EngineLayer
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
                         scans[i].OneBasedScanNumber, zeroBasedScanIndex, index, null);
                     peaksByScan[scans[i].OneBasedScanNumber].Add(newPeak);
-                    index++;
+                    index++;                        
                 }
             }
             return peaksByScan;

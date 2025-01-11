@@ -237,10 +237,10 @@ namespace EngineLayer.DIA
                         {
                             newPeakCurve.CutPeak();
                         }
-                        if (newPeakCurve.Peaks.Count > 0)
+                        if (newPeakCurve.Peaks.Count > 4)
                         {
                             allPeakCurves.Add(newPeakCurve);
-                            //newPeakCurve.GetScanCycleSmoothedData(diaParam.ScanCycleSplineTimeInterval);
+                            newPeakCurve.GetScanCycleSmoothedData(diaParam.ScanCycleSplineTimeInterval);
                             newPeakCurve.Index = index;
                             index++;
                         }
