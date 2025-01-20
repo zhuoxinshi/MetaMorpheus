@@ -32,7 +32,7 @@ namespace EngineLayer.DIA
                 out List<Peak>[] peaksByScan, diaParam.CutMs1Peaks);
 
             //Get ms2 XICs
-            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var ms2Scans = dataFile.Where(s => s.MsnOrder == 2).ToArray();
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
             var allMs2PeakCurves = new Dictionary<double, List<PeakCurve>>();
             foreach(var ms2Group in isdScanVoltageMap)
@@ -122,41 +122,42 @@ namespace EngineLayer.DIA
             {
                 allPeaksByScan = Peak.GetAllPeaksByScan(scans);
             }
+
             var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var rankedPeaks = allPeaks.OrderByDescending(p => p.Intensity).ToList();
             var peakTable = Peak.GetPeakTable(allPeaks, diaParam.PeakSearchBinSize);
             foreach (var peak in rankedPeaks)
             {
-                if (peak.PeakCurve == null)
+                if (peak.PeakCurve != null)
+                    continue;
+
+                var newPeakCurve = PeakCurve.FindPeakCurve(peak, peakTable, scans, scans[0].IsolationRange,
+                    diaParam.MaxNumMissedScan, peakFindingTolerance, diaParam.PeakSearchBinSize, maxRTRange);
+                if (diaParam.SplitMS2Peak)
                 {
-                    var newPeakCurve = PeakCurve.FindPeakCurve(peak, peakTable, scans, scans[0].IsolationRange,
-                        diaParam.MaxNumMissedScan, peakFindingTolerance, diaParam.PeakSearchBinSize, maxRTRange);
-                    if (diaParam.SplitMS2Peak)
+                    if (newPeakCurve.Peaks.Count > 4)
                     {
-                        if (newPeakCurve.Peaks.Count > 4)
+                        newPeakCurve.DetectPeakRegions();
+                        var newPCs = newPeakCurve.SeparatePeakByRegion();
+                        foreach (var pc in newPCs)
                         {
-                            newPeakCurve.DetectPeakRegions();
-                            var newPCs = newPeakCurve.SeparatePeakByRegion();
-                            foreach (var pc in newPCs)
+                            if (pc.Peaks.Count > 4)
                             {
-                                if (pc.Peaks.Count > 4)
-                                {
-                                    allPeakCurves.Add(pc);
-                                }
+                                allPeakCurves.Add(pc);
                             }
                         }
                     }
-                    else
+                }
+                else
+                {
+                    if (cutPeak)
                     {
-                        if (cutPeak)
-                        {
-                            newPeakCurve.CutPeak();
-                        }
-                        if (newPeakCurve.Peaks.Count > 4)
-                        {
-                            allPeakCurves.Add(newPeakCurve);
-                            newPeakCurve.GetScanCycleSmoothedData(diaParam.ScanCycleSplineTimeInterval);
-                        }
+                        newPeakCurve.CutPeak();
+                    }
+                    if (newPeakCurve.Peaks.Count > 4)
+                    {
+                        allPeakCurves.Add(newPeakCurve);
+                        newPeakCurve.GetScanCycleSmoothedData(diaParam.ScanCycleSplineTimeInterval);
                     }
                 }
             }
@@ -201,7 +202,7 @@ namespace EngineLayer.DIA
                     allPrecursors.Add(precursor);
                 }
             }
-            allPrecursors = allPrecursors.OrderByDescending(p => p.HighestPeakIntensity).ToList();
+            //allPrecursors = allPrecursors.OrderByDescending(p => p.HighestPeakIntensity).ToList();
             //var precursorGroups = allPrecursors.GroupBy(p => new { mass = Math.Round(p.MonoisotopicMass, 0), p.Charge}).ToList();
             foreach (var precursor in allPrecursors)
             {
@@ -454,6 +455,26 @@ namespace EngineLayer.DIA
             }
 
             return match;
+        }
+
+        public static Dictionary<double, double> GetRtMap(MsDataScan[] ms1Scans, MsDataScan[] ms2Scans)
+        {
+            var rtMap = new Dictionary<double, double>();
+            foreach (var scan in ms2Scans)
+            {
+                rtMap[scan.RetentionTime] = ms1Scans.Where(s => s.OneBasedScanNumber == scan.OneBasedPrecursorScanNumber).First().RetentionTime;
+            }
+            return rtMap;
+        }
+
+        public static Dictionary<int, double> GetRtIndexMap(MsDataScan[] scans)
+        {
+            var map = new Dictionary<int, double>();
+            for (int i = 0; i < scans.Length; i++)
+            {
+                map[i] = scans[i].RetentionTime;
+            }
+            return map;
         }
     }
 }

@@ -164,6 +164,11 @@ namespace TaskLayer
             var spectralLibrary = LoadSpectralLibraries(taskId, dbFilenameList);
 
             // write prose settings
+            if (CommonParameters.DIAparameters != null)
+            {
+                ProseCreatedWhileRunning.Append(CommonParameters.DIAparameters.WriteDIASettings());
+                ProseCreatedWhileRunning.Append("\n");
+            }
             ProseCreatedWhileRunning.Append("The following search settings were used: ");
             ProseCreatedWhileRunning.Append("protease = " + CommonParameters.DigestionParams.Protease + "; ");
             ProseCreatedWhileRunning.Append("search for truncated proteins and proteolysis products = " + CommonParameters.AddTruncations + "; ");

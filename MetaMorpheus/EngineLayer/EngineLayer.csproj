@@ -28,7 +28,10 @@
     <PackageReference Include="NETStandard.Library" Version="2.0.3" />
     <PackageReference Include="Nett" Version="0.15.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Numerics.NET" Version="9.0.5" />
+    <PackageReference Include="NWaves" Version="0.9.6" />
     <PackageReference Include="Plotly.NET.CSharp" Version="0.12.1" />
+    <PackageReference Include="SignalSharp" Version="0.1.3" />
     <PackageReference Include="TopDownProteomics" Version="0.0.297" />
   </ItemGroup>
 

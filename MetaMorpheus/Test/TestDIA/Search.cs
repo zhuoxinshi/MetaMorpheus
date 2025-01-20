@@ -24,17 +24,17 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\DIA_scanBased_corr0.5_highestPeakXIC_ms1Tol5ppmMs2Tol20ppm_RetentionTime_apexRT0.25_overlap0.2_corr0.5_maxRT0.5_Frank100_Prank10_miss1";
+            string outputFolder = @"E:\DIA\TestSearch\DIAEngine_static_corr0.5_highestPeakXIC_ms1Tol5ppmMs2Tol20ppm_RetentionTime_Ms1SpaceSpline_apexRT0.25_overlap0.2_corr0.5_maxRT0.5_Frank100_Prank10_miss1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 
-                maxNumMissedScan:1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance:0.25, 
-                fragmentRankCutOff: 150, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
+                maxNumMissedScan:1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance:0.2, 
+                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
                 scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.RetentionTime,
-                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIA_scanBased, correlationType: CorrelationType.CubicSpline_RT);
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, correlationType: CorrelationType.Ms1SpaceSpline);
             // Use reflection to set max threads
             //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
             //var type = task.CommonParameters.GetType();
@@ -89,6 +89,7 @@ namespace Test.TestDIA
             var myMsDataFile = myFileManager.LoadFile(DIAfile, task.CommonParameters);
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(dataBase, false) }, new List<string> { DIAfile }, "test");
         }
+
 
     }
 }

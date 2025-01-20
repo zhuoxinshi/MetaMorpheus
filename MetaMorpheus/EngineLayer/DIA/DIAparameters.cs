@@ -29,6 +29,7 @@ namespace EngineLayer.DIA
         public bool SplitMS2Peak { get; set; } 
         public bool SplitMS1Peak { get; set; }  
         public float SplineTimeInterval { get; set; }
+        public double SplineTimeIntervalDouble { get; set; }
         public double ScanCycleSplineTimeInterval { get; set; }
         public double MinMass { get; set; }
         public double MaxMass { get; set; }
@@ -90,6 +91,49 @@ namespace EngineLayer.DIA
             AnalysisType = analysisType;
             CombineFragments = combineFragments;
             CorrelationType = correlationType;
+        }
+
+        public StringBuilder WriteDIASettings()
+        {
+            var settings = new StringBuilder();
+            settings.AppendLine("DIA Settings:");
+            settings.AppendLine("AnalysisType: " + AnalysisType);
+            settings.AppendLine("Ms1XICType: " + Ms1XICType);
+            settings.AppendLine("Ms2XICType: " + Ms2XICType);
+            settings.AppendLine("PFGroupingType: " + PFGroupingType);
+            settings.AppendLine("PseudoMs2ConstructionType: " + PseudoMs2ConstructionType);
+            settings.AppendLine("CombineFragments: " + CombineFragments);
+            settings.AppendLine("CorrelationType: " + CorrelationType);
+            settings.Append("\n");
+            settings.AppendLine("Ms1PeakFindingTolerance: " + Ms1PeakFindingTolerance.ToString());
+            settings.AppendLine("Ms2PeakFindingTolerance: " + Ms2PeakFindingTolerance.ToString());
+            settings.AppendLine("OverlapRatioCutOff: " + OverlapRatioCutOff);
+            settings.AppendLine("CorrelationCutOff: " + CorrelationCutOff);
+            settings.AppendLine("ApexRtTolerance: " + ApexRtTolerance);
+            settings.AppendLine("ApexCycleTolerance: " + ApexCycleTolerance);
+            settings.AppendLine("FragmentRankCutOff: " + FragmentRankCutOff);
+            settings.AppendLine("PrecursorRankCutOff: " + PrecursorRankCutOff);
+            settings.AppendLine("MaxRTRangeMS1: " + MaxRTRangeMS1);
+            settings.AppendLine("MaxRTRangeMS2: " + MaxRTRangeMS2);
+            settings.Append("\n");
+            settings.AppendLine("PrecursorIntensityCutOff: " + PrecursorIntensityCutOff);
+            settings.AppendLine("MinRTRangeForCWT: " + MinRTRangeForCWT);
+            settings.AppendLine("SplitMS2Peak: " + SplitMS2Peak);
+            settings.AppendLine("SplitMS1Peak: " + SplitMS1Peak);
+            settings.AppendLine("SplineTimeInterval: " + SplineTimeInterval);
+            settings.AppendLine("MinMass: " + MinMass);
+            settings.AppendLine("MaxMass: " + MaxMass);
+            settings.AppendLine("NumHighCorrFragments: " + NumHighCorrFragments);
+            settings.AppendLine("HighCorrThreshold: " + HighCorrThreshold);
+            settings.AppendLine("ScanCycleSplineTimeInterval: " + ScanCycleSplineTimeInterval);
+            settings.AppendLine("CutMs1Peaks: " + CutMs1Peaks);
+            settings.AppendLine("CutMs2Peaks: " + CutMs2Peaks);
+            settings.AppendLine("MinCharge: " + MinCharge);
+            settings.AppendLine("AverageMs2Scans: " + AverageMs2Scans);
+            settings.AppendLine("MaxNumMissedScan: " + MaxNumMissedScan);
+            settings.AppendLine("PeakSearchBinSize: " + PeakSearchBinSize);
+
+            return settings;
         }
 
     }

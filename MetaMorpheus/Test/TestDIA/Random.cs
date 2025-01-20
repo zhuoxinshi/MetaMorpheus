@@ -14,6 +14,7 @@ using Plotly.NET;
 using UsefulProteomicsDatabases;
 using System.IO.Compression;
 using Nett;
+using OxyPlot;
 
 namespace Test.TestDIA
 {
@@ -510,6 +511,94 @@ namespace Test.TestDIA
                 x: ms1scans.Select(s => s.MassSpectrum.Size),
                 y: ms2scans.Select(s => s.MassSpectrum.Size)).WithTraceInfo().WithMarkerStyle(Color: Color.fromString("green"));
             plot.Show();
+        }
+
+        [Test]
+        public static void TestCEvsLC()
+        {
+            var pathCE = @"E:\ISD Project\CE_241213\Good data\12-20-24_CE_PEPPI-FC-ammon-acet_5AA_500nL-pHjunction_ISD60-80-100_micro4_120k.raw";
+            var pathLC = @"E:\ISD Project\ISD_240812\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100.mzML";
+            var tomlFile = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            var fileCE = new MyFileManager(true).LoadFile(pathCE, Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig).CommonParameters);
+            var fileLC = new MyFileManager(true).LoadFile(pathLC, Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig).CommonParameters);
+            var ms2CE = fileCE.GetAllScansList().Where(s => !s.ScanFilter.Contains("sid=15")).ToList();
+            var ms1CE = fileCE.GetAllScansList().Where(s => s.ScanFilter.Contains("sid=15")).ToList();
+            var ms2LC = fileLC.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
+            var ms1LC = fileLC.GetAllScansList().Where(s => s.MsnOrder == 1).ToList();
+            var numPeaksCE = ms2CE.Select(s => s.MassSpectrum.Size).ToList();
+            var numPeaksLC = ms2LC.Select(s => s.MassSpectrum.Size).ToList();
+            var numPeaksCE_ms1 = ms1CE.Select(s => s.MassSpectrum.Size).ToList();
+            var numPeaksLC_ms1 = ms1LC.Select(s => s.MassSpectrum.Size).ToList();
+            // Create the plot model
+            var plotModel = new PlotModel { Title = "Histogram of numPeaksCE and numPeaksLC" };
+
+            //// Create the histogram series for numPeaksCE
+            //var barSeriesCE = new BarSeries
+            //{
+            //    Title = "numPeaksCE",
+            //    FillColor = OxyColors.Blue,
+            //    StrokeColor = OxyColors.Black,
+            //    StrokeThickness = 1
+            //};
+
+            //// Create the histogram series for numPeaksLC
+            //var barSeriesLC = new BarSeries
+            //{
+            //    Title = "numPeaksLC",
+            //    FillColor = OxyColors.Red,
+            //    StrokeColor = OxyColors.Black,
+            //    StrokeThickness = 1
+            //};
+
+            //// Define the bins
+            //int binCount = 10;
+            //double min = Math.Min(numPeaksCE.Min(), numPeaksLC.Min());
+            //double max = Math.Max(numPeaksCE.Max(), numPeaksLC.Max());
+            //double binWidth = (max - min) / binCount;
+
+            //// Create bins for numPeaksCE
+            //var binsCE = new int[binCount];
+            //foreach (var value in numPeaksCE)
+            //{
+            //    int binIndex = (int)((value - min) / binWidth);
+            //    if (binIndex >= binCount) binIndex = binCount - 1;
+            //    binsCE[binIndex]++;
+            //}
+
+            //// Create bins for numPeaksLC
+            //var binsLC = new int[binCount];
+            //foreach (var value in numPeaksLC)
+            //{
+            //    int binIndex = (int)((value - min) / binWidth);
+            //    if (binIndex >= binCount) binIndex = binCount - 1;
+            //    binsLC[binIndex]++;
+            //}
+
+            //// Add data to the bar series
+            //for (int i = 0; i < binCount; i++)
+            //{
+            //    barSeriesCE.Items.Add(new BarItem { Value = binsCE[i], CategoryIndex = i });
+            //    barSeriesLC.Items.Add(new BarItem { Value = binsLC[i], CategoryIndex = i });
+            //}
+
+            //// Add the series to the plot model
+            //plotModel.Series.Add(barSeriesCE);
+            //plotModel.Series.Add(barSeriesLC);
+
+            //// Add category axis
+            //plotModel.Axes.Add(new CategoryAxis
+            //{
+            //    Position = AxisPosition.Bottom,
+            //    Key = "CategoryAxis"
+            //});
+
+            //// Add value axis
+            //plotModel.Axes.Add(new LinearAxis
+            //{
+            //    Position = AxisPosition.Bottom,
+            //    Minimum = 0
+            //});
+
         }
     }
 }

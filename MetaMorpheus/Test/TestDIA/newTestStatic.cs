@@ -15,6 +15,7 @@ using UsefulProteomicsDatabases;
 using Nett;
 using System.IO.Compression;
 using Chemistry;
+using MzLibUtil;
 using MathNet.Numerics.Statistics;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Double;
@@ -30,6 +31,9 @@ using Proteomics.ProteolyticDigestion;
 using Omics.Modifications;
 using Omics.Fragmentation;
 using OxyPlot;
+using Org.BouncyCastle.Asn1.Mozilla;
+using NWaves.Filters;
+using NWaves.Signals;
 
 namespace Test.TestDIA
 {
@@ -504,42 +508,58 @@ namespace Test.TestDIA
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, minMass: 0, maxMass: 5000, type: "ISD", apexCycleTolerance: 5,
                 scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.ScanCycle,
                 pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISDEngine_static, correlationType: CorrelationType.CubicSpline_scanCycle_preCalc,
-                cutMs1Peaks: true, cutMs2Peaks: true);
+                cutMs1Peaks: false, cutMs2Peaks: false);
             var myFileManagers = new MyFileManager(true);
             var dataFile = myFileManagers.LoadFile(path, task.CommonParameters);
 
-            var peptide = new PeptideWithSetModifications("GLSDGEWQQVLNVWGK", new Dictionary<string, Modification>());
+            var peptide = new PeptideWithSetModifications("VLDALDSIK", new Dictionary<string, Modification>());
             var fragments = new List<Product>();
             peptide.Fragment(DissociationType.HCD, task.CommonParameters.DigestionParams.FragmentationTerminus, fragments);
 
             //Get ms1 XICs
-            var ms1Scans = dataFile.GetMS1Scans().Where(s => s.RetentionTime >= 14 && s.RetentionTime <= 17.5).ToArray();
+            var ms1Scans = dataFile.GetMS1Scans().Where(s => s.RetentionTime >= 38 && s.RetentionTime <= 40).ToArray();
             var allMs1PeakCurves = ISDEngine_static.GetAllPeakCurves(ms1Scans, task.CommonParameters, task.CommonParameters.DIAparameters, 
                 task.CommonParameters.DIAparameters.Ms1XICType, task.CommonParameters.DIAparameters.Ms1PeakFindingTolerance, 
                 task.CommonParameters.DIAparameters.MaxRTRangeMS1, out List<Peak>[] peaksByScan, task.CommonParameters.DIAparameters.CutMs1Peaks);
 
             //Get ms2 XICs
-            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).Where(s => s.RetentionTime >= 14 && s.RetentionTime <= 17.5).ToArray();
+            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).Where(s => s.RetentionTime >= 38 && s.RetentionTime <= 40).ToArray();
             var allMs2PeakCurves = ISDEngine_static.GetAllPeakCurves(ms2Scans, task.CommonParameters, task.CommonParameters.DIAparameters, 
                 task.CommonParameters.DIAparameters.Ms2XICType, task.CommonParameters.DIAparameters.Ms2PeakFindingTolerance, 
                 task.CommonParameters.DIAparameters.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, task.CommonParameters.DIAparameters.CutMs2Peaks);
 
             //Group XICs for the peptide
-            var preXIC = allMs1PeakCurves.Where(pc => Math.Abs(pc.AveragedMz - 762.39) < 0.01 && pc.Charge == 2
+            var preXIC = allMs1PeakCurves.Where(pc => Math.Abs(pc.AveragedMz - 487.28) < 0.01 && pc.Charge == 2
             ).First();
 
-            //preXIC.VisualizePeakRegions();
-            //preXIC.CutPeak();
-            //preXIC.VisualizeRaw("line").Show();
+            preXIC.VisualizePeakRegions();
+            preXIC.CutPeak();
+            preXIC.VisualizeRaw("line").Show();
+            var map = ISDEngine_static.GetRtIndexMap(ms1Scans);
+            preXIC.GetSGfilterSmoothedData(map, 9, 3);
             //Find the minimum, compare the discrimination factor of the left and the right point, keep the point with higher discrimination factor side
             //SG filter first, then cut peak; wavelet or cutPeak
             //var SGSmoothed = preXIC.GetSGfilterSmoothedData(9, 2);
             //preXIC.Visualize(preXIC.Peaks.Select(p => p.RetentionTime).ToArray(), SGSmoothed).Show();
 
             var pfGroup = ISDEngine_static.PFgrouping(preXIC, allMs2PeakCurves, task.CommonParameters.DIAparameters);
-            var ms2WithPre = ISDEngine_static.ConstructNewMs2Scans(pfGroup, task.CommonParameters, task.CommonParameters.DIAparameters.PseudoMs2ConstructionType, dataFile.FilePath);
+            var pseudoMs2 = ISDEngine_static.ConstructNewMs2Scans(pfGroup, task.CommonParameters, task.CommonParameters.DIAparameters.PseudoMs2ConstructionType, dataFile.FilePath);
+
+            //deconvolute the raw spectrum at apex
+            var apexScan = ms1Scans.Where(s => s.RetentionTime == preXIC.ApexRT).First();
+            var apexMs2 = ms2Scans.Where(s => s.OneBasedScanNumber == apexScan.OneBasedScanNumber + 1).First();
+            var allObservedMasses = Deconvoluter.Deconvolute(apexMs2, task.CommonParameters.PrecursorDeconvolutionParameters);
+            var observedTheoreticalMasses = new List<Product>();
+            var roundedObservedMasses = allObservedMasses.Select(m => Math.Round(m.MonoisotopicMass, 0)).ToList();
+            foreach (var fragment in fragments)
+            {
+                if (roundedObservedMasses.Contains(Math.Round(fragment.MonoisotopicMass, 0)))
+                {
+                    observedTheoreticalMasses.Add(fragment);
+                }
+            }
             var matchedMs2Curves = pfGroup.PFpairs.Select(p => p.FragmentPeakCurve).ToList();
-            var deconvolutedMasses = ms2WithPre.ExperimentalFragments.Select(p => Math.Round(p.MonoisotopicMass, 1)).ToList();
+            var deconvolutedMasses = pseudoMs2.ExperimentalFragments.Select(p => Math.Round(p.MonoisotopicMass, 1)).ToList();
             var matchedMasses = new List<double>();
             var unmatchedMasses = new List<double>();
             foreach (var fragment in fragments)
@@ -553,6 +573,78 @@ namespace Test.TestDIA
                     unmatchedMasses.Add(fragment.MonoisotopicMass);
                 }
             }
+        }
+
+        [Test]
+        public static void TestVisualization()
+        {
+            var path = @"E:\DIA\Data\DIA-bottom-up_241218\12-18-24_bu-ISD100_5pro_mix1_labelCorrected.mzML";
+            string tomlFile = @"E:\DIA\Data\DIA-bottom-up_241218\bu-ISD_mix1_120k\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(5),
+                maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+                fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 2, maxRTrangeMS2: 2, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, minMass: 0, maxMass: 5000, type: "ISD", apexCycleTolerance: 5,
+                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.ScanCycle,
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISDEngine_static, correlationType: CorrelationType.CubicSpline_scanCycle_preCalc,
+                cutMs1Peaks: false, cutMs2Peaks: false);
+            var myFileManagers = new MyFileManager(true);
+            var dataFile = myFileManagers.LoadFile(path, task.CommonParameters);
+
+            var ms1Scans = dataFile.GetMS1Scans().Where(s => s.RetentionTime >= 38 && s.RetentionTime <= 40).ToArray();
+            var allMs1PeakCurves = ISDEngine_static.GetAllPeakCurves(ms1Scans, task.CommonParameters, task.CommonParameters.DIAparameters,
+                task.CommonParameters.DIAparameters.Ms1XICType, task.CommonParameters.DIAparameters.Ms1PeakFindingTolerance,
+                task.CommonParameters.DIAparameters.MaxRTRangeMS1, out List<Peak>[] peaksByScan, task.CommonParameters.DIAparameters.CutMs1Peaks);
+            var preXIC = allMs1PeakCurves.Where(pc => Math.Abs(pc.AveragedMz - 487.28) < 0.01 && pc.Charge == 2
+            ).First();
+
+            //preXIC.VisualizeRaw("line").Show();
+            var map = ISDEngine_static.GetRtIndexMap(ms1Scans);
+            var smoothedData = preXIC.GetSGfilterSmoothedData(map, 51, 2);
+            preXIC.VisualizeGeneral(smoothedData.Select(p => p.Item1).ToArray(), smoothedData.Select(p => p.Item2).ToArray()).Show();
+        }
+
+        [Test]
+        public static void TestTemp()
+        {
+            var spectrum = new MzSpectrum(new double[] { 1, 2, 3 }, new double[] { 10, 20, 30 }, false);
+            double[] intensity = { 645523.0313,  2840027.875, 3638575.93, 10811454.23, 18073620.34,
+                       18725528.47, 27232004.29, 40920044.22, 42583805.95, 55198342.05, 56973095.88, 74472979.85, 81412777.7,
+                       86125057.49, 72334569.94, 76413935.04, 62766233.79, 61580305.79, 63975710.61, 50340044.05, 45728131.18,
+                       53059923.13, 46062358.94, 33987709.73,  28573307.18, 31451496.96, 30863762.17, 31758881.85,
+                       44452680.13, 51583712.98, 65542667.65, 59104996.7, 54094069.27, 49302712.43, 47378242.51, 42609288.13,
+                       39850707.92, 35733177.29, 42743239.44, 39426074.07, 34068996.89, 31745392.82, 34066514.36, 33100802.68,
+                       27264968.85, 28240874.96, 28044224.33, 24225874.99, 24133904.89,  23105600.01,
+                       24196788.96, 26124754.13, 23572928.42, 22178019.58, 19562688.35, 18567397.43, 17071497.79,
+                       14410106.09, 15909702.51, 15499873.91, 13752143.89, 14551270.77, 13127558.88, 14314424.74, 12676548.31,
+                       12269520.52, 12036858.71, 10631350.14, 11887922.79, 9704722.864,  9030259.031, 9308738.631,
+                       7320634.788, 7756802.779, 7140971.624, 6266278.887, 6337805.943, 5971872.621,  5847247.232,
+                       4387509.91, 4206881.253, 2682847.883,
+                       2188591.858, 2596483.797, 2942508.441, 2321496.598, 2051064.086,  2538946.367, 1944507.633,
+                       1850311.938, 1831861.398, 1252752.586 };
+            float[] y = new float[intensity.Length];    
+            for (int i = 0; i < intensity.Length; i++)
+            {
+                y[i] = (float)intensity[i];
+            }
+            var filter = new SavitzkyGolayFilter(9);
+            var signal = new DiscreteSignal(1, y);
+            var smoothed = filter.ApplyTo(signal);
+            var x = new double[intensity.Length];
+            var extra = filter.Size / 2;
+            var smoothedData = smoothed.Samples.Skip(extra).Take(smoothed.Samples.Length - extra*2).ToArray();
+            for (int i = 0; i < intensity.Length; i++)
+            {
+                x[i] = i + 1;
+            }
+            var plot1 = Chart2D.Chart.Line<double, double, string>(
+                        x: x,
+                        y: intensity).WithTraceInfo($"raw", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("blue"));
+            var plot2 = Chart2D.Chart.Line<double, float, string>(
+                        x: x,
+                        y: smoothedData).WithTraceInfo($"smoothed", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+            var combinedPlot = Chart.Combine(new[] { plot1, plot2 });
+            combinedPlot.Show();
         }
 
         [Test]
@@ -594,8 +686,8 @@ namespace Test.TestDIA
             var path = @"E:\DIA\Data\DIA-bottom-up_241218\12-18-24_bu-ISD100_5pro_mix1_labelCorrected_RT13.21-16.21.mzML";
             string tomlFile = @"E:\DIA\Data\DIA-bottom-up_241218\bu-ISD_noPeakTrim\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(5),
-                maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20),
+                maxNumMissedScan: 1, binSize: 100, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
                 fragmentRankCutOff: 150, precursorRankCutOff: 10, maxRTrangeMS1: 2, maxRTrangeMS2: 2, precursorIntensityCutOff: 300000, 
                 splineTimeInterval: 0.005f, minMass: 0, maxMass: 5000, apexCycleTolerance: 15, scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, 
                 ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.ScanCycle, pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISDEngine_static, 
@@ -611,93 +703,7 @@ namespace Test.TestDIA
             task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { path }, "test");
         }
 
-        [Test]
-        public static void TestCEvsLC()
-        {
-            var pathCE = @"E:\ISD Project\CE_241213\Good data\12-20-24_CE_PEPPI-FC-ammon-acet_5AA_500nL-pHjunction_ISD60-80-100_micro4_120k.raw";
-            var pathLC = @"E:\ISD Project\ISD_240812\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100.mzML";
-            var tomlFile = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
-            var fileCE = new MyFileManager(true).LoadFile(pathCE, Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig).CommonParameters);
-            var fileLC = new MyFileManager(true).LoadFile(pathLC, Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig).CommonParameters);
-            var ms2CE = fileCE.GetAllScansList().Where(s => !s.ScanFilter.Contains("sid=15")).ToList();
-            var ms1CE = fileCE.GetAllScansList().Where(s => s.ScanFilter.Contains("sid=15")).ToList();
-            var ms2LC = fileLC.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
-            var ms1LC = fileLC.GetAllScansList().Where(s => s.MsnOrder == 1).ToList();
-            var numPeaksCE = ms2CE.Select(s => s.MassSpectrum.Size).ToList();
-            var numPeaksLC = ms2LC.Select(s => s.MassSpectrum.Size).ToList();
-            var numPeaksCE_ms1 = ms1CE.Select(s => s.MassSpectrum.Size).ToList();
-            var numPeaksLC_ms1 = ms1LC.Select(s => s.MassSpectrum.Size).ToList();
-            // Create the plot model
-            var plotModel = new PlotModel { Title = "Histogram of numPeaksCE and numPeaksLC" };
-
-            //// Create the histogram series for numPeaksCE
-            //var barSeriesCE = new BarSeries
-            //{
-            //    Title = "numPeaksCE",
-            //    FillColor = OxyColors.Blue,
-            //    StrokeColor = OxyColors.Black,
-            //    StrokeThickness = 1
-            //};
-
-            //// Create the histogram series for numPeaksLC
-            //var barSeriesLC = new BarSeries
-            //{
-            //    Title = "numPeaksLC",
-            //    FillColor = OxyColors.Red,
-            //    StrokeColor = OxyColors.Black,
-            //    StrokeThickness = 1
-            //};
-
-            //// Define the bins
-            //int binCount = 10;
-            //double min = Math.Min(numPeaksCE.Min(), numPeaksLC.Min());
-            //double max = Math.Max(numPeaksCE.Max(), numPeaksLC.Max());
-            //double binWidth = (max - min) / binCount;
-
-            //// Create bins for numPeaksCE
-            //var binsCE = new int[binCount];
-            //foreach (var value in numPeaksCE)
-            //{
-            //    int binIndex = (int)((value - min) / binWidth);
-            //    if (binIndex >= binCount) binIndex = binCount - 1;
-            //    binsCE[binIndex]++;
-            //}
-
-            //// Create bins for numPeaksLC
-            //var binsLC = new int[binCount];
-            //foreach (var value in numPeaksLC)
-            //{
-            //    int binIndex = (int)((value - min) / binWidth);
-            //    if (binIndex >= binCount) binIndex = binCount - 1;
-            //    binsLC[binIndex]++;
-            //}
-
-            //// Add data to the bar series
-            //for (int i = 0; i < binCount; i++)
-            //{
-            //    barSeriesCE.Items.Add(new BarItem { Value = binsCE[i], CategoryIndex = i });
-            //    barSeriesLC.Items.Add(new BarItem { Value = binsLC[i], CategoryIndex = i });
-            //}
-
-            //// Add the series to the plot model
-            //plotModel.Series.Add(barSeriesCE);
-            //plotModel.Series.Add(barSeriesLC);
-
-            //// Add category axis
-            //plotModel.Axes.Add(new CategoryAxis
-            //{
-            //    Position = AxisPosition.Bottom,
-            //    Key = "CategoryAxis"
-            //});
-
-            //// Add value axis
-            //plotModel.Axes.Add(new LinearAxis
-            //{
-            //    Position = AxisPosition.Bottom,
-            //    Minimum = 0
-            //});
-
-        }
+        
 
         [Test]
         public static void TestSimpleFakeData()
@@ -764,6 +770,26 @@ namespace Test.TestDIA
             Assert.That(ms2WithPre_mass.ExperimentalFragments.Length == 2);
             Assert.That(ms2WithPre_mass.ExperimentalFragments[0].MonoisotopicMass == 10);
             Assert.That(ms2WithPre_mass.ExperimentalFragments[1].MonoisotopicMass == 10);
+        }
+
+        [Test]
+        public static void TestRtMap()
+        {
+            var path = @"E:\DIA\Data\DIA-bottom-up_241218\12-18-24_bu-ISD100_5pro_mix1_labelCorrected.mzML";
+            string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
+            var myFileManagers = new MyFileManager(true);
+            var dataFile = myFileManagers.LoadFile(path, new CommonParameters());
+            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var ms1Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 1).ToArray();
+            var rtMap = ISDEngine_static.GetRtMap(ms1Scans, ms2Scans);
+            Assert.That(rtMap.Count == ms2Scans.Length);
+        }
+
+        [Test]
+        public static void TestMzSpectrumInitialization()
+        {
+            var spectrum = new MzSpectrum(new double[] { 1, 2, 3 }, new double[] { 10, 20, 30 }, false);
+            
         }
 
     }

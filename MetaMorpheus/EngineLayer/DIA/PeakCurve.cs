@@ -11,10 +11,10 @@ using MathNet.Numerics;
 using MathNet.Numerics.Interpolation;
 using MathNet.Numerics.Statistics;
 using MathNet.Numerics.Distributions;
-using ThermoFisher.CommonCore.BackgroundSubtraction;
-using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using MathNet.Numerics.LinearAlgebra;
+using TopDownProteomics;
+using NWaves.Signals;
+using NWaves.Filters.Polyphase;
+using NWaves.Filters;
 
 namespace EngineLayer.DIA
 {
@@ -64,6 +64,7 @@ namespace EngineLayer.DIA
         public double AveragedIntensity => AverageIntensity();
         public LinearSpline LinearSpline { get; set; }
         public CubicSpline CubicSpline { get; set; }    
+        public CubicSpline Ms1SpaceSpline { get; set; }
         public int Index {  get; set; }
         public List<PrecursorFragmentPair> PFpairs { get; set; }
         public IsotopicEnvelope Envelope { get; set; }
@@ -81,6 +82,8 @@ namespace EngineLayer.DIA
         public List<(double, double)> GaussianFitData { get; set; }
         public double NL { get; set; }
         public PrecursorFragmentsGroup PFGroup {  get; set; }
+        public (double, double)[] LowessSmoothedData { get; set; }
+        public (double, double)[] SavgolSmoothedData { get; set; }
 
         public double AverageMz()
         {
@@ -255,48 +258,65 @@ namespace EngineLayer.DIA
             return smoothedData;
         }
 
-        public double[] GetSGfilterSmoothedData(int windowSize, int polyOrder)
+        //public (double, double)[] GetLowessSmoothedData(int windowLength, int steps, double delta)
+        //{
+        //    var x = Peaks.Select(p => p.RetentionTime).ToArray();
+        //    var y = Peaks.Select(p => p.Intensity).ToArray();
+        //    var smoothedData = Smoothing.Loess(x, y, windowLength, steps, delta);
+        //    var newData = new (double, double)[smoothedData.Length];
+        //    for (int i = 0; i < smoothedData.Length; i++)
+        //    {
+        //        newData[i] = (x[i], smoothedData[i]);
+        //    }
+        //    LowessSmoothedData = newData;
+        //    return newData;
+        //}
+        public (double, double)[] GetSGfilterSmoothedData(Dictionary<int, double> rtIndexMap, int windowSize, int polyOrder)
         {
-            var rawData = Peaks.Select(p => p.Intensity).ToArray();
-            int halfWindow = windowSize / 2;
-            var coefficients = ComputeSGCoefficients(windowSize, polyOrder);
-
-            int n = rawData.Length;
-            double[] smoothedData = new double[n];
-
-            for (int i = 0; i < n; i++)
+            if (CubicSpline == null)
             {
-                double sum = 0;
-                for (int j = -halfWindow; j <= halfWindow; j++)
-                {
-                    int index = i + j;
-
-                    if (index < 0) index = -index;
-                    if (index >= n) index = 2 * n - index - 1;
-
-                    sum += coefficients[j + halfWindow] * rawData[index];
-                }
-                smoothedData[i] = sum;
+                GetCubicSpline();
             }
-
+            var numPoints = EndCycle - StartCycle + 1;
+            var y = new float[numPoints];
+            y[0] = (float)Peaks.First().Intensity;
+            y[numPoints - 1] = (float)Peaks.Last().Intensity;
+            var indexList = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
+            for (int i = StartCycle + 1; i < EndCycle; i++)
+            {
+                var id = Array.BinarySearch(indexList.ToArray(), i);
+                if (id >= 0)
+                {
+                    y[i - StartCycle] = (float)Peaks[id].Intensity;
+                }
+                else
+                {
+                    double rt = rtIndexMap[i];
+                    double intensity = CubicSpline.Interpolate(rt);
+                    y[i - StartCycle] = (float)intensity;
+                }
+            }
+            var smoother = new SavitzkyGolayFilter(11);
+            var signal = new DiscreteSignal(1, y);
+            var smoothedY = smoother.ApplyTo(signal);  
+            var smoothedData = new (double, double)[numPoints];
+            for (int i = 0; i < numPoints; i++)
+            {
+                smoothedData[i] = (rtIndexMap[StartCycle + i], smoothedY[i]);
+            }
             return smoothedData;
         }
 
-        private static double[] ComputeSGCoefficients(int windowSize, int polyOrder)
+
+        public void GetMs1SpaceSpline(Dictionary<double, double> rtMap, string type)
         {
-            int halfWindow = windowSize / 2;
-            var designMatrix = Matrix<double>.Build.Dense(windowSize, polyOrder + 1);
-
-            for (int i = -halfWindow; i <= halfWindow; i++)
+            var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
+            var rtArray = sortedPeaks.Select(p => rtMap[p.RetentionTime]).ToArray();
+            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
+            if (type == "cubic")
             {
-                for (int j = 0; j <= polyOrder; j++)
-                {
-                    designMatrix[i + halfWindow, j] = Math.Pow(i, j);
-                }
+                Ms1SpaceSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
             }
-
-            var pseudoInverse = designMatrix.TransposeThisAndMultiply(designMatrix).Inverse() * designMatrix.Transpose();
-            return pseudoInverse.Row(0).ToArray(); // Coefficients for smoothing
         }
 
         public void GetPrecursorRanks()
@@ -401,7 +421,7 @@ namespace EngineLayer.DIA
 
             // go right
             int missedScans = 0;
-            for (int t = targetPeak.ZeroBasedScanIndex + 1; t < scans.Length; t++)
+            for (int t = targetPeak.ZeroBasedScanIndex + 1; t < peakTable.Length; t++)
             {
                 var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, tolerance, binSize);
 
@@ -1400,7 +1420,7 @@ namespace EngineLayer.DIA
             return peakCurve;
         }
         
-        public GenericChart Visualize(double[] timepoints, double[] intensities)
+        public GenericChart VisualizeGeneral(double[] timepoints, double[] intensities)
         {
             var plot = Chart2D.Chart.Line<double, double, string>(
                         x: Peaks.Select(p => p.RetentionTime),
@@ -1411,6 +1431,7 @@ namespace EngineLayer.DIA
             var combinedPlot = Chart.Combine(new[] { plot, plot2 });
             return combinedPlot;
         }
+        
     }
  
     }

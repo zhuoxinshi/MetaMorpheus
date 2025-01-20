@@ -100,5 +100,28 @@ namespace EngineLayer.DIA
             return pseudoMs2Scans;
         }
 
+        //public static void GetPrecursorPeakCurve(List<Ms2ScanWithSpecificMass>[] scansWithPrecursor, MsDataScan[] ms1scans, List<Peak>[] allPeaks,
+        //    List<Peak>[] ms1PeakTable, DIAparameters DIAparam, Dictionary<int, int> scanIndexMap)
+        //{
+        //    for (int i = 0; i < scansWithPrecursor.Length; i++)
+        //    {
+        //        foreach (var scan in scansWithPrecursor[i])
+        //        {
+        //            var preScan = ms1scans.Where(s => s.OneBasedScanNumber == scan.OneBasedPrecursorScanNumber).First();
+        //            var precursorPeak = PeakCurve.GetPeakFromScan(scan.HighestPeakMz, ms1PeakTable, scanIndexMap[preScan.OneBasedScanNumber], new PpmTolerance(0), DIAparam.PeakSearchBinSize);
+        //            if (precursorPeak.PeakCurve == null)
+        //            {
+        //                scan.PrecursorPeakCurve = PeakCurve.FindPeakCurve(precursorPeak, ms1PeakTable, ms1scans, null, DIAparam.MaxNumMissedScan, DIAparam.Ms1PeakFindingTolerance,
+        //                    DIAparam.PeakSearchBinSize, DIAparam.MaxRTRange);
+        //                scan.PrecursorPeakCurve.MonoisotopicMass = scan.PrecursorMass;
+        //                scan.PrecursorPeakCurve.Charge = scan.PrecursorCharge;
+        //            }
+        //            else
+        //            {
+        //                scan.PrecursorPeakCurve = precursorPeak.PeakCurve;
+        //            }
+        //        }
+        //    }
+        //}
     }
 }

@@ -221,7 +221,7 @@ namespace EngineLayer.DIA
             DIAparameters diaParam)
         {
             int zeroBasedScanIndex = (ms2WithMass.OneBasedScanNumber - 1) / numScansPerCycle;
-            var precursorPeak = PeakCurve.GetPeakFromScan(ms2WithMass.HighestPrecursorPeakMz, ms1PeakTable, zeroBasedScanIndex, diaParam.Ms1PeakFindingTolerance,
+            var precursorPeak = PeakCurve.GetPeakFromScan(ms2WithMass.HighestPrecursorPeakMz, ms1PeakTable, zeroBasedScanIndex, new PpmTolerance(0),
                 diaParam.PeakSearchBinSize);
             if (precursorPeak.PeakCurve == null || precursorPeak.PeakCurve.Peaks.Count < 5)
             {

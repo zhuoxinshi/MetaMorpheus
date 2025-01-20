@@ -406,6 +406,9 @@ namespace EngineLayer.DIA
                                 case CorrelationType.CubicSpline_scanCycle:
                                     corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
                                     break;
+                                case CorrelationType.Ms1SpaceSpline:
+                                    corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "ms1cubic", DIAparameters.SplineTimeInterval);
+                                    break;
                                 default: 
                                     corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
                                     break;

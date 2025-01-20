@@ -100,11 +100,11 @@ namespace EngineLayer.DIA
             {
                 return 0;
             }
-            //change
-            //var startRT = Math.Max(peakCurve1.StartRT, peakCurve2.StartRT);
-            //var endRT = Math.Min(peakCurve1.EndRT, peakCurve2.EndRT);
-            var startRT = peakCurve1.StartRT;
-            var endRT = peakCurve1.EndRT;
+            
+            var startRT = Math.Max(peakCurve1.StartRT, peakCurve2.StartRT);
+            var endRT = Math.Min(peakCurve1.EndRT, peakCurve2.EndRT);
+            //var startRT = peakCurve1.StartRT;
+            //var endRT = peakCurve1.EndRT;
 
             if (splineType == "Bspline")
             {
@@ -190,6 +190,21 @@ namespace EngineLayer.DIA
                 {
                     intensities1.Add(peakCurve1.CubicSpline.Interpolate(rt));
                     intensities2.Add(peakCurve2.CubicSpline.Interpolate(rt));
+                }
+                double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
+                return corr;
+            }
+
+            if (splineType == "ms1cubic")
+            {
+                if (peakCurve1.CubicSpline == null)
+                {
+                    peakCurve1.GetCubicSpline();
+                }
+                foreach (var rt in rtSeq)
+                {
+                    intensities1.Add(peakCurve1.CubicSpline.Interpolate(rt));
+                    intensities2.Add(peakCurve2.Ms1SpaceSpline.Interpolate(rt));
                 }
                 double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
                 return corr;

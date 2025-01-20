@@ -41,12 +41,19 @@ namespace EngineLayer.DIA
                 }
             }
 
-            //Get ms2 XICs
+            //Get rtMap
+            var rtMap = ISDEngine_static.GetRtMap(ms1Scans, ms2Scans);
+
+            //Get ms2 XICs and ms1SpaceSpline
             var allMs2PeakCurves = new Dictionary<(double min, double max), List<PeakCurve>>();
             foreach (var ms2Group in DIAScanWindowMap)
             {
                 allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2);
+                foreach(var peakCurve in allMs2PeakCurves[ms2Group.Key])
+                {
+                    peakCurve.GetMs1SpaceSpline(rtMap, "cubic");
+                }
             }
 
             //precursor fragment grouping

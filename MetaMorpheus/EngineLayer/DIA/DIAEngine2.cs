@@ -313,7 +313,7 @@ namespace EngineLayer.DIA
                 group.GetNumberOfHighCorrFragments(DIAparameters);
             }
             PFgroups = PFgroups.Where(pf => pf.PFpairs.Count > 0  && pf.NumHighCorrFragments >= DIAparameters.NumHighCorrFragments).ToList();
-       }
+        }
 
         public void ConstructNewMs2Scans()
         {
