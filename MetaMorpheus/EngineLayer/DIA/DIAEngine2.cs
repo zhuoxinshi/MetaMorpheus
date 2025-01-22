@@ -148,7 +148,7 @@ namespace EngineLayer.DIA
                                 Ms1PeakCurves[ms1window].Add(newPeakCurve);
                                 newPeakCurve.Index = index;
                                 index++;
-                                newPeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                                newPeakCurve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                             }
                         }
                     }
@@ -202,7 +202,7 @@ namespace EngineLayer.DIA
                             if (newPeakCurve.Peaks.Count > 4)
                             {
                                 ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
-                                newPeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                                newPeakCurve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                             }
                         }
                     }
@@ -262,8 +262,6 @@ namespace EngineLayer.DIA
                         newPeakCurve.Envelope = mass.Envelope;
                         if (newPeakCurve.Peaks.Count > 4)
                         {
-                            newPeakCurve.GetCubicSpline();
-                            newPeakCurve.Interpolte_cubic(DIAparameters.SplineTimeInterval);
                             ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
                         }
                     }

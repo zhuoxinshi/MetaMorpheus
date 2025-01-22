@@ -194,7 +194,7 @@ namespace EngineLayer.DIA
                         if (newPeakCurve.Peaks.Count > 4)
                         {
                             Ms1PeakCurves.Add(newPeakCurve);
-                            newPeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                            newPeakCurve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                             newPeakCurve.Index = index;
                             index++;
                             
@@ -257,7 +257,7 @@ namespace EngineLayer.DIA
                             if (newPeakCurve.Peaks.Count > 4)
                             {
                                 ms2PeakCurves[ms2Group.Key].Add(newPeakCurve);
-                                newPeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                                newPeakCurve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                             }
                         }
                     }
@@ -391,28 +391,7 @@ namespace EngineLayer.DIA
                         var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
                         {
-                            double corr = double.NaN;
-                            switch (DIAparameters.CorrelationType)
-                            {
-                                case CorrelationType.NoSpline:
-                                    corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
-                                    break;
-                                case CorrelationType.CubicSpline_scanCycle_preCalc:
-                                    corr = PrecursorFragmentPair.CalculateCorr_scanCycleSpline_preCalculated(precursor, ms2curve);
-                                    break;
-                                case CorrelationType.CubicSpline_RT:
-                                    corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
-                                    break;
-                                case CorrelationType.CubicSpline_scanCycle:
-                                    corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
-                                    break;
-                                case CorrelationType.Ms1SpaceSpline:
-                                    corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "ms1cubic", DIAparameters.SplineTimeInterval);
-                                    break;
-                                default: 
-                                    corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
-                                    break;
-                            }
+                            double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
                             if (corr > DIAparameters.CorrelationCutOff)
                             {
                                 var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
@@ -690,7 +669,7 @@ namespace EngineLayer.DIA
                     newPEC.GetFakePeakCurve();
                     index++;
                     Ms1PeakCurves.Add(newPEC.FakePeakCurve);
-                    newPEC.FakePeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                    newPEC.FakePeakCurve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                 }
             }
             //debug
@@ -747,7 +726,7 @@ namespace EngineLayer.DIA
                         newPEC.IsolationRange = null;
                         newPEC.GetFakePeakCurve();
                         ms2PeakCurves[ms2Group.Key].Add(newPEC.FakePeakCurve);
-                        newPEC.FakePeakCurve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                        newPEC.FakePeakCurve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                     }
                 }
             }
@@ -819,9 +798,6 @@ namespace EngineLayer.DIA
                                     break;
                                 case CorrelationType.CubicSpline_RT:
                                     corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
-                                    break;
-                                case CorrelationType.CubicSpline_scanCycle:
-                                    corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
                                     break;
                                 default:
                                     corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
@@ -908,9 +884,6 @@ namespace EngineLayer.DIA
                                 case CorrelationType.CubicSpline_RT:
                                     corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", DIAparameters.SplineTimeInterval);
                                     break;
-                                case CorrelationType.CubicSpline_scanCycle:
-                                    corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
-                                    break;
                                 default:
                                     corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
                                     break;
@@ -951,7 +924,7 @@ namespace EngineLayer.DIA
                     continue;
                 }
                 var newMs2curve = new PeakCurve(ms2peaks);
-                newMs2curve.GetScanCycleSmoothedData(DIAparameters.ScanCycleSplineTimeInterval);
+                newMs2curve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
                 if (Math.Abs(newMs2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
                 {
                     var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, newMs2curve);
@@ -968,9 +941,6 @@ namespace EngineLayer.DIA
                                 break;
                             case CorrelationType.CubicSpline_RT:
                                 corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, newMs2curve, "cubic", DIAparameters.SplineTimeInterval);
-                                break;
-                            case CorrelationType.CubicSpline_scanCycle:
-                                corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, newMs2curve, "cubic", DIAparameters.ScanCycleSplineTimeInterval);
                                 break;
                             default:
                                 corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, newMs2curve);

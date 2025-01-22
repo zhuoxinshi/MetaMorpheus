@@ -15,6 +15,7 @@ namespace EngineLayer.DIA
         CubicSpline_scanCycle,
         CubicSpline_scanCycle_preCalc,
         Normalized,
-        Ms1SpaceSpline
+        Ms1SpaceSpline,
+        Smoothed_cubicSplineRT
     }
 }

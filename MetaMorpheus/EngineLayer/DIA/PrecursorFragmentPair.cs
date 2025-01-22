@@ -35,6 +35,33 @@ namespace EngineLayer.DIA
         public int FragmentRank { get; set; }
         public int PrecursorRank { get; set; }
 
+        public static double CalculateCorrelation((double, double)[] xy1, (double, double)[] xy2)
+        {
+            if (xy1.Length < 5 || xy2.Length < 5)
+            {
+                return 0;
+            }
+
+            double start = Math.Max(xy1[0].Item1, xy2[0].Item1);
+            double end = Math.Min(xy1[xy1.Length - 1].Item1, xy2[xy2.Length - 1].Item1);
+
+            var validxy1 = xy1.Where(p => p.Item1 >= start && p.Item1 <= end).ToArray();
+            var validxy2 = xy2.Where(p => p.Item1 >= start && p.Item1 <= end).ToArray();
+            int numPoints = Math.Min(validxy1.Length, validxy2.Length);
+            var xy = validxy1.Take(numPoints).Zip(validxy2.Take(numPoints), (a, b) => (a.Item2, b.Item2)).ToArray();
+            var y1 = xy.Select(p => p.Item1).ToArray();
+            var y2 = xy.Select(p => p.Item2).ToArray();
+            double corr = MathNet.Numerics.Statistics.Correlation.Pearson(y1, y2);
+
+            return corr;
+        }
+
+        public static double CalculatePeakCurveCorrXYData(PeakCurve peakCurve1, PeakCurve peakCurve2)
+        {
+            double corr = CalculateCorrelation(peakCurve1.XYData, peakCurve2.XYData);
+            return corr;
+        }
+
         public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
         {
             double overlap = 0;
@@ -159,14 +186,6 @@ namespace EngineLayer.DIA
 
             if (splineType == "linear")
             {
-                if (peakCurve1.LinearSpline == null)
-                {
-                    peakCurve1.GetLinearSpline();
-                }
-                if (peakCurve2.LinearSpline == null)
-                {
-                    peakCurve2.GetLinearSpline();
-                }
                 foreach (var rt in rtSeq)
                 {
                     intensities1.Add(peakCurve1.LinearSpline.Interpolate(rt));
@@ -178,14 +197,6 @@ namespace EngineLayer.DIA
 
             if (splineType == "cubic")
             {
-                if (peakCurve1.CubicSpline == null)
-                {
-                    peakCurve1.GetCubicSpline();
-                }
-                if (peakCurve2.CubicSpline == null)
-                {
-                    peakCurve2.GetCubicSpline();
-                }
                 foreach (var rt in rtSeq)
                 {
                     intensities1.Add(peakCurve1.CubicSpline.Interpolate(rt));
@@ -197,10 +208,6 @@ namespace EngineLayer.DIA
 
             if (splineType == "ms1cubic")
             {
-                if (peakCurve1.CubicSpline == null)
-                {
-                    peakCurve1.GetCubicSpline();
-                }
                 foreach (var rt in rtSeq)
                 {
                     intensities1.Add(peakCurve1.CubicSpline.Interpolate(rt));
@@ -212,61 +219,6 @@ namespace EngineLayer.DIA
             return 0;
         }
 
-        public static double CalculateCorr_spline_scanCycle(PeakCurve peakCurve1, PeakCurve peakCurve2, string splineType, double cycleInterval)
-        {
-            if (peakCurve2.Peaks.Count < 5 || peakCurve1.Peaks.Count < 5)
-            {
-                return 0;
-            }
-            var startCycle = peakCurve1.StartCycle;
-            var endCycle = peakCurve1.EndCycle;
-            var cycleSeq = new List<double>();
-            for (double i = startCycle; i < endCycle; i += cycleInterval)
-            {
-                cycleSeq.Add(i);
-            }
-            var intensities1 = new List<double>();
-            var intensities2 = new List<double>();
-
-            if (splineType == "linear")
-            {
-                if (peakCurve1.LinearSpline == null)
-                {
-                    peakCurve1.GetLinearSpline();
-                }
-                if (peakCurve2.LinearSpline == null)
-                {
-                    peakCurve2.GetLinearSpline();
-                }
-                foreach (var cycle in cycleSeq)
-                {
-                    intensities1.Add(peakCurve1.LinearSpline.Interpolate(cycle));
-                    intensities2.Add(peakCurve2.LinearSpline.Interpolate(cycle));
-                }
-                double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
-                return corr;
-            }
-
-            if (splineType == "cubic")
-            {
-                if (peakCurve1.CubicSpline == null)
-                {
-                    peakCurve1.GetCubicSpline_scanCycle();
-                }
-                if (peakCurve2.CubicSpline == null)
-                {
-                    peakCurve2.GetCubicSpline_scanCycle();
-                }
-                foreach (var cycle in cycleSeq)
-                {
-                    intensities1.Add(peakCurve1.CubicSpline.Interpolate(cycle));
-                    intensities2.Add(peakCurve2.CubicSpline.Interpolate(cycle));
-                }
-                double corr = MathNet.Numerics.Statistics.Correlation.Pearson(intensities1, intensities2);
-                return corr;
-            }
-            return 0;
-        }
 
         public static double CalculateCorr_diaUmpire(PeakCurve curve1, PeakCurve curve2, float timeInterval)
         {
@@ -439,6 +391,7 @@ namespace EngineLayer.DIA
 
             return corr;
         }
+
 
         public static double CalculateOverlapAreaRatio(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {

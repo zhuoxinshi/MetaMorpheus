@@ -237,8 +237,6 @@ namespace Test.TestDIA
             var allPC = diaEngine.Ms1PeakCurves;
             var samplePC1 = allPC[49];
             var samplePC2 = allPC[50];
-            samplePC1.GetCubicSpline();
-            samplePC2.GetCubicSpline();
             var startRT = Math.Max(samplePC1.StartRT, samplePC2.StartRT);
             var endRT = Math.Min(samplePC1.EndRT, samplePC2.EndRT);
 
@@ -389,7 +387,7 @@ namespace Test.TestDIA
                 rtSeq.Add(i);
             }
             //precursor spline
-            precursorPeakCurve.GetCubicSpline();
+            //precursorPeakCurve.GetCubicSpline();
             var preIntensities = rtSeq.Select(rt => precursorPeakCurve.CubicSpline.Interpolate(rt));
             var pre_norm = preIntensities.Select(i => Math.Log10(i));
             var prePlot = Chart2D.Chart.Point<double, double, string>(
@@ -398,7 +396,7 @@ namespace Test.TestDIA
             splinePlots.Add(prePlot);
             foreach (var pc in matchedIonPeakCurves)
             {
-                pc.GetCubicSpline();
+                //pc.GetCubicSpline();
                 var intensities = rtSeq.Select(rt => pc.CubicSpline.Interpolate(rt));
                 var normalized = intensities.Select(i => Math.Log10(i));
                 var plot_spline = Chart2D.Chart.Point<double, double, string>(

@@ -29,7 +29,7 @@ namespace EngineLayer.DIA
         public bool SplitMS2Peak { get; set; } 
         public bool SplitMS1Peak { get; set; }  
         public float SplineTimeInterval { get; set; }
-        public double SplineTimeIntervalDouble { get; set; }
+        public double SplineRtInterval { get; set; }
         public double ScanCycleSplineTimeInterval { get; set; }
         public double MinMass { get; set; }
         public double MaxMass { get; set; }
@@ -47,15 +47,19 @@ namespace EngineLayer.DIA
         public bool CombineFragments { get; set; }
         public CorrelationType CorrelationType { get; set; }
         public int NumScansPerCycle { get; set; }
+        public int SGfilterWindowSize { get; set; }
+        public SplineType Ms1SplineType { get; set; }
+        public SplineType Ms2SplineType { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan = 2, int binSize = 100, 
             double overlapRatioCutOff = 0.3, double correlationCutOff = 0.5, double apexRtTolerance = 0.1, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
             , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
-            bool splitMS2Peak = false, bool splitMS1Peak = false, float splineTimeInterval = 0.05f, double minMass = 0, double maxMass = 99999, string type = "DIA", int apexCycleTolerance = 2, 
+            bool splitMS2Peak = false, bool splitMS1Peak = false, double splineRtInterval = 0.05, double minMass = 0, double maxMass = 99999, string type = "DIA", int apexCycleTolerance = 2, 
             double scanCycleSplineInterval = 0.025, int minCharge = 1, bool averageMs2Scans = false, XICType ms1XICType = XICType.DeconHighestPeak, 
             XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak, 
             AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,
-            bool cutMs1Peaks = false, bool cutMs2Peaks = false)
+            bool cutMs1Peaks = false, bool cutMs2Peaks = false, int sgFilterWindowSize = 5, SplineType ms1SplineType = SplineType.NoSpline, SplineType ms2SplineType = SplineType.NoSpline, 
+            float splineTimeInterval = 0.05f)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -91,6 +95,10 @@ namespace EngineLayer.DIA
             AnalysisType = analysisType;
             CombineFragments = combineFragments;
             CorrelationType = correlationType;
+            SGfilterWindowSize = sgFilterWindowSize;
+            Ms1SplineType = ms1SplineType;
+            Ms2SplineType = ms2SplineType;
+            SplineRtInterval = splineRtInterval;
         }
 
         public StringBuilder WriteDIASettings()
@@ -104,6 +112,8 @@ namespace EngineLayer.DIA
             settings.AppendLine("PseudoMs2ConstructionType: " + PseudoMs2ConstructionType);
             settings.AppendLine("CombineFragments: " + CombineFragments);
             settings.AppendLine("CorrelationType: " + CorrelationType);
+            settings.AppendLine("Ms1SplineType: " + Ms1SplineType);
+            settings.AppendLine("Ms2SplineType: " + Ms2SplineType);
             settings.Append("\n");
             settings.AppendLine("Ms1PeakFindingTolerance: " + Ms1PeakFindingTolerance.ToString());
             settings.AppendLine("Ms2PeakFindingTolerance: " + Ms2PeakFindingTolerance.ToString());
@@ -120,7 +130,7 @@ namespace EngineLayer.DIA
             settings.AppendLine("MinRTRangeForCWT: " + MinRTRangeForCWT);
             settings.AppendLine("SplitMS2Peak: " + SplitMS2Peak);
             settings.AppendLine("SplitMS1Peak: " + SplitMS1Peak);
-            settings.AppendLine("SplineTimeInterval: " + SplineTimeInterval);
+            settings.AppendLine("SplineRtInterval: " + SplineRtInterval);
             settings.AppendLine("MinMass: " + MinMass);
             settings.AppendLine("MaxMass: " + MaxMass);
             settings.AppendLine("NumHighCorrFragments: " + NumHighCorrFragments);

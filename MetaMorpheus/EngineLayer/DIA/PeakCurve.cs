@@ -15,6 +15,8 @@ using TopDownProteomics;
 using NWaves.Signals;
 using NWaves.Filters.Polyphase;
 using NWaves.Filters;
+using Numerics.NET.Statistics;
+using System.Xml.Linq;
 
 namespace EngineLayer.DIA
 {
@@ -81,9 +83,9 @@ namespace EngineLayer.DIA
         public Normal GaussianFit { get; set; }
         public List<(double, double)> GaussianFitData { get; set; }
         public double NL { get; set; }
-        public PrecursorFragmentsGroup PFGroup {  get; set; }
-        public (double, double)[] LowessSmoothedData { get; set; }
-        public (double, double)[] SavgolSmoothedData { get; set; }
+        public (float, float)[] SavgolSmoothedData { get; set; }
+        public CubicSpline SavgolSmoothedCubicSpline { get; set; }
+        public (double, double)[] XYData { get; set; }
 
         public double AverageMz()
         {
@@ -115,41 +117,6 @@ namespace EngineLayer.DIA
             NL = Peaks.Min(p => p.Intensity);
         }
 
-        public void GetScanCycleSmoothedData(double splineInterval)
-        {
-            if (ScanCycleSmoothedData != null)
-            {
-                return;
-            }
-            ScanCycleSmoothedData = new List<(double, double)>();
-            var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
-            var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
-            var RTArray = sortedPeaks.Select(p => p.RetentionTime).ToArray();
-            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
-            var cubicSpline = CubicSpline.InterpolateAkima(RTArray, intensityArray);
-            var timePoints = new List<double>();
-            for (double i = RTArray[0]; i < RTArray[RTArray.Length - 1] + splineInterval; i += splineInterval)
-            {
-                timePoints.Add(i);
-            }
-            var cyclePoints = new double[timePoints.Count];
-            double cycleInterval = (double)(EndCycle - StartCycle)/(timePoints.Count - 1);
-            for (int i = 0; i < timePoints.Count; i++)
-            {
-                cyclePoints[i] = StartCycle + i * cycleInterval;
-            }
-            for (int i = 0; i < timePoints.Count; i++)
-            {
-                ScanCycleSmoothedData.Add((cyclePoints[i], cubicSpline.Interpolate(timePoints[i])));
-            }
-
-            var imputedData = ScanCycleSmoothedData.Select(p => p.Item2).ToArray();
-            if (imputedData.Any(double.IsNaN))
-            {
-                bool stop = true;
-            }
-            //var rawData = sortedPeaks.Select(p => ((float)p.ZeroBasedScanIndex, (float)p.Intensity)).ToList();
-        }
 
         public void GetNormalizedPeaks()
         {
@@ -161,50 +128,16 @@ namespace EngineLayer.DIA
             NormalizedPeaks = normalizedPeaks.ToArray();
         }
 
-        public void GetGaussianFitData(double interval)
-        {
-            GaussianFitData = new List<(double, double)>();
-            double mean = ApexScanCycle;
-            double sd = (EndCycle - StartCycle) / 4;
-            GaussianFit = new Normal(mean, sd);
-            for (double i = StartCycle; i < EndCycle; i += interval)
-            {
-                GaussianFitData.Add((i, GaussianFit.Density(i) * TotalIntensity));
-            }
-        }
-
-
-        public void GetLinearSpline()
+        private void GetLinearSpline()
         {
             var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
             var rtArray = sortedPeaks.Select(p => p.RetentionTime).ToArray();
             var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
             var linearSpline = LinearSpline.InterpolateSorted(rtArray, intensityArray);
             this.LinearSpline = linearSpline;
-
-            //plot
-            //var rtSeq = new List<double>();
-            //var intensities = new List<double>();
-            //for (double i = StartRT; i < EndRT; i += 0.0001)
-            //{
-            //    rtSeq.Add(i);
-            //}
-            //foreach(var rt in rtSeq)
-            //{
-            //    intensities.Add(linearSpline.Interpolate(rt));
-            //}
-
-            //var plot1 = Chart2D.Chart.Point<double, double, string>(
-            //    x: Peaks.Select(p => p.RetentionTime),
-            //    y: Peaks.Select(p => p.Intensity)).WithTraceInfo("original").WithMarkerStyle(Color: Color.fromString("red"));
-            //var plot2 = Chart2D.Chart.Point<double, double, string>(
-            //    x: rtSeq,
-            //    y: intensities).WithTraceInfo("interpolate").WithMarkerStyle(Color: Color.fromString("blue"));
-            //var combinedPlot = Chart.Combine(new[] { plot1, plot2 });
-            //combinedPlot.Show();
         }
 
-        public void GetCubicSpline()
+        private void GetCubicSpline()
         {
             var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
             var rtArray = sortedPeaks.Select(p => p.RetentionTime).ToArray();
@@ -213,42 +146,36 @@ namespace EngineLayer.DIA
             this.CubicSpline = cubicSpline;
         }
 
-        public void GetCubicSpline_scanCycle()
+        private (double, double)[] CalculateSpline(double startRT, double endRT, double splineRtInterval, IInterpolation spline)
         {
-            var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
-            var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
-            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
-            var cubicSpline = CubicSpline.InterpolateAkima(scanCycleArray, intensityArray);
-            this.CubicSpline = cubicSpline;
+            int numPoints = (int)Math.Floor((endRT - startRT) / splineRtInterval) + 1;
+            var xyData = new (double, double)[numPoints];
+            for (int i = 0; i < numPoints; i++)
+            {
+                var rt = startRT + i * splineRtInterval;
+                var intensity = spline.Interpolate(rt);
+                xyData[i] = (rt, intensity);
+            }
+            return xyData;
         }
 
-        public void GetLinearSpline_scanCycle()
+        public void GetLinearSplineXYData(double splineRtInterval)
         {
-            var sortedPeaks = Peaks.OrderBy(p => p.ZeroBasedScanIndex).ToList();
-            var scanCycleArray = sortedPeaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
-            var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
-            var linearSpline = LinearSpline.InterpolateSorted(scanCycleArray, intensityArray);
-            this.LinearSpline = linearSpline;
+            if (LinearSpline == null)
+            {
+                GetLinearSpline();
+            }
+            XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, LinearSpline);
         }
 
-        public List<(float, float)> Interpolte_cubic(float timeInterval)
+        public void GetCubicSplineXYData(double splineRtInterval)
         {
             if (CubicSpline == null)
             {
                 GetCubicSpline();
             }
-            var rtSeq = new List<float>();
-            var RTwindow = EndRT - StartRT;
-            for (float i = (float)StartRT; i < (float)EndRT; i += timeInterval)
-            {
-                rtSeq.Add(i);
-            }
-            var smoothedData = new List<(float, float)>();
-            for (int i = 0; i < rtSeq.Count; i++)
-            {
-                smoothedData.Add((rtSeq[i], (float)CubicSpline.Interpolate(rtSeq[i])));
-            }
-            return smoothedData;
+            int numPoints = (int)Math.Floor((EndRT - StartRT) / splineRtInterval) + 1;
+            XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, CubicSpline);
         }
 
         public List<(float, float)> GetBsplineData(int PtNum, int smoothDegree)
@@ -258,65 +185,124 @@ namespace EngineLayer.DIA
             return smoothedData;
         }
 
-        //public (double, double)[] GetLowessSmoothedData(int windowLength, int steps, double delta)
-        //{
-        //    var x = Peaks.Select(p => p.RetentionTime).ToArray();
-        //    var y = Peaks.Select(p => p.Intensity).ToArray();
-        //    var smoothedData = Smoothing.Loess(x, y, windowLength, steps, delta);
-        //    var newData = new (double, double)[smoothedData.Length];
-        //    for (int i = 0; i < smoothedData.Length; i++)
-        //    {
-        //        newData[i] = (x[i], smoothedData[i]);
-        //    }
-        //    LowessSmoothedData = newData;
-        //    return newData;
-        //}
-        public (double, double)[] GetSGfilterSmoothedData(Dictionary<int, double> rtIndexMap, int windowSize, int polyOrder)
+        public void GetRawXYData()
         {
-            if (CubicSpline == null)
+            XYData = new (double, double)[Peaks.Count];
+            for (int i = 0; i < Peaks.Count; i++)
             {
-                GetCubicSpline();
+                XYData[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity);
             }
-            var numPoints = EndCycle - StartCycle + 1;
-            var y = new float[numPoints];
-            y[0] = (float)Peaks.First().Intensity;
-            y[numPoints - 1] = (float)Peaks.Last().Intensity;
-            var indexList = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
-            for (int i = StartCycle + 1; i < EndCycle; i++)
+        }
+        public void GetSavgolSmoothedXYData(Dictionary<int, double> rtIndexMap, int windowSize)
+        {
+            double[] imputedY = ImputeMissingValues(rtIndexMap, CubicSpline, out double[] rtArray);
+            double[] y = CalculateSavgolSmoothedData(imputedY, windowSize);
+            XYData = new (double, double)[y.Length];
+            double cycleInterval = (double)(EndCycle - StartCycle) / (y.Length - 1);
+            for (int i = 0; i < y.Length; i++)
             {
-                var id = Array.BinarySearch(indexList.ToArray(), i);
-                if (id >= 0)
-                {
-                    y[i - StartCycle] = (float)Peaks[id].Intensity;
-                }
-                else
-                {
-                    double rt = rtIndexMap[i];
-                    double intensity = CubicSpline.Interpolate(rt);
-                    y[i - StartCycle] = (float)intensity;
-                }
+                var cyclePoint = StartCycle + i * cycleInterval;
+                XYData[i] = (cyclePoint, y[i]);
             }
-            var smoother = new SavitzkyGolayFilter(11);
-            var signal = new DiscreteSignal(1, y);
-            var smoothedY = smoother.ApplyTo(signal);  
-            var smoothedData = new (double, double)[numPoints];
-            for (int i = 0; i < numPoints; i++)
-            {
-                smoothedData[i] = (rtIndexMap[StartCycle + i], smoothedY[i]);
-            }
-            return smoothedData;
         }
 
+        public void GetSavgolSmoothedCubicSplineXYData (Dictionary<int, double> rtIndexMap, int windowSize, double splineRtInterval)
+        {
+            double[] imputedY = ImputeMissingValues(rtIndexMap, CubicSpline, out double[] x);
+            double[] y = CalculateSavgolSmoothedData(imputedY, windowSize);
+            var cubicSpline = CubicSpline.InterpolateAkima(x, y);
+            XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, cubicSpline);
+        }
 
-        public void GetMs1SpaceSpline(Dictionary<double, double> rtMap, string type)
+        public void GetCubicSplineSavgolSmoothedXYData(int windowSize, double splineRtInterval)
+        {
+            GetCubicSplineXYData(splineRtInterval);
+            double[] y = XYData.Select(p => p.Item2).ToArray();
+            var smoothedY = CalculateSavgolSmoothedData(y, windowSize);
+            for (int i = 0; i < XYData.Length; i++)
+            {
+                XYData[i] = (XYData[i].Item1, smoothedY[i]);
+            }
+        }
+
+        public void GetScanCycleCubicSplineXYData(double splineCycleInterval)
+        {
+            int numPoints = (int)Math.Floor((EndCycle - StartCycle) / splineCycleInterval) + 1;
+            double splineRtInterval = (EndRT - StartRT) / (numPoints - 1);
+            GetCubicSplineXYData(splineRtInterval);
+            for (int i = 0; i < XYData.Length; i++)
+            {
+                var cyclePoint = StartCycle + i * splineCycleInterval;
+                XYData[i] = (cyclePoint, XYData[i].Item2);
+            }
+        }
+
+        public void GetScanCycleCubicSplineSavgolSmoothedXYData(int windowSize, double splineRtInterval)
+        {
+            GetScanCycleCubicSplineXYData(splineRtInterval);
+            double[] y = XYData.Select(p => p.Item2).ToArray();
+            var smoothedY = CalculateSavgolSmoothedData(y, windowSize);
+            for (int i = 0; i < XYData.Length; i++)
+            {
+                XYData[i] = (XYData[i].Item1, smoothedY[i]);
+            }
+        }
+
+        public void GetMs1SpaceCubicSplineXYData(Dictionary<double, double> rtMap, double splineRTinterval)
         {
             var sortedPeaks = Peaks.OrderBy(p => p.RetentionTime).ToList();
             var rtArray = sortedPeaks.Select(p => rtMap[p.RetentionTime]).ToArray();
             var intensityArray = sortedPeaks.Select(p => p.Intensity).ToArray();
-            if (type == "cubic")
+            var ms1SpaceSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
+
+            var startRT = rtArray[0];
+            var endRT = rtArray[rtArray.Length - 1];
+            XYData = CalculateSpline(startRT, endRT, splineRTinterval, ms1SpaceSpline);
+        }
+
+        public void GetMs1SpaceCubicSplineSavgolSmoothedXYData(Dictionary<double, double> rtMap, int windowSize, double splineRTinterval)
+        {
+            GetMs1SpaceCubicSplineXYData(rtMap, splineRTinterval);
+            var y = XYData.Select(p => p.Item2).ToArray();
+            var smoothedY = CalculateSavgolSmoothedData(y, windowSize);
+            for (int i = 0 ; i < smoothedY.Length; i++)
             {
-                Ms1SpaceSpline = CubicSpline.InterpolateAkima(rtArray, intensityArray);
+                XYData[i] = (XYData[i].Item1, smoothedY[i]);
             }
+        }
+
+        private double[] ImputeMissingValues(Dictionary<int, double> rtIndexMap, IInterpolation spline, out double[] x)
+        {
+            var numPoints = EndCycle - StartCycle + 1;
+            x = new double[numPoints];
+            var y = new double[numPoints];
+            var indexList = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
+            for (int i = StartCycle + 1; i < EndCycle; i++)
+            {
+                x[i - StartCycle] = rtIndexMap[i];
+                var id = Array.BinarySearch(indexList.ToArray(), i);
+                if (id >= 0)
+                {
+                    y[i - StartCycle] = Peaks[id].Intensity;
+                }
+                else
+                {
+                    double intensity = spline.Interpolate(rtIndexMap[i]);
+                    y[i - StartCycle] = intensity;
+                }
+            }
+            return y;
+        }
+        private static double[] CalculateSavgolSmoothedData(double[] y, int windowSize)
+        {
+            float[] newY = y.Select(p => (float)p).ToArray();
+            var smoother = new SavitzkyGolayFilter(windowSize);
+            var signal = new DiscreteSignal(1, newY);
+            var extra = smoother.Size / 2;
+            var smoothedY = smoother.ApplyTo(signal).Samples.Skip(extra).Take(y.Length).ToArray();
+            var yData = smoothedY.Select(p => (double)p).ToArray();
+
+            return yData;
         }
 
         public void GetPrecursorRanks()
@@ -370,7 +356,7 @@ namespace EngineLayer.DIA
             return bestPeak;
         }
 
-        public static int BinarySearchForIndexedPeak(List<Peak> peakList, int zeroBasedScanIndex)
+        private static int BinarySearchForIndexedPeak(List<Peak> peakList, int zeroBasedScanIndex)
         {
             int m = 0;
             int l = 0;
@@ -635,65 +621,50 @@ namespace EngineLayer.DIA
 
             return newPeakCurve;
         }
-        
-        public static PeakCurve FindPeakCurve_mz(double targetMz, int zeroBasedScanIndex, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
-            , Tolerance mzTolerance, int binSize, double maxRTrange)
+   
+        public GenericChart VisualizeBspline(out List<float> rtSeq)
         {
-            var targetPeak = GetPeakFromScan(targetMz,  peakTable, zeroBasedScanIndex, mzTolerance, binSize);
-            var pc = FindPeakCurve(targetPeak, peakTable, scans, isolationWindow, maxMissedScans, mzTolerance, binSize, maxRTrange);
-            return pc;
+            var rawData = Peaks.Select(p => ((float)p.RetentionTime, (float)p.Intensity)).ToList();
+            rtSeq = new List<float>();
+            for (float i = (float)StartRT; i < (float)EndRT; i += 0.005f)
+            {
+                rtSeq.Add(i);
+            }
+            int numPt = rtSeq.Count;
+            var smoothedData = new Bspline().Run(rawData, numPt, 2);
+            var plot = Chart2D.Chart.Point<float, float, string>(
+                x: smoothedData.Select(p => p.Item1),
+                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("green"));
+            return plot;
         }
 
-
-        public static List<PeakCurve> GetMs1PeakCurves(MsDataScan[] allMs1Scans, List<Peak>[] ms1PeakTable, DIAparameters DIAparameters, CommonParameters commonParameters)
+        public GenericChart VisualizeGeneral(string type)
         {
-            //Get all precursors
-            var allPrecursors = new List<DeconvolutedMass>();
-            for (int i = 0; i < allMs1Scans.Length; i++)
+            GenericChart plot = null;
+            if (type == "rt")
             {
-                var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], commonParameters.PrecursorDeconvolutionParameters);
-                foreach (var envelope in envelopes)
-                {
-                    var charge = envelope.Charge;
-                    double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
-                    double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                        allMs1Scans[i].OneBasedScanNumber, i);
-                    allPrecursors.Add(precursor);
-                }
+                plot = Chart2D.Chart.Line<double, double, string>(
+                        x: Peaks.Select(p => p.RetentionTime),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
             }
-            //sort precursors by envelope totalintensity
-            var preGroups = allPrecursors.GroupBy(p => new { p.MonoisotopicMass, p.Charge}).ToList();
-            var referencePrecursors = preGroups.Select(g => g.OrderByDescending(p => p.Envelope.TotalIntensity).First()).ToList();
-            var allMs1PeakCurves = new List<PeakCurve>();
+            if (type == "cycle")
+            {
+                plot = Chart2D.Chart.Line<int, double, string>(
+                        x: Peaks.Select(p => p.ZeroBasedScanIndex),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+            }
+            if (XYData == null)
+            {
+                return plot;
+            }
 
-            //Find precursor XIC
-            foreach (var precursor in allPrecursors)
-            {
-                var highestPeak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, ms1PeakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0), DIAparameters.PeakSearchBinSize);
-                if (Math.Abs(highestPeak.Mz - 626.997) < 0.005 && highestPeak.ScanNumber > 4170 && highestPeak.ScanNumber < 4190)
-                {
-                    int stop = 0;
-                    var peak = GetPeakFromScan(626.663, ms1PeakTable, 1391, new PpmTolerance(5), 100);
-                    var pc = FindPeakCurve(peak, ms1PeakTable, allMs1Scans, null, 2, new PpmTolerance(10), 100, DIAparameters.MaxRTRangeMS1);
-                    
-                }
-                if (highestPeak.PeakCurve == null && highestPeak.Intensity > DIAparameters.PrecursorIntensityCutOff)
-                {
-                    var newPeakCurve = PeakCurve.FindPeakCurve_cutPeak(highestPeak, ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
-                        DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize);
-                    newPeakCurve.MonoisotopicMass = precursor.MonoisotopicMass;
-                    newPeakCurve.Charge = precursor.Charge;
-                    newPeakCurve.StartMz = precursor.Envelope.Peaks.Min(p => p.mz);
-                    newPeakCurve.EndMz = precursor.Envelope.Peaks.Max(p => p.mz);
-                    allMs1PeakCurves.Add(newPeakCurve);
-                }
-            }
-            return allMs1PeakCurves;
+            var plot2 = Chart2D.Chart.Line<double, double, string>(
+                        x: XYData.Select(xy => xy.Item1),
+                        y: XYData.Select(xy => xy.Item2)).WithTraceInfo("XYData").WithMarkerStyle(Color: Color.fromString("blue"));
+            var combinedPlot = Chart.Combine(new[] { plot, plot2 });
+            return combinedPlot;
         }
 
-
-        
         public void DetectPeakRegions()
         {
             PeakRidgeList = new List<PeakRidge>();
@@ -1225,63 +1196,6 @@ namespace EngineLayer.DIA
             return lower;
         }
 
-        public GenericChart VisualizeRaw(string chartType)
-        {
-            var maxIntensity = Peaks.Max(p => p.Intensity);
-            if (chartType == "line")
-            {
-                var plot = Chart2D.Chart.Line<double, double, string>(
-                        x: Peaks.Select(p => p.RetentionTime),
-                        y: Peaks.Select(p => p.Intensity/maxIntensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend:true).WithMarkerStyle(Color: Color.fromString("red"));
-                return plot;
-            }
-            if (chartType == "point")
-            {
-                var plot = Chart2D.Chart.Point<double, double, string>(
-                        x: Peaks.Select(p => p.RetentionTime),
-                        y: Peaks.Select(p => p.Intensity/maxIntensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
-                return plot;
-            }
-            return null;
-        }
-
-        public GenericChart VisualizeCubicSpline()
-        {
-            if (CubicSpline == null)
-            {
-                GetCubicSpline();
-            }
-            var smoothedData = Interpolte_cubic(0.005f);
-            var plot = Chart2D.Chart.Point<float, float, string>(
-                x: smoothedData.Select(p => p.Item1),
-                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
-            return plot;
-        }
-
-        public GenericChart VisualizeBspline(out List<float> rtSeq)
-        {
-            var rawData = Peaks.Select(p => ((float)p.RetentionTime, (float)p.Intensity)).ToList();
-            rtSeq = new List<float>();
-            for (float i = (float)StartRT; i < (float)EndRT; i += 0.005f)
-            {
-                rtSeq.Add(i);
-            }
-            int numPt = rtSeq.Count;
-            var smoothedData = new Bspline().Run(rawData, numPt, 2);
-            var plot = Chart2D.Chart.Point<float, float, string>(
-                x: smoothedData.Select(p => p.Item1),
-                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("green"));
-            return plot;
-        }
-
-        public GenericChart VisualizeScanCycleSmoothedData()
-        {
-            var plot = Chart2D.Chart.Point<double, double, string>(
-                x: ScanCycleSmoothedData.Select(p => p.Item1),
-                y: ScanCycleSmoothedData.Select(p => p.Item2)).WithTraceInfo("ScanCycleSmoothed").WithMarkerStyle(Color: Color.fromString("blue"));
-            return plot;
-        }
-
         public void VisualizePeakRegions()
         {
             if (PeakRegionList == null)
@@ -1419,18 +1333,7 @@ namespace EngineLayer.DIA
             var peakCurve = FindPeakCurve(peak, peakTable, scans, null, maxMissedScans, tolerance, binSize, maxRTRange);
             return peakCurve;
         }
-        
-        public GenericChart VisualizeGeneral(double[] timepoints, double[] intensities)
-        {
-            var plot = Chart2D.Chart.Line<double, double, string>(
-                        x: Peaks.Select(p => p.RetentionTime),
-                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"pre_{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
-            var plot2 = Chart2D.Chart.Line<double, double, string>(
-                        x: timepoints,
-                        y: intensities).WithTraceInfo("smoothed").WithMarkerStyle(Color: Color.fromString("blue"));
-            var combinedPlot = Chart.Combine(new[] { plot, plot2 });
-            return combinedPlot;
-        }
+
         
     }
  

@@ -51,10 +51,6 @@ namespace Test.TestDIA
             var numPeaks = diaEngine2.Ms2PeakCurves.Values.SelectMany(v => v).Sum(v => v.Peaks.Count);
             var num = diaDataFile.GetAllScansList().Where(s => s.MsnOrder == 2).Sum(s => s.MassSpectrum.Size);
             var testPeakCurve1 = testPeakCurve[58];
-            testPeakCurve1.VisualizeCubicSpline().Show();
-            testPeakCurve1.VisualizeRaw("point");
-            testPeakCurve1.CutPeak();
-            testPeakCurve1.VisualizeCubicSpline().Show();
             //testPeakCurve1.DetectPeakRegions();
             //testPeakCurve1.VisualizePeakRegions();
             //plot.Show();

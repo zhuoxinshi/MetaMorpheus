@@ -70,10 +70,10 @@ namespace EngineLayer.DIA
         public void GetMs1PeakCurves()
         {
             var allMs1Scans = MyMSDataFile.GetMS1Scans().ToArray();
-            var allMs1PeakCurves = PeakCurve.GetMs1PeakCurves(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
+            //var allMs1PeakCurves = PeakCurve.GetMs1PeakCurves(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
             //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves(allMs1Scans, DIAparameters, CommonParameters);
             //var allMs1PeakCurves = PrecursorCluster.GetMs1PeakCurves_isotope(allMs1Scans, Ms1PeakTable, DIAparameters, CommonParameters);
-            Ms1PeakCurves = allMs1PeakCurves.Where(c => c.Peaks.Count >= 5).ToList();
+            //Ms1PeakCurves = allMs1PeakCurves.Where(c => c.Peaks.Count >= 5).ToList();
 
             //for debug
             var allMasses = Ms1PeakCurves.Select(c => c.MonoisotopicMass).ToList();

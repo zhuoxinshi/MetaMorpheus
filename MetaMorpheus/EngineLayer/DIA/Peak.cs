@@ -66,7 +66,7 @@ namespace EngineLayer
                 var spectrum = scans[i].MassSpectrum;
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
-                    Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
+                    Peak newPeak = new Peak(spectrum.XArray[j], Math.Round(scans[i].RetentionTime, 2), spectrum.YArray[j], scans[i].MsnOrder,
                         scans[i].OneBasedScanNumber, i, index, null);
                     peaksByScan[scans[i].OneBasedScanNumber].Add(newPeak);
                     index++;

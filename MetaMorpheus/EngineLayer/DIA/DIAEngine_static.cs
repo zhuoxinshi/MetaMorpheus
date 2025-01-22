@@ -40,6 +40,7 @@ namespace EngineLayer.DIA
                     DIAScanWindowMap.Remove(ms1window);
                 }
             }
+            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves.Values.SelectMany(p => p).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
 
             //Get rtMap
             var rtMap = ISDEngine_static.GetRtMap(ms1Scans, ms2Scans);
@@ -50,10 +51,7 @@ namespace EngineLayer.DIA
             {
                 allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2);
-                foreach(var peakCurve in allMs2PeakCurves[ms2Group.Key])
-                {
-                    peakCurve.GetMs1SpaceSpline(rtMap, "cubic");
-                }
+                ISDEngine_static.PeakCurveSpline(allMs2PeakCurves[ms2Group.Key], diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
             }
 
             //precursor fragment grouping

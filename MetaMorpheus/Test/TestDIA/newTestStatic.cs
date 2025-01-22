@@ -337,8 +337,8 @@ namespace Test.TestDIA
             var chartList = new List<GenericChart>();
             foreach(var pc in allPCs)
             {
-                var plot = pc.VisualizeRaw("line");
-                chartList.Add(plot);
+                //var plot = pc.VisualizeRaw("line");
+                //chartList.Add(plot);
             }
             var combinedPlot = Chart.Combine(chartList);
             //combinedPlot.Show();
@@ -534,9 +534,7 @@ namespace Test.TestDIA
 
             preXIC.VisualizePeakRegions();
             preXIC.CutPeak();
-            preXIC.VisualizeRaw("line").Show();
             var map = ISDEngine_static.GetRtIndexMap(ms1Scans);
-            preXIC.GetSGfilterSmoothedData(map, 9, 3);
             //Find the minimum, compare the discrimination factor of the left and the right point, keep the point with higher discrimination factor side
             //SG filter first, then cut peak; wavelet or cutPeak
             //var SGSmoothed = preXIC.GetSGfilterSmoothedData(9, 2);
@@ -599,13 +597,12 @@ namespace Test.TestDIA
             ).First();
 
             //preXIC.VisualizeRaw("line").Show();
-            var map = ISDEngine_static.GetRtIndexMap(ms1Scans);
-            var smoothedData = preXIC.GetSGfilterSmoothedData(map, 51, 2);
-            preXIC.VisualizeGeneral(smoothedData.Select(p => p.Item1).ToArray(), smoothedData.Select(p => p.Item2).ToArray()).Show();
+            //var map = ISDEngine_static.GetRtIndexMap(ms1Scans);
+            //preXIC.VisualizeGeneral(smoothedData.Select(p => p.Item1).ToArray(), smoothedData.Select(p => p.Item2).ToArray()).Show();
         }
 
         [Test]
-        public static void TestTemp()
+        public static void TestSmoothing()
         {
             var spectrum = new MzSpectrum(new double[] { 1, 2, 3 }, new double[] { 10, 20, 30 }, false);
             double[] intensity = { 645523.0313,  2840027.875, 3638575.93, 10811454.23, 18073620.34,
@@ -745,9 +742,9 @@ namespace Test.TestDIA
 
             //Test correlation calculations
             var corr1 = PrecursorFragmentPair.CalculatePeakCurveCorr(precursorPC, fragmentPC2);
-            precursorPC.GetScanCycleSmoothedData(0.05f);
-            fragmentPC1.GetScanCycleSmoothedData(0.05f);
-            fragmentPC2.GetScanCycleSmoothedData(0.05f);
+            precursorPC.GetScanCycleCubicSplineXYData(0.05f);
+            fragmentPC1.GetScanCycleCubicSplineXYData(0.05f);
+            fragmentPC2.GetScanCycleCubicSplineXYData(0.05f);
             var corr2 = PrecursorFragmentPair.CalculateCorr_scanCycleSpline_preCalculated(precursorPC, fragmentPC2);
             var corr3 = PrecursorFragmentPair.CalculateCorr_spline(precursorPC, fragmentPC2, "cubic", 0.005);
             Assert.That(corr1 == 1);
@@ -790,6 +787,14 @@ namespace Test.TestDIA
         {
             var spectrum = new MzSpectrum(new double[] { 1, 2, 3 }, new double[] { 10, 20, 30 }, false);
             
+        }
+
+        [Test]
+        public static void TestNewCorrCalculation()
+        {
+            var xy1 = new (double, double)[] { (1, 10), (2, 20), (3, 30), (4, 40), (5, 50) };
+            var xy2 = new (double, double)[] { (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6) };
+            var corr = PrecursorFragmentPair.CalculateCorrelation(xy1, xy2);
         }
 
     }

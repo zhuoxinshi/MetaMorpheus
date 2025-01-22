@@ -68,7 +68,7 @@ namespace EngineLayer.DIA
                 out List<Peak>[] peaksByScan);
             foreach (var pc in allMs2PeakCurves)
             {
-                pc.GetScanCycleSmoothedData(diaParam.ScanCycleSplineTimeInterval);
+                pc.GetScanCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
             }
 
             var pfGroup = new PrecursorFragmentsGroup(precursor);
@@ -90,9 +90,6 @@ namespace EngineLayer.DIA
                                 break;
                             case CorrelationType.CubicSpline_RT:
                                 corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", diaParam.SplineTimeInterval);
-                                break;
-                            case CorrelationType.CubicSpline_scanCycle:
-                                corr = PrecursorFragmentPair.CalculateCorr_spline_scanCycle(precursor, ms2curve, "cubic", diaParam.ScanCycleSplineTimeInterval);
                                 break;
                             default:
                                 corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
