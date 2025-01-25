@@ -31,7 +31,7 @@ namespace EngineLayer.DIA
                 bspline_T_[m - i] = 1;
             }
             float intv = 1.0f / (m - 2 * p);
-            for (int i = 1; i <= (m - 1); i++)
+            for (int i = 1; i <= m - 1; i++)
             {
                 bspline_T_[p + i] = bspline_T_[p + i - 1] + intv;
             }
@@ -39,7 +39,7 @@ namespace EngineLayer.DIA
 
             for (int i = 0; i <= PtNum; i++)
             {
-                float t = ((float)i / PtNum);
+                float t = (float)i / PtNum;
                 var pt = getbspline(data, t, n, p);
                 bsplineCollection.Add(pt);
             }
@@ -64,7 +64,7 @@ namespace EngineLayer.DIA
                 x += pt.Item1 * a;
                 y += pt.Item2 * a;
             }
-            return new (x, y);
+            return new(x, y);
         }
 
         float bspline_base(int i, int p, float t)
@@ -85,25 +85,25 @@ namespace EngineLayer.DIA
             }
             else
             {
-                if ((bspline_T_[i + p] - bspline_T_[i]) == 0)
+                if (bspline_T_[i + p] - bspline_T_[i] == 0)
                 {
                     c1 = 0;
                 }
                 else
                 {
-                    tn1 = bspline_base(i, (p - 1), t);
+                    tn1 = bspline_base(i, p - 1, t);
                     c1 = (t - bspline_T_[i]) / (bspline_T_[i + p] - bspline_T_[i]);
                 }
-                if ((bspline_T_[i + p + 1] - bspline_T_[i + 1]) == 0)
+                if (bspline_T_[i + p + 1] - bspline_T_[i + 1] == 0)
                 {
                     c2 = 0;
                 }
                 else
                 {
-                    tn2 = bspline_base((i + 1), (p - 1), t);
+                    tn2 = bspline_base(i + 1, p - 1, t);
                     c2 = (bspline_T_[i + p + 1] - t) / (bspline_T_[i + p + 1] - bspline_T_[i + 1]);
                 }
-                n = (c1 * tn1) + (c2 * tn2);
+                n = c1 * tn1 + c2 * tn2;
             }
             return n;
         }

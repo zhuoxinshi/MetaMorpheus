@@ -1,6 +1,8 @@
 ﻿using BayesianEstimation;
 using Chemistry;
 using Easy.Common.Extensions;
+using EngineLayer.DIA;
+using EngineLayer.DIA.Other;
 using MassSpectrometry;
 using MathNet.Numerics.LinearAlgebra.Storage;
 using MzLibUtil;
@@ -780,9 +782,9 @@ namespace EngineLayer.DIA
                     bool stop = true;
                 }
 
-                if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
+                if (ms2curve.ApexCycle >= precursor.StartCycle && ms2curve.ApexCycle <= precursor.EndCycle)
                 {
-                    if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                    if (Math.Abs(ms2curve.ApexCycle - precursor.ApexCycle) <= DIAparameters.ApexCycleTolerance)
                     {
                         var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
@@ -832,9 +834,9 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
-                if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
+                if (ms2curve.ApexCycle >= precursor.StartCycle && ms2curve.ApexCycle <= precursor.EndCycle)
                 {
-                    if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                    if (Math.Abs(ms2curve.ApexCycle - precursor.ApexCycle) <= DIAparameters.ApexCycleTolerance)
                     {
                         var overlap = PrecursorFragmentPair.CalculateOverlapAreaRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
@@ -865,9 +867,9 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
-                if (ms2curve.ApexScanCycle >= precursor.StartCycle && ms2curve.ApexScanCycle <= precursor.EndCycle)
+                if (ms2curve.ApexCycle >= precursor.StartCycle && ms2curve.ApexCycle <= precursor.EndCycle)
                 {
-                    if (Math.Abs(ms2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                    if (Math.Abs(ms2curve.ApexCycle - precursor.ApexCycle) <= DIAparameters.ApexCycleTolerance)
                     {
                         var overlap = PrecursorFragmentPair.CalculateOverlapAreaRatio(precursor, ms2curve);
                         if (overlap > DIAparameters.OverlapRatioCutOff)
@@ -925,7 +927,7 @@ namespace EngineLayer.DIA
                 }
                 var newMs2curve = new PeakCurve(ms2peaks);
                 newMs2curve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
-                if (Math.Abs(newMs2curve.ApexScanCycle - precursor.ApexScanCycle) <= DIAparameters.ApexCycleTolerance)
+                if (Math.Abs(newMs2curve.ApexCycle - precursor.ApexCycle) <= DIAparameters.ApexCycleTolerance)
                 {
                     var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, newMs2curve);
                     if (overlap > DIAparameters.OverlapRatioCutOff)

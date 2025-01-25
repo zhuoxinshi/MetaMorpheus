@@ -1,4 +1,5 @@
-﻿using MzLibUtil;
+﻿using EngineLayer.DIA;
+using MzLibUtil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,7 +60,7 @@ namespace EngineLayer.DIA
             XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak, 
             AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,
             bool cutMs1Peaks = false, bool cutMs2Peaks = false, int sgFilterWindowSize = 5, SplineType ms1SplineType = SplineType.NoSpline, SplineType ms2SplineType = SplineType.NoSpline, 
-            float splineTimeInterval = 0.05f)
+            float splineTimeInterval = 0.05f, int numScanPerCycle = 0)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -99,6 +100,7 @@ namespace EngineLayer.DIA
             Ms1SplineType = ms1SplineType;
             Ms2SplineType = ms2SplineType;
             SplineRtInterval = splineRtInterval;
+            NumScansPerCycle = numScanPerCycle;
         }
 
         public StringBuilder WriteDIASettings()

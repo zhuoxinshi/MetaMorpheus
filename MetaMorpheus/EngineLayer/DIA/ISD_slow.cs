@@ -74,7 +74,7 @@ namespace EngineLayer.DIA
             var pfGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in allMs2PeakCurves)
             {
-                if (Math.Abs(precursor.ApexScanCycle - ms2curve.ApexScanCycle) <= diaParam.ApexCycleTolerance)
+                if (Math.Abs(precursor.ApexCycle - ms2curve.ApexCycle) <= diaParam.ApexCycleTolerance)
                 {
                     var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
                     if (overlap >= diaParam.OverlapRatioCutOff)

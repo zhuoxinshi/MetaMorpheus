@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ThermoFisher.CommonCore.Data.Business;
 
-namespace EngineLayer.DIA
+namespace EngineLayer.DIA.Other
 {
     public class EnvelopeCurve
     {
@@ -20,9 +20,9 @@ namespace EngineLayer.DIA
         }
 
         public List<DeconvolutedMass> Envelopes { get; set; }
-        public int MassIndex {  get; set; }
+        public int MassIndex { get; set; }
         public List<Peak>[] Peaks { get; set; }
-        public double MonoisotopicMass {  get; set; }
+        public double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
         public double ApexRT { get; set; }
         public PeakCurve FakePeakCurve { get; set; }
@@ -31,7 +31,7 @@ namespace EngineLayer.DIA
         public PeakCurve GetEnvelopePeakCurve()
         {
             var fakePeaks = new List<Peak>();
-            foreach(var envelopePeaks in Peaks)
+            foreach (var envelopePeaks in Peaks)
             {
                 var mz = envelopePeaks.OrderByDescending(p => p.Intensity).First().Mz;
                 var rt = envelopePeaks.First().RetentionTime;
@@ -108,7 +108,7 @@ namespace EngineLayer.DIA
             newEC.Envelopes = list.OrderBy(p => p.RetentionTime).ToList();
             var targetEnvelope = newEC.Envelopes.OrderByDescending(p => p.HighestPeakIntensity).First();
             var targetPeakMzs = targetEnvelope.Envelope.Peaks.Select(p => p.mz).ToList();
-            foreach(var envelope in newEC.Envelopes)
+            foreach (var envelope in newEC.Envelopes)
             {
                 envelope.Isotopes = FindIsotopes(targetPeakMzs, peakTable, envelope.ZeroBasedScanIndex, DIAparameters);
             }
@@ -125,7 +125,7 @@ namespace EngineLayer.DIA
             int ind = Array.BinarySearch(masses.Select(p => p.MonoisotopicMass).ToArray(), mass.MonoisotopicMass);
             if (ind >= 0)
             {
-                return masses[ind]; 
+                return masses[ind];
             }
             else
             {
@@ -140,7 +140,7 @@ namespace EngineLayer.DIA
                     {
                         return null;
                     }
-                } 
+                }
                 else if (ind == masses.Length)
                 {
                     if (DIAparameters.PrecursorMassTolerance.Within(mass.MonoisotopicMass, masses[ind - 1].MonoisotopicMass))

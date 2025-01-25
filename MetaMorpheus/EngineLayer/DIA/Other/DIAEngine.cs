@@ -22,15 +22,15 @@ namespace EngineLayer.DIA
         public DIAparameters DIAparameters { get; set; }
         public List<Peak>[] Ms1PeakTable { get; set; }
         public List<Peak>[] Ms2PeakTable { get; set; }
-        public List<PeakCurve> Ms1PeakCurves {  get; set; }
+        public List<PeakCurve> Ms1PeakCurves { get; set; }
         public Dictionary<MzRange, List<PeakCurve>> Ms2PeakCurves { get; set; }
         public MsDataFile MyMSDataFile { get; set; }
         public CommonParameters CommonParameters { get; set; }
         public List<Ms2ScanWithSpecificMass> PseudoMS2Scans { get; set; }
         public Dictionary<(double min, double max), List<MsDataScan>> DIAScanWindowMap { get; set; }
         public List<PrecursorFragmentsGroup> PFgroups { get; set; }
-        public double CycleTime {  get; set; }
-        public List<Ms2ScanWithSpecificMass> PseudoMs2WithPre {  get; set; }
+        public double CycleTime { get; set; }
+        public List<Ms2ScanWithSpecificMass> PseudoMs2WithPre { get; set; }
 
         public void GetPseudoMS2Scans()
         {
@@ -52,9 +52,9 @@ namespace EngineLayer.DIA
         {
             DIAScanWindowMap = new Dictionary<(double min, double max), List<MsDataScan>>();
             var ms2Scans = MyMSDataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
-            foreach(var ms2 in ms2Scans)
+            foreach (var ms2 in ms2Scans)
             {
-                (double min, double max) range = new (ms2.IsolationRange.Minimum, ms2.IsolationRange.Maximum);
+                (double min, double max) range = new(ms2.IsolationRange.Minimum, ms2.IsolationRange.Maximum);
                 if (!DIAScanWindowMap.ContainsKey(range))
                 {
                     DIAScanWindowMap[range] = new List<MsDataScan>();
@@ -88,7 +88,7 @@ namespace EngineLayer.DIA
         public void GetMs2PeakCurves()
         {
             var ms2PeakCurves = new Dictionary<MzRange, List<PeakCurve>>();
-            foreach(var ms2Group in DIAScanWindowMap)
+            foreach (var ms2Group in DIAScanWindowMap)
             {
                 var ms2scans = ms2Group.Value.ToArray();
                 MzRange range = ms2scans[0].IsolationRange;
@@ -96,7 +96,7 @@ namespace EngineLayer.DIA
                 var rankedMs2Peaks = allMs2Peaks.OrderByDescending(p => p.Intensity).ToList();
                 var ms2PeakTable = Peak.GetPeakTable(allMs2Peaks, DIAparameters.PeakSearchBinSize);
                 ms2PeakCurves[range] = new List<PeakCurve>();
-                foreach(var peak in rankedMs2Peaks)
+                foreach (var peak in rankedMs2Peaks)
                 {
                     if (peak.PeakCurve == null)
                     {
@@ -114,8 +114,8 @@ namespace EngineLayer.DIA
 
         public void PrecursorFragmentPairing()
         {
-            PFgroups = new List<PrecursorFragmentsGroup> ();
-            foreach(var ms2group in Ms2PeakCurves)
+            PFgroups = new List<PrecursorFragmentsGroup>();
+            foreach (var ms2group in Ms2PeakCurves)
             {
                 var precursorsInRange = Ms1PeakCurves.Where(c => c.MzRange.IsOverlapping(ms2group.Key)).ToArray();
 
@@ -163,9 +163,9 @@ namespace EngineLayer.DIA
 
         public void ConstructNewMs2Scans()
         {
-            PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass> ();
+            PseudoMs2WithPre = new List<Ms2ScanWithSpecificMass>();
             int oneBasedScanNum = 1;
-            foreach(var pfGroup in PFgroups)
+            foreach (var pfGroup in PFgroups)
             {
                 var mzs = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedMz).ToArray();
                 var intensities = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedIntensity).ToArray();

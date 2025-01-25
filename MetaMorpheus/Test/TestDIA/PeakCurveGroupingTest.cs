@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static Test.TestDIA.PeakExtractionTests;
 using EngineLayer;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 
@@ -15,7 +14,6 @@ namespace Test.TestDIA
 {
     public class PeakCurveGroupingTest
     {
-
         public class PeakCurveGroupingTestCase
         {
             public MsDataScan[] Scans { get; set; }

@@ -34,6 +34,7 @@ using OxyPlot;
 using Org.BouncyCastle.Asn1.Mozilla;
 using NWaves.Filters;
 using NWaves.Signals;
+using EngineLayer.DIA.CWT;
 
 namespace Test.TestDIA
 {
@@ -55,7 +56,6 @@ namespace Test.TestDIA
             pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISD_scanBased, correlationType: CorrelationType.CubicSpline_scanCycle_preCalc);
 
             var scans = ISD_scanBased.GetPseudoMs2Scans(dataFile, task.CommonParameters, task.CommonParameters.DIAparameters);
-
         }
 
         [Test]
@@ -797,5 +797,23 @@ namespace Test.TestDIA
             var corr = PrecursorFragmentPair.CalculateCorrelation(xy1, xy2);
         }
 
+        [Test]
+        public static void TestPython()
+        {
+            var path = @"E:\ISD Project\ISD_bu\12-18-24_bu-ISD100_5pro_mix1_labelCorrected.mzML";
+            var myFileManagers = new MyFileManager(true);
+            var commonParam = new CommonParameters();
+            commonParam.TrimMsMsPeaks = false;
+            var dataFile = myFileManagers.LoadFile(path, commonParam);
+            var realScans = dataFile.GetAllScansList().Where(s => s.RetentionTime >= 32 && s.RetentionTime <= 42).ToArray();
+            var diaParam = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), numScanPerCycle: 2);
+            var allPeakCurves1 = ISDEngine_static.GetAllPeakCurves_Peak(realScans, diaParam, new PpmTolerance(10), maxRTRange: 1, out List<Peak>[] allPeaksByScan2, false);
+            var pc = allPeakCurves1.Where(p => Math.Abs(p.AveragedMz - 838.05) < 0.01).First();
+            pc.GetCubicSplineSavgolSmoothedXYData(11, 0.05);
+            var y = pc.XYData.Select(i => i.Item2).ToArray();
+            double[] widths = Enumerable.Range(1, 30).Select(p => (double)p).ToArray();
+            var results = Scipy_signal.FindPeaks_cwt(y, widths);
+
+        }
     }
 }
