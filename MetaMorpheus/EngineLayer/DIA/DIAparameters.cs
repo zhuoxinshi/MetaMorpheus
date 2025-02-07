@@ -51,6 +51,8 @@ namespace EngineLayer.DIA
         public int SGfilterWindowSize { get; set; }
         public SplineType Ms1SplineType { get; set; }
         public SplineType Ms2SplineType { get; set; }
+        public bool TrimMs2Peaks { get; set; }
+        public double TrimMs2MinSNR { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan = 2, int binSize = 100, 
             double overlapRatioCutOff = 0.3, double correlationCutOff = 0.5, double apexRtTolerance = 0.1, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
@@ -60,7 +62,7 @@ namespace EngineLayer.DIA
             XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak, 
             AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,
             bool cutMs1Peaks = false, bool cutMs2Peaks = false, int sgFilterWindowSize = 5, SplineType ms1SplineType = SplineType.NoSpline, SplineType ms2SplineType = SplineType.NoSpline, 
-            float splineTimeInterval = 0.05f, int numScanPerCycle = 0)
+            float splineTimeInterval = 0.05f, int numScanPerCycle = 0, bool trimMs2Peaks = false, double trimMs2MinSNR = 0.01)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -101,6 +103,8 @@ namespace EngineLayer.DIA
             Ms2SplineType = ms2SplineType;
             SplineRtInterval = splineRtInterval;
             NumScansPerCycle = numScanPerCycle;
+            TrimMs2Peaks = trimMs2Peaks;
+            TrimMs2MinSNR = trimMs2MinSNR;
         }
 
         public StringBuilder WriteDIASettings()
@@ -128,6 +132,8 @@ namespace EngineLayer.DIA
             settings.AppendLine("MaxRTRangeMS1: " + MaxRTRangeMS1);
             settings.AppendLine("MaxRTRangeMS2: " + MaxRTRangeMS2);
             settings.Append("\n");
+            settings.AppendLine("TrimMss2Peaks: " + TrimMs2Peaks);
+            settings.AppendLine("TrimMs2MinSNR: " + TrimMs2MinSNR);
             settings.AppendLine("PrecursorIntensityCutOff: " + PrecursorIntensityCutOff);
             settings.AppendLine("MinRTRangeForCWT: " + MinRTRangeForCWT);
             settings.AppendLine("SplitMS2Peak: " + SplitMS2Peak);

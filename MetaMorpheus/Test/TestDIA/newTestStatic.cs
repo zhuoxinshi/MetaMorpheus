@@ -35,6 +35,7 @@ using Org.BouncyCastle.Asn1.Mozilla;
 using NWaves.Filters;
 using NWaves.Signals;
 using EngineLayer.DIA.CWT;
+using CsvHelper.Configuration.Attributes;
 
 namespace Test.TestDIA
 {
@@ -805,15 +806,204 @@ namespace Test.TestDIA
             var commonParam = new CommonParameters();
             commonParam.TrimMsMsPeaks = false;
             var dataFile = myFileManagers.LoadFile(path, commonParam);
-            var realScans = dataFile.GetAllScansList().Where(s => s.RetentionTime >= 32 && s.RetentionTime <= 42).ToArray();
+            var realScans = dataFile.GetAllScansList().Where(s => s.RetentionTime >= 32 && s.RetentionTime <= 35).ToArray();
+            var ms1Scans = realScans.Where(s => s.MsnOrder == 1).ToArray();
+            var ms2Scans = realScans.Where(s => s.MsnOrder == 2).ToArray();
+            var rtIndexMap = ISDEngine_static.GetRtIndexMap(ms1Scans);
             var diaParam = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), numScanPerCycle: 2);
-            var allPeakCurves1 = ISDEngine_static.GetAllPeakCurves_Peak(realScans, diaParam, new PpmTolerance(10), maxRTRange: 1, out List<Peak>[] allPeaksByScan2, false);
+            var allPeakCurves1 = ISDEngine_static.GetAllPeakCurves_Peak(ms1Scans, diaParam, new PpmTolerance(5), maxRTRange: 1, out List<Peak>[] allPeaksByScan2, false);
             var pc = allPeakCurves1.Where(p => Math.Abs(p.AveragedMz - 838.05) < 0.01).First();
-            pc.GetCubicSplineSavgolSmoothedXYData(11, 0.05);
-            var y = pc.XYData.Select(i => i.Item2).ToArray();
+            var pcs = allPeakCurves1.Where(p => Math.Abs(p.AveragedMz - 838.06) < 0.01).ToList();
             double[] widths = Enumerable.Range(1, 30).Select(p => (double)p).ToArray();
-            var results = Scipy_signal.FindPeaks_cwt(y, widths);
 
+            //pc.VisualizeCubicSpline(0.005f).Show();
+            ////pc.GetCubicSplineSavgolSmoothedXYData(11, 0.005);
+
+            //pc.VisualizeGeneral("cycle").Show();
+            //pc.VisualizeCubicSpline().Show();
+            //pc.GetCubicSplineXYData(0.005);
+            //pc.VisualizeGeneral("rt").Show();
+
+            //pc.GetCubicSplineSavgolSmoothedXYData(11, 0.005);
+            //pc.VisualizeGeneral("rt").Show();
+
+            //var y = pc.Peaks.Select(p => p.Intensity).ToArray();
+            //var smoothedY = Scipy_signal.SavgolFilter(y, 11, 2);
+            //var maxima = Scipy_signal.FindPeaks_cwt(smoothedY, widths);
+
+            //pc.GetCubicSplineSavgolSmoothedXYData(21, 0.005);
+            //pc.VisualizeGeneral("rt").Show();
+            //var y1 = pc.XYData.Select(i => i.Item2).ToArray();
+            //var maxima1 = Scipy_signal.FindPeaks_cwt(y1, widths);
+
+            //pc.GetSavgolSmoothedXYData(11);
+            //var y2 = pc.XYData.Select(i => i.Item2).ToArray();
+            //var maxima2 = Scipy_signal.FindPeaks_cwt(y2, widths);
+
+            //cut peak version
+            //var allPCs = ISDEngine_static.GetAllPeakCurves_Peak(ms1Scans, diaParam, new PpmTolerance(20), 0.5, out List<Peak>[] allPeaksByScan3, true);
+            var allPCs_cutPeak = ISDEngine_static.GetAllPeakCurves_Peak(ms1Scans, diaParam, new PpmTolerance(5), 1, out List<Peak>[] allPeaksByScan, true);
+            var targetedPCs = allPCs_cutPeak.Where(p => Math.Abs(p.AveragedMz - 838.06) < 0.01).ToList();
+
+            var targetedPCs2 = allPCs_cutPeak.Where(p => Math.Abs(p.AveragedMz - 628.79) < 0.01).ToList();
+            var pcs2 = allPeakCurves1.Where(p => Math.Abs(p.AveragedMz - 628.79) < 0.01).ToList();
+            int stop = 0;
+
+            pc.VisualizePeakRegions();
+        }
+
+        [Test]
+        public static void TestNumPeakCurves()
+        {
+            var path1 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_105min_gradient5_ISD60-80-100_micro3_labelCorrected.mzML";
+            var path2 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_105min_ISD60_micro4_labelCorrected.mzML";
+            var path3 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_105min_ISD60-80-100_micro1_labelCorrected.mzML";
+            var path4 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_105min_ISD60-80-100_micro4_labelCorrected.mzML";
+            var path5 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_140min_ISD60-80-100_micro4_rerun_labelCorrected.mzML";
+            var tomlFile = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            var myFileManager = new MyFileManager(true);
+            var file1 = myFileManager.LoadFile(path1, task.CommonParameters);
+            var file2 = myFileManager.LoadFile(path2, task.CommonParameters);
+            var file3 = myFileManager.LoadFile(path3, task.CommonParameters);
+            var file4 = myFileManager.LoadFile(path4, task.CommonParameters);
+            var file5 = myFileManager.LoadFile(path5, task.CommonParameters);
+            var ms1Scans1 = file1.GetMS1Scans().ToArray();
+            var ms1Scans2 = file2.GetMS1Scans().ToArray();
+            var ms1Scans3 = file3.GetMS1Scans().ToArray();
+            var ms1Scans4 = file4.GetMS1Scans().ToArray();
+            var ms1Scans5 = file5.GetMS1Scans().ToArray();
+            var ms2Scans1 = file1.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var ms2Scans2 = file2.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var ms2Scans3 = file3.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var ms2Scans4 = file4.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var ms2Scans5 = file5.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20),
+                maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.2,
+                fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 1.5, maxRTrangeMS2: 1.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minCharge: 6, minMass: 11000);
+            //var allMs1PCs1 = ISDEngine_static.GetAllPeakCurves(ms1Scans1, task.CommonParameters, task.CommonParameters.DIAparameters,
+            //                   XICType.DeconHighestPeak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan1, false);
+            //var allMs1PCs2 = ISDEngine_static.GetAllPeakCurves(ms1Scans2, task.CommonParameters, task.CommonParameters.DIAparameters,
+            //                   XICType.DeconHighestPeak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan3, false);
+            //var allMs1PCs3 = ISDEngine_static.GetAllPeakCurves(ms1Scans3, task.CommonParameters, task.CommonParameters.DIAparameters,
+            //                   XICType.DeconHighestPeak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan5, false);
+            //var allMs1PCs4 = ISDEngine_static.GetAllPeakCurves(ms1Scans4, task.CommonParameters, task.CommonParameters.DIAparameters,
+            //                   XICType.DeconHighestPeak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan6, false);
+            //var allMs1PCs5 = ISDEngine_static.GetAllPeakCurves(ms1Scans5, task.CommonParameters, task.CommonParameters.DIAparameters,
+            //                   XICType.DeconHighestPeak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan7, false);
+
+
+            var isd60_1 = ms2Scans1.Where(s => s.ScanFilter.Contains("sid=100")).ToArray();
+            //var isd60_2 = ms2Scans2.Where(s => s.ScanFilter.Contains("sid=100")).ToArray();
+            var isd60_3 = ms2Scans3.Where(s => s.ScanFilter.Contains("sid=100")).ToArray();
+            var isd60_4 = ms2Scans4.Where(s => s.ScanFilter.Contains("sid=100")).ToArray();
+            var isd60_5 = ms2Scans5.Where(s => s.ScanFilter.Contains("sid=100")).ToArray();
+            var ms2PCs60_1 = ISDEngine_static.GetAllPeakCurves(isd60_1, task.CommonParameters, task.CommonParameters.DIAparameters,
+                                              XICType.Peak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan2, false);
+            //var ms2PCs60_2 = ISDEngine_static.GetAllPeakCurves(isd60_2, task.CommonParameters, task.CommonParameters.DIAparameters,
+            //                                  XICType.Peak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan12, false);
+            var ms2PCs60_3 = ISDEngine_static.GetAllPeakCurves(isd60_3, task.CommonParameters, task.CommonParameters.DIAparameters,
+                XICType.Peak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan22, false);
+            var ms2PCs60_4 = ISDEngine_static.GetAllPeakCurves(isd60_4, task.CommonParameters, task.CommonParameters.DIAparameters,
+                XICType.Peak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan32, false);
+            var ms2PCs60_5 = ISDEngine_static.GetAllPeakCurves(isd60_5, task.CommonParameters, task.CommonParameters.DIAparameters,
+                XICType.Peak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan42, false);
+        }
+
+        [Test]
+        public static void Testtemp()
+        {
+            var path1 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_105min_gradient5_ISD60-80-100_micro3_labelCorrected_RT38.5-41.56.mzML";
+            var tomlFile = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            var myFileManager = new MyFileManager(true);
+            var file1 = myFileManager.LoadFile(path1, task.CommonParameters);
+            var ms1Scans1 = file1.GetMS1Scans().ToArray();
+            var ms2Scans1 = file1.GetAllScansList().Where(s => s.ScanFilter.Contains("sid=80")).ToArray();
+
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20),
+                maxNumMissedScan: 2, binSize: 100, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.2,
+                fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 1.5, maxRTrangeMS2: 1.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minCharge: 6, minMass: 11000);
+            var allMs1PCs1 = ISDEngine_static.GetAllPeakCurves(ms1Scans1, task.CommonParameters, task.CommonParameters.DIAparameters,
+                               XICType.DeconHighestPeak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan1, false);
+            var allISD80PCs1 = ISDEngine_static.GetAllPeakCurves(ms2Scans1, task.CommonParameters, task.CommonParameters.DIAparameters,
+                                              XICType.Peak, new PpmTolerance(5), 2, out List<Peak>[] peaksByScan2, false);
+            var targetPC = allMs1PCs1.Where(p => Math.Abs(p.AveragedMz - 715.95) < 0.01).First();
+            var targetPC80 = allISD80PCs1.Where(p => Math.Abs(p.AveragedMz - 595.36) < 0.01).First();
+            //targetPC.VisualizeGeneral("rt").Show();
+            //int stop3 = 0;
+            //targetPC.GetCubicSplineSavgolSmoothedXYData(31, 0.005);
+            //targetPC.VisualizeGeneral("rt").Show();
+            targetPC.GetSavgolSmoothedXYData(5);
+            targetPC80.GetSavgolSmoothedXYData(5);
+            var corr1 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetPC, targetPC80);
+            targetPC.GetRawXYData();
+            targetPC80.GetRawXYData();
+            var corr2 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetPC, targetPC80);
+            targetPC.GetCubicSplineXYData(0.005);
+            var rtMap = ISDEngine_static.GetRtMap(ms1Scans1, ms2Scans1);
+            targetPC80.GetMs1SpaceCubicSplineXYData(rtMap, 0.005);
+            var corr3 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetPC, targetPC80);
+            targetPC.GetCubicSplineSavgolSmoothedXYData(31, 0.005);
+            targetPC80.GetMs1SpaceCubicSplineSavgolSmoothedXYData(rtMap, 31, 0.005);
+            var corr4 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetPC, targetPC80);
+            targetPC.GetSavgolSmoothedCubicSplineXYData(5, 0.005);
+            targetPC80.GetMs1SpaceSavgolSmoothedCubicSplineXYData(rtMap, 5, 0.005);
+            targetPC.VisualizeGeneral("rt").Show();
+            targetPC80.VisualizeGeneral("rt").Show();
+            var corr5 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetPC, targetPC80);
+            int stop4 = 0;
+        }
+
+        [Test]
+        public static void TestBottomUpISDDecon()
+        {
+            var task = new SearchTask();
+            task.CommonParameters.TrimMsMsPeaks = false;
+            task.CommonParameters.TrimMs1Peaks = false;
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(5),
+                maxNumMissedScan: 1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.2,
+                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMass: 0, maxMass: 10000,
+                ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: true, cutMs2Peaks: true,
+                ms1SplineType: SplineType.SavgolSmoothed, ms2SplineType: SplineType.SavgolSmoothed, sgFilterWindowSize: 9);
+            string DIAfile = @"E:\ISD Project\ISD_bu\01-14-25_bu_Yeast_SP3_1ug_rep1_ISD100_labeled.mzML";
+            string dataBase = @"E:\ISD Project\ISD_250128\2025-02-01-13-52-03\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
+            var myFileManager = new MyFileManager(true);
+            var myMsDataFile = myFileManager.LoadFile(DIAfile, task.CommonParameters);
+            var ms1Scans = myMsDataFile.GetMS1Scans().ToArray();
+            var scan = ms1Scans.Where(s => Math.Abs(s.RetentionTime - 36.92) <= 0.01).First();
+            var envelopes = Deconvoluter.Deconvolute(scan, task.CommonParameters.PrecursorDeconvolutionParameters)
+                .OrderBy(e => e.MostAbundantObservedIsotopicMass.ToMz(e.Charge))
+                .Select(e => new { Charge = e.Charge, mz = e.MonoisotopicMass.ToMz(e.Charge) });
+
+            //all decon results
+            var allEnvelopes = ms1Scans.Select(s => Deconvoluter.Deconvolute(s, task.CommonParameters.PrecursorDeconvolutionParameters)
+                               .Select(e => new { Rt = s.RetentionTime, charge = e.Charge, mass = e.MonoisotopicMass})).ToList();
+            var ddaPeptides = @"E:\DIA\Data\DIA_bu_250114\2025-01-15-17-15-46\Task1-SearchTask\Individual File Results\01-14-25_bu-DDA_Yeast_SP3_1ug_rep1_Peptides.psmtsv";
+            var ddaAllPsms = PsmTsvReader.ReadTsv(ddaPeptides, out List<string> warnings).ToList();
+            var ddaPsms = ddaAllPsms.Where(psm => psm.QValue <= 0.01 && psm.DecoyContamTarget == "T" && psm.QValueNotch <= 0.01)
+                          .Where(psm => psm.RetentionTime >=20 && psm.RetentionTime <=30).ToList();
+
+            int containedCount = 0;
+            foreach (var psm in ddaPsms)
+            {
+                bool isContained = allEnvelopes.SelectMany(envelope => envelope)
+                    .Any(e =>
+                        Math.Abs(psm.PrecursorMass - e.mass) < 0.5 &&
+                        psm.PrecursorCharge == e.charge && Math.Abs(psm.RetentionTime.GetValueOrDefault() - e.Rt) < 0.3);
+
+                if (isContained)
+                {
+                    containedCount++;
+                }
+            }
         }
     }
 }

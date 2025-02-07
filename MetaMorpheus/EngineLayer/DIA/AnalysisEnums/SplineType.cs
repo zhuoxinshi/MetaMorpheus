@@ -14,7 +14,9 @@ namespace EngineLayer.DIA
         ScanCycleCubicSpline,
         Normalized,
         Ms1SpaceCubicSpline,
+        SavgolSmoothed,
         SavgolSmoothedCubicSpline,
+        Ms1SpaceSavgolSmoothedCubicSpline,
         CubicSplineSavgolSmoothed,
         ScanCycleCubicSplineSavgolSmoothed,
         Ms1SpaceCubicSplineSavgolSmoothed

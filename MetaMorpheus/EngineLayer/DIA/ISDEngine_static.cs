@@ -57,8 +57,21 @@ namespace EngineLayer.DIA
                 }
             }
 
+            //precursor fragment rank filtering
+            foreach (var ms2curve in allMs2PeakCurves.Values.SelectMany(p => p))
+            {
+                ms2curve.GetPrecursorRanks();
+            }
+            foreach (var group in pfGroups)
+            {
+                group.PFpairs = group.PFpairs.OrderByDescending(pf => pf.Correlation).Take(diaParam.FragmentRankCutOff).ToList();
+                group.PFpairs = group.PFpairs.Where(pf => pf.PrecursorRank <= diaParam.PrecursorRankCutOff).ToList();
+                group.GetNumberOfHighCorrFragments(diaParam);
+            }
+            pfGroups = pfGroups.Where(pf => pf.PFpairs.Count > 0 && pf.NumHighCorrFragments >= diaParam.NumHighCorrFragments).ToList();
+
             //construct new ms2Scans
-            foreach(var pfGroup in pfGroups)
+            foreach (var pfGroup in pfGroups)
             {
                 var newScans = ConstructNewMs2Scans(pfGroup, commonParameters, diaParam.PseudoMs2ConstructionType, dataFile.FilePath);
                 pseudoMs2Scans.Add(newScans);
@@ -140,9 +153,13 @@ namespace EngineLayer.DIA
                     foreach (var pc in allPeakCurves)
                         pc.GetScanCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
                     break;
+                case SplineType.SavgolSmoothed:
+                    foreach(var pc in allPeakCurves)
+                        pc.GetSavgolSmoothedXYData(diaParam.SGfilterWindowSize);
+                    break;
                 case SplineType.CubicSplineSavgolSmoothed:
                     foreach (var pc in allPeakCurves)
-                        pc.GetCubicSplineSavgolSmoothedXYData(diaParam.SGfilterWindowSize, diaParam.ScanCycleSplineTimeInterval);
+                        pc.GetCubicSplineSavgolSmoothedXYData(diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
                     break;
                 case SplineType.ScanCycleCubicSplineSavgolSmoothed:
                     foreach (var pc in allPeakCurves)
@@ -150,7 +167,7 @@ namespace EngineLayer.DIA
                     break;
                 case SplineType.SavgolSmoothedCubicSpline:
                     foreach (var pc in allPeakCurves)
-                        pc.GetSavgolSmoothedCubicSplineXYData(rtIndexMap, diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                        pc.GetSavgolSmoothedCubicSplineXYData(diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
                     break;
                 case SplineType.Ms1SpaceCubicSpline:
                     foreach (var pc in allPeakCurves)
@@ -160,8 +177,13 @@ namespace EngineLayer.DIA
                     foreach(var pc in allPeakCurves)
                         pc.GetMs1SpaceCubicSplineSavgolSmoothedXYData(rtMap, diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
                     break;
+                case SplineType.Ms1SpaceSavgolSmoothedCubicSpline:
+                    foreach (var pc in allPeakCurves)
+                        pc.GetMs1SpaceSavgolSmoothedCubicSplineXYData(rtMap, diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                    break;
             }
         }
+
         public static List<PeakCurve> GetAllPeakCurves_Peak(MsDataScan[] scans, DIAparameters diaParam, Tolerance peakFindingTolerance, double maxRTRange
             , out List<Peak>[] allPeaksByScan, bool cutPeak = false)
         {
@@ -464,7 +486,7 @@ namespace EngineLayer.DIA
             var rtMap = new Dictionary<double, double>();
             foreach (var scan in ms2Scans)
             {
-                rtMap[Math.Round(scan.RetentionTime, 2)] = Math.Round(ms1Scans.Where(s => s.OneBasedScanNumber == scan.OneBasedPrecursorScanNumber).First().RetentionTime, 2);
+                rtMap[scan.RetentionTime] = ms1Scans.Where(s => s.OneBasedScanNumber == scan.OneBasedPrecursorScanNumber).First().RetentionTime;
             }
             return rtMap;
         }

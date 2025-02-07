@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using EngineLayer.DIA;
 using MassSpectrometry;
+using Numerics.NET;
 
 namespace EngineLayer
 {
@@ -66,7 +67,7 @@ namespace EngineLayer
                 var spectrum = scans[i].MassSpectrum;
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
-                    Peak newPeak = new Peak(spectrum.XArray[j], Math.Round(scans[i].RetentionTime, 2), spectrum.YArray[j], scans[i].MsnOrder,
+                    Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
                         scans[i].OneBasedScanNumber, i, index, null);
                     peaksByScan[scans[i].OneBasedScanNumber].Add(newPeak);
                     index++;
@@ -75,18 +76,30 @@ namespace EngineLayer
             return peaksByScan;
         }
 
-        public static List<Peak>[] GetAllPeaksByScan(MsDataScan[] scans, int numScansPerCycle)
+        public static List<Peak>[] GetAllPeaksByScan(MsDataScan[] scans, int numScansPerCycle, bool trimMs2 = false, double minSNR = 0.01)
         {
             var maxScanNum = scans[scans.Length - 1].OneBasedScanNumber;
             var peaksByScan = new List<Peak>[maxScanNum + 1];
             int index = 0;
             for (int i = 0; i < scans.Length; i++)
             {
+                double maxIntensity = 0;
+                if (trimMs2)
+                {
+                   maxIntensity = scans[i].MassSpectrum.YArray.Max();
+                }
                 peaksByScan[scans[i].OneBasedScanNumber] = new List<Peak>();
                 var spectrum = scans[i].MassSpectrum;
                 var zeroBasedScanIndex = (scans[i].OneBasedScanNumber - 1)/numScansPerCycle;
                 for (int j = 0; j < spectrum.XArray.Length; j++)
                 {
+                    if (trimMs2)
+                    {
+                        if (spectrum.YArray[j] < maxIntensity * minSNR)
+                        {
+                            continue;
+                        }
+                    }
                     Peak newPeak = new Peak(spectrum.XArray[j], scans[i].RetentionTime, spectrum.YArray[j], scans[i].MsnOrder,
                         scans[i].OneBasedScanNumber, zeroBasedScanIndex, index, null);
                     peaksByScan[scans[i].OneBasedScanNumber].Add(newPeak);

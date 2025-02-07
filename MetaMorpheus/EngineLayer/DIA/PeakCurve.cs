@@ -17,6 +17,8 @@ using NWaves.Filters.Polyphase;
 using NWaves.Filters;
 using Numerics.NET.Statistics;
 using System.Xml.Linq;
+using EngineLayer.DIA.CWT;
+using Accord.Statistics.Kernels;
 
 namespace EngineLayer.DIA
 {
@@ -193,23 +195,28 @@ namespace EngineLayer.DIA
                 XYData[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity);
             }
         }
-        public void GetSavgolSmoothedXYData(Dictionary<int, double> rtIndexMap, int windowSize)
+
+        public void GetSavgolSmoothedXYData(int windowSize)
         {
-            double[] imputedY = ImputeMissingValues(rtIndexMap, CubicSpline, out double[] rtArray);
+            if (CubicSpline == null)
+            {
+                GetCubicSpline();
+            }
+            double[] imputedY = ImputeMissingValues(CubicSpline, out double[] rtArray);
             double[] y = CalculateSavgolSmoothedData(imputedY, windowSize);
             XYData = new (double, double)[y.Length];
             double cycleInterval = (double)(EndCycle - StartCycle) / (y.Length - 1);
             for (int i = 0; i < y.Length; i++)
             {
-                var cyclePoint = StartCycle + i * cycleInterval;
-                XYData[i] = (cyclePoint, y[i]);
+                XYData[i] = (rtArray[i], y[i]);
             }
         }
 
-        public void GetSavgolSmoothedCubicSplineXYData (Dictionary<int, double> rtIndexMap, int windowSize, double splineRtInterval)
+        public void GetSavgolSmoothedCubicSplineXYData (int windowSize, double splineRtInterval)
         {
-            double[] imputedY = ImputeMissingValues(rtIndexMap, CubicSpline, out double[] x);
-            double[] y = CalculateSavgolSmoothedData(imputedY, windowSize);
+            GetSavgolSmoothedXYData(windowSize);
+            double[] x = XYData.Select(p => p.Item1).ToArray();
+            double[] y = XYData.Select(p => p.Item2).ToArray();
             var cubicSpline = CubicSpline.InterpolateAkima(x, y);
             XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, cubicSpline);
         }
@@ -271,24 +278,72 @@ namespace EngineLayer.DIA
             }
         }
 
-        private double[] ImputeMissingValues(Dictionary<int, double> rtIndexMap, IInterpolation spline, out double[] x)
+        public void GetMs1SpaceSavgolSmoothedCubicSplineXYData(Dictionary<double, double> rtMap, int windowSize, double splineRTinterval)
         {
+            var ms1SpaceRts = Peaks.Select(p => rtMap[p.RetentionTime]).ToArray();
+            var ms1SpaceCubicSpline = CubicSpline.InterpolateAkima(ms1SpaceRts, Peaks.Select(p => p.Intensity).ToArray());
+
+            double meanInterval = CalculateAverageInterval();
             var numPoints = EndCycle - StartCycle + 1;
-            x = new double[numPoints];
+            int[] cycles = Enumerable.Range(StartCycle, numPoints).ToArray();
+            var x = new double[numPoints];
             var y = new double[numPoints];
             var indexList = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
-            for (int i = StartCycle + 1; i < EndCycle; i++)
+            for (int i = 0; i < numPoints; i++)
             {
-                x[i - StartCycle] = rtIndexMap[i];
-                var id = Array.BinarySearch(indexList.ToArray(), i);
+                var id = Array.BinarySearch(indexList.ToArray(), cycles[i]);
                 if (id >= 0)
                 {
-                    y[i - StartCycle] = Peaks[id].Intensity;
+                    x[i] = ms1SpaceRts[id];
+                    y[i] = Peaks[id].Intensity;
                 }
                 else
                 {
-                    double intensity = spline.Interpolate(rtIndexMap[i]);
-                    y[i - StartCycle] = intensity;
+                    x[i] = x[i - 1] + meanInterval;
+                    y[i] = ms1SpaceCubicSpline.Interpolate(x[i]);
+                }
+            }
+            var smoothedY = CalculateSavgolSmoothedData(y, windowSize);
+            var cubicSpline = CubicSpline.InterpolateAkima(x, smoothedY);
+            XYData = CalculateSpline(x[0], x[x.Length - 1], splineRTinterval, cubicSpline);
+        }
+        private double CalculateAverageInterval()
+        {
+            var intervals = new List<double>();
+            var rts = Peaks.Select(p => p.RetentionTime).ToArray();
+            var indices = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
+            for (int i = 0; i < rts.Length - 1; i++)
+            {
+                if (indices[i + 1] == indices[i] + 1)
+                {
+                    var rtInterval = rts[i + 1] - rts[i];
+                    intervals.Add(rtInterval);
+                }
+            }
+            return intervals.Mean();
+        }
+
+        private double[] ImputeMissingValues(IInterpolation spline, out double[] x)
+        {
+            double meanInterval = CalculateAverageInterval();
+            var numPoints = EndCycle - StartCycle + 1;
+            int[] cycles = Enumerable.Range(StartCycle, numPoints).ToArray();
+            var rts = Peaks.Select(p => p.RetentionTime).ToArray();
+            x = new double[numPoints];
+            var y = new double[numPoints];
+            var indexList = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
+            for (int i = 0; i < numPoints; i++)
+            {
+                var id = Array.BinarySearch(indexList.ToArray(), cycles[i]);
+                if (id >= 0)
+                {
+                    x[i] = rts[id];
+                    y[i] = Peaks[id].Intensity;
+                }
+                else
+                {
+                    x[i] = x[i - 1] + meanInterval;
+                    y[i] = spline.Interpolate(x[i]);
                 }
             }
             return y;
@@ -663,6 +718,37 @@ namespace EngineLayer.DIA
                         y: XYData.Select(xy => xy.Item2)).WithTraceInfo("XYData").WithMarkerStyle(Color: Color.fromString("blue"));
             var combinedPlot = Chart.Combine(new[] { plot, plot2 });
             return combinedPlot;
+        }
+
+        public GenericChart VisualizeCubicSpline(float timeInterval)
+        {
+            var smoothedData = Interpolte_cubic(timeInterval);
+            var raw = Chart2D.Chart.Point<float, float, string>(
+                x: Peaks.Select(p => (float)p.RetentionTime),
+                y: Peaks.Select(p => (float)p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
+            var plot = Chart2D.Chart.Point<float, float, string>(
+                x: smoothedData.Select(p => p.Item1),
+                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
+            var combined = Chart.Combine(new[] { plot, raw });
+            return combined;
+        }
+        public List<(float, float)> Interpolte_cubic(float timeInterval)
+        {
+            if (CubicSpline == null)
+            {
+                GetCubicSpline();
+            }
+            var rtSeq = new List<float>();
+            for (float i = (float)StartRT; i < (float)EndRT; i += timeInterval)
+            {
+                rtSeq.Add(i);
+            }
+            var smoothedData = new List<(float, float)>();
+            for (int i = 0; i < rtSeq.Count; i++)
+            {
+                smoothedData.Add((rtSeq[i], (float)CubicSpline.Interpolate(rtSeq[i])));
+            }
+            return smoothedData;
         }
 
         public void DetectPeakRegions()
@@ -1234,6 +1320,7 @@ namespace EngineLayer.DIA
             {
                 return;
             }
+            var peaksToRemove = new List<Peak>();
 
             //DiscriminationFactorToCutPeak is a parameter, default 0.6 in FlashLFQ
             double DiscriminationFactorToCutPeak = 0.6;
@@ -1259,23 +1346,22 @@ namespace EngineLayer.DIA
 
                 if (discriminationFactor > DiscriminationFactorToCutPeak)
                 {
-                    //decide which peak the valley point belongs to 
-                    var discriminationLeft = (Peaks[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
-                    var discriminationRight = (Peaks[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                    var secondValleyPoint = Peaks[indexOfValley - 1];
+                    var discriminationFactor2 = (timepoint.Intensity - secondValleyPoint.Intensity) / valleyPeak.Intensity;
+                    if (discriminationFactor2 > DiscriminationFactorToCutPeak)
+                    {
+                        //decide which peak the valley point belongs to 
+                        var discriminationLeft = (Peaks[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                        var discriminationRight = (Peaks[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
 
-                    var peaksToRemove = new List<Peak>();
-                    if (discriminationLeft > discriminationRight)
-                    {
-                        peaksToRemove = Peaks.Where(p => p.RetentionTime <= valleyPeak.RetentionTime).ToList();
-                    }
-                    else
-                    {
-                        peaksToRemove = Peaks.Where(p => p.RetentionTime < valleyPeak.RetentionTime).ToList();
-                    }
-                    foreach (var peak in peaksToRemove)
-                    {
-                        peak.PeakCurve = null;
-                        Peaks.Remove(peak);
+                        if (discriminationLeft > discriminationRight)
+                        {
+                            peaksToRemove.AddRange(Peaks.Where(p => p.RetentionTime <= valleyPeak.RetentionTime));
+                        }
+                        else
+                        {
+                            peaksToRemove.AddRange(Peaks.Where(p => p.RetentionTime < valleyPeak.RetentionTime));
+                        }
                     }
                     break;
                 }
@@ -1298,11 +1384,161 @@ namespace EngineLayer.DIA
 
                 if (discriminationFactor > DiscriminationFactorToCutPeak)
                 {
-                    //decide which peak the valley point belongs to 
-                    var discriminationLeft = (Peaks[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
-                    var discriminationRight = (Peaks[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                    var secondValleyPoint = Peaks[indexOfValley + 1];
+                    var discriminationFactor2 = (timepoint.Intensity - secondValleyPoint.Intensity) / valleyPeak.Intensity;
+                    if (discriminationFactor2 > DiscriminationFactorToCutPeak)
+                    {
+                        //decide which peak the valley point belongs to 
+                        var discriminationLeft = (Peaks[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                        var discriminationRight = (Peaks[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
 
-                    var peaksToRemove = new List<Peak>();
+                        if (discriminationLeft > discriminationRight)
+                        {
+                            peaksToRemove.AddRange(Peaks.Where(p => p.RetentionTime > valleyPeak.RetentionTime));
+                        }
+                        else
+                        {
+                            peaksToRemove.AddRange(Peaks.Where(p => p.RetentionTime >= valleyPeak.RetentionTime));
+                        }
+                    }
+                    break;
+                }
+            }
+
+            foreach (var peak in peaksToRemove)
+            {
+                peak.PeakCurve = null;
+                Peaks.Remove(peak);
+            }
+        }
+
+        //for scipy signal split
+        //TODO
+        public void ScipySplit(bool doSpline, bool doSmooth, double[] widths, IInterpolation spline = null, float splineRtInterval = 0.005f, int windowSize = 5)
+        {
+            var peakPoints = GetScipyPeakPoints(doSpline, doSmooth, widths, spline, splineRtInterval, windowSize);
+            var valleyPointIndices = new List<int> { 0 };
+            for (int i = 0; i < peakPoints.Count - 1; i++)
+            {
+                var valleyPointIndex = FindValleyPoints((float)peakPoints[i], (float)peakPoints[i + 1]);
+                valleyPointIndices.Add(valleyPointIndex);
+            }
+            valleyPointIndices.Add(Peaks.Count - 1);
+        }
+
+        public int FindValleyPoints(float maxima1, float maxima2)
+        {
+            var rtArray = Peaks.Select(p => (float)p.RetentionTime).ToArray();
+            var leftIndex = BinarySearchLower(rtArray, maxima1);
+            var rightIndex = BinarySearchHigher(rtArray, maxima2);
+            var valleyPointIndex = 0;
+            for (int i = leftIndex; i <= rightIndex; i++)
+            {
+                if (Peaks[i].Intensity < Peaks[leftIndex].Intensity)
+                {
+                    valleyPointIndex = i;
+                }
+            }
+            return valleyPointIndex;
+        }
+
+        public List<double> GetScipyPeakPoints(bool doSpline, bool doSmooth, double[] widths, IInterpolation spline = null, float splineRtInterval = 0.005f, int windowSize = 5)
+        {
+            var y = Peaks.Select(p => p.Intensity).ToArray();
+            var x = Peaks.Select(p => p.RetentionTime).ToArray();
+            if (doSpline)
+            {
+                var data = CalculateSpline(StartRT, EndRT, splineRtInterval, spline);
+                y = data.Select(p => p.Item2).ToArray();
+                x = data.Select(p => p.Item1).ToArray();
+            }
+            if (doSmooth)
+            {
+                double[] imputedY = ImputeMissingValues(spline, out double[] rtArray);
+                y = CalculateSavgolSmoothedData(imputedY, windowSize);
+            }
+            var peaks = Scipy_signal.FindPeaks_cwt(y, widths);
+            var peaksRT = peaks.Select(p => x[p]).ToList();
+            return peaksRT;
+        }
+
+        public void CutPeak_smooth(int windowSize)
+        {
+            // find out if we need to split this peak by using the discrimination factor
+            // this method assumes that the isotope envelopes in a chromatographic peak are already sorted by MS1 scan number
+            bool cutThisPeak = false;
+
+            if (Peaks.Count < 5)
+            {
+                return;
+            }
+            var peaksToRemove = new List<Peak>();
+
+            //sg smooth the peak
+            GetSavgolSmoothedXYData(windowSize);
+            (double RetentionTime, double Intensity)[] smoothedData = XYData;
+
+            //DiscriminationFactorToCutPeak is a parameter, default 0.6 in FlashLFQ
+            double DiscriminationFactorToCutPeak = 0.6;
+
+            var apexPeak = smoothedData.OrderByDescending(p => p.Intensity).First();
+            int apexIndex = smoothedData.IndexOf(apexPeak);
+            (double RetentionTime, double Intensity) valleyPeak = (0,0);
+            int indexOfValley = 0;
+
+            //go left
+            for (int i = apexIndex; i >= 0; i--)
+            {
+                var timepoint = smoothedData[i];
+
+                if (valleyPeak == (0,0) || timepoint.Intensity < valleyPeak.Intensity)
+                {
+                    valleyPeak = timepoint;
+                    indexOfValley = smoothedData.IndexOf(valleyPeak);
+                }
+
+                double discriminationFactor =
+                    (timepoint.Intensity - valleyPeak.Intensity) / timepoint.Intensity;
+
+                if (discriminationFactor > DiscriminationFactorToCutPeak)
+                {
+                    //decide which peak the valley point belongs to 
+                    var discriminationLeft = (smoothedData[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                    var discriminationRight = (smoothedData[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+
+                    if (discriminationLeft > discriminationRight)
+                    {
+                        peaksToRemove = Peaks.Where(p => p.RetentionTime <= valleyPeak.RetentionTime).ToList();
+                    }
+                    else
+                    {
+                        peaksToRemove = Peaks.Where(p => p.RetentionTime < valleyPeak.RetentionTime).ToList();
+                    }
+                }
+                break;
+            }
+
+            //go right
+            valleyPeak = (0,0);
+            for (int i = apexIndex; i < smoothedData.Length; i++)
+            {
+                var timepoint = smoothedData[i];
+
+                if (valleyPeak == (0,0) || timepoint.Intensity < valleyPeak.Intensity)
+                {
+                    valleyPeak = timepoint;
+                    indexOfValley = smoothedData.IndexOf(valleyPeak);
+                }
+
+                double discriminationFactor =
+                    (timepoint.Intensity - valleyPeak.Intensity) / timepoint.Intensity;
+
+                if (discriminationFactor > DiscriminationFactorToCutPeak)
+                {
+                    //decide which peak the valley point belongs to 
+                    var discriminationLeft = (smoothedData[indexOfValley - 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+                    var discriminationRight = (smoothedData[indexOfValley + 1].Intensity - valleyPeak.Intensity) / valleyPeak.Intensity;
+
                     if (discriminationLeft > discriminationRight)
                     {
                         peaksToRemove = Peaks.Where(p => p.RetentionTime > valleyPeak.RetentionTime).ToList();
@@ -1311,14 +1547,14 @@ namespace EngineLayer.DIA
                     {
                         peaksToRemove = Peaks.Where(p => p.RetentionTime >= valleyPeak.RetentionTime).ToList();
                     }
-                    foreach (var peak in peaksToRemove)
-                    {
-                        peak.PeakCurve = null;
-                        Peaks.Remove(peak);
-                    }
-                    break;
                 }
-            }  
+                break;
+            }
+            foreach (var peak in peaksToRemove)
+            {
+                peak.PeakCurve = null;
+                Peaks.Remove(peak);
+            }
         }
 
         public static PeakCurve PeakTracing(double mz, int zeroBasedScanIndex, MsDataScan[] scans, Tolerance tolerance, int binSize, int maxMissedScans, double maxRTRange)

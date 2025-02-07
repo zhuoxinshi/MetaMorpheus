@@ -133,7 +133,7 @@ namespace EngineLayer
             PrecursorIntensity = (parsedHeader[PsmTsvHeader.PrecursorIntensity] < 0) ? null : Double.TryParse(spl[parsedHeader[PsmTsvHeader.PrecursorIntensity]].Trim(), out double value) ? value : null;
             PrecursorMz = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorMz]].Trim(), CultureInfo.InvariantCulture);
             PrecursorMass = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorMass]].Trim(), CultureInfo.InvariantCulture);
-            PrecursorHighestPeakMz = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorHighestPeakMz]].Trim(), CultureInfo.InvariantCulture);
+            //PrecursorHighestPeakMz = double.Parse(spl[parsedHeader[PsmTsvHeader.PrecursorHighestPeakMz]].Trim(), CultureInfo.InvariantCulture);
             BaseSeq = RemoveParentheses(spl[parsedHeader[PsmTsvHeader.BaseSequence]].Trim());
             FullSequence = spl[parsedHeader[PsmTsvHeader.FullSequence]];
             PeptideMonoMass = spl[parsedHeader[PsmTsvHeader.PeptideMonoMass]].Trim();
