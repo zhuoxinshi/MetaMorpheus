@@ -26,7 +26,7 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\DIAEngine_static_corr0.5_highestPeakXIC_ms1Tol5ppmMs2Tol20ppm_RetentionTime_Ms1SpaceSpline_apexRT0.25_overlap0.2_corr0.5_maxRT0.5_Frank100_Prank10_miss1";
+            string outputFolder = @"E:\DIA\TestSearch\testPeakFindChange_DIAEngine_static_corr0.5_ms1Tol5ppmMs2Tol20ppm_RetentionTime_cubicSpline_apexRT0.25_overlap0.2_corr0.5_maxRT0.5_Frank100_Prank10_miss1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -36,7 +36,7 @@ namespace Test.TestDIA
                 fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
                 scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.RetentionTime,
-                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, correlationType: CorrelationType.Ms1SpaceSpline);
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.CubicSpline);
             // Use reflection to set max threads
             //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
             //var type = task.CommonParameters.GetType();
@@ -110,7 +110,7 @@ namespace Test.TestDIA
                 ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: true, cutMs2Peaks: true, 
                 ms1SplineType:SplineType.SavgolSmoothed, ms2SplineType: SplineType.SavgolSmoothed, sgFilterWindowSize: 9);
-            string DIAfile = @"E:\ISD Project\ISD_bu\01-14-25_bu_Yeast_SP3_1ug_rep1_ISD100_labeled_RT36.31-37.9.mzML";
+            string DIAfile = @"E:\ISD Project\ISD_bu\01-14-25_bu_Yeast_SP3_1ug_rep1_ISD100_labeled.mzML";
             string dataBase = @"E:\ISD Project\ISD_250128\2025-02-01-13-52-03\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             var myFileManager = new MyFileManager(true);
             var myMsDataFile = myFileManager.LoadFile(DIAfile, task.CommonParameters);
@@ -121,10 +121,10 @@ namespace Test.TestDIA
         public static void TestTopDownISDSearch()
         {
             var filePath1 = @"E:\ISD Project\ISD_250128\YD_gradient5_ISD_cali-avg\Task2-AveragingTask\01-31-25_td-ISD_PEPPI-YD_105min_gradient5_ISD60-80-100_micro3_labelCorrected-calib-averaged_RT38.5-44.04.mzML";
-            var filePath2 = @"E:\ISD Project\ISD_250128\YD_comparisons2_cali-avg-gptmd-xml\Task2-AveragingTask\01-31-25_td-ISD_PEPPI-YD_105min_ISD60-80-100_micro1_labelCorrected-calib-averaged_RT30.01-33.01.mzML";
+            var filePath2 = @"E:\ISD Project\TestIsdDataAnalysis\02-01-25_td-ISD_PEPPI-YC_105min_ISD60-80-100_micro1_labelCorrected-calib-averaged.mzML";
             var tomlFile = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
-            var outputFolder = @"E:\ISD Project\TestSearch\ISDEngine_static_gradient5-RT38-44_cali-avged_Ms1DeconHighestMs2Peak_5ppm_Ms1SavgolCubic(5)_apexRT0.5_overlap0.3_corr_0.5_maxRT1.5";
+            var outputFolder = @"E:\ISD Project\TestSearch\testPeakFindChange_ISDEngine_static_gradient5-RT38-44_cali-avged_Ms1DeconHighestMs2Peak_5ppm_Ms1SavgolCubic(5)_apexRT0.5_overlap0.3_corr_0.5_maxRT1.5";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -138,7 +138,7 @@ namespace Test.TestDIA
                 pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
                 ms1SplineType: SplineType.SavgolSmoothedCubicSpline, ms2SplineType: SplineType.Ms1SpaceSavgolSmoothedCubicSpline, sgFilterWindowSize: 5);
             string myDatabase = @"E:\ISD Project\ISD_250128\2025-02-01-13-52-03\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
-            task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { filePath1, filePath2 }, "test");
+            task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(myDatabase, false) }, new List<string> { filePath1 }, "test");
         }
         //remove minimum number of points required for correlation?
     }

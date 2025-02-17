@@ -57,7 +57,7 @@ namespace EngineLayer.DIA
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan = 2, int binSize = 100, 
             double overlapRatioCutOff = 0.3, double correlationCutOff = 0.5, double apexRtTolerance = 0.1, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
             , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
-            bool splitMS2Peak = false, bool splitMS1Peak = false, double splineRtInterval = 0.05, double minMass = 0, double maxMass = 99999, string type = "DIA", int apexCycleTolerance = 2, 
+            bool splitMS2Peak = false, bool splitMS1Peak = false, double splineRtInterval = 0.005, double minMass = 0, double maxMass = 99999, string type = "DIA", int apexCycleTolerance = 2, 
             double scanCycleSplineInterval = 0.025, int minCharge = 1, bool averageMs2Scans = false, XICType ms1XICType = XICType.DeconHighestPeak, 
             XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak, 
             AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,

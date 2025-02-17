@@ -45,7 +45,7 @@ namespace EngineLayer.DIA
             NumHighCorrFragments = PFpairs.Where(p => p.Correlation >= diaParam.HighCorrThreshold).Count();
         }
         
-        public void Visualize()
+        public GenericChart VisualizeLog10()
         {
             var normalizedIntensity = PrecursorPeakCurve.Peaks.Select(p => Math.Log10(p.Intensity));
             var precursorPlot = Chart2D.Chart.Line<double, double, string>(
@@ -62,7 +62,67 @@ namespace EngineLayer.DIA
                 plots.Add(fragmentPlot2);
             }
             var combinedPlot = Chart.Combine(plots);
-            combinedPlot.Show();
+            return combinedPlot;
+        }
+
+        public GenericChart VisualizeNormalized()
+        {
+            var maxPreIntensity = PrecursorPeakCurve.Peaks.Max(p => p.Intensity);
+            var normalizedIntensity = PrecursorPeakCurve.Peaks.Select(p => p.Intensity / maxPreIntensity);
+            var precursorPlot = Chart2D.Chart.Line<double, double, string>(
+                    x: PrecursorPeakCurve.Peaks.Select(p => p.RetentionTime),
+                    y: normalizedIntensity, FillColor: Color.fromString("white")).WithTraceInfo($"precursor_{Math.Round(PrecursorPeakCurve.AveragedMz, 3)}").WithMarkerStyle(Color: Color.fromString("red"));
+            var plots = new List<GenericChart> { };
+            foreach (var pf in PFpairs)
+            {
+                var maxFragIntensity = pf.FragmentPeakCurve.Peaks.Max(p => p.Intensity);
+                var norm2 = pf.FragmentPeakCurve.Peaks.Select(p => p.Intensity / maxFragIntensity);
+                var fragmentPlot2 = Chart2D.Chart.Line<double, double, string>(
+                        x: pf.FragmentPeakCurve.Peaks.Select(p => p.RetentionTime),
+                        y: norm2).WithTraceInfo($"fragment_{Math.Round(pf.FragmentPeakCurve.AveragedMz, 3)}_{Math.Round(pf.Correlation, 2)}_{pf.FragmentRank}")
+                        .WithMarkerStyle(Color: Color.fromString("blue"));
+                plots.Add(fragmentPlot2);
+            }
+            plots.Add(precursorPlot);
+            var combinedPlot = Chart.Combine(plots);
+            return combinedPlot;
+        }
+
+        public GenericChart VisualizeXYData(int numFrags = 0)
+        {
+            if (PrecursorPeakCurve.XYData == null)
+            {
+                return null;
+            }
+            var plots = new List<GenericChart> { };
+
+            var maxPreIntensity = PrecursorPeakCurve.XYData.Max(p => p.Item2);
+            var normalizedIntensity = PrecursorPeakCurve.XYData.Select(p => p.Item2 / maxPreIntensity);
+            var precursorPlot = Chart2D.Chart.Line<double, double, string>(
+                       x: PrecursorPeakCurve.XYData.Select(p => p.Item1),
+                       y: normalizedIntensity).WithLayout(Layout.init<string>(PlotBGColor: Color.fromString("white")))
+                       .WithTraceInfo($"precursor_{Math.Round(PrecursorPeakCurve.AveragedMz, 3)}")
+                       .WithMarkerStyle(Color: Color.fromString("red")).WithLineStyle(Width: 8);
+
+            var pairs = PFpairs;
+            if (numFrags > 0 && PFpairs.Count > numFrags)
+            {
+                pairs = PFpairs.OrderByDescending(p => p.Correlation).Take(numFrags).ToList();
+            }
+            var maxFragIntensity = pairs.Max(pf => pf.FragmentPeakCurve.XYData.Max(p => p.Item2));
+            foreach (var pf in pairs)
+            {
+                var norm2 = pf.FragmentPeakCurve.XYData.Select(p => p.Item2 / maxFragIntensity);
+                var fragmentPlot2 = Chart2D.Chart.Line<double, double, string>(
+                        x: pf.FragmentPeakCurve.XYData.Select(p => p.Item1),
+                        y: norm2).WithLayout(Layout.init<string>(PlotBGColor: Color.fromString("white")))
+                        .WithTraceInfo($"fragment_{Math.Round(pf.FragmentPeakCurve.AveragedMz, 3)}_{Math.Round(pf.Correlation, 2)}_{pf.FragmentRank}")
+                        .WithMarkerStyle(Color: Color.fromString("RoyalBlue")).WithLineStyle(Width: 4);
+                plots.Add(fragmentPlot2);
+            }
+            plots.Add(precursorPlot);
+            var combinedPlot = Chart.Combine(plots);
+            return combinedPlot;
         }
 
         public static List<GenericChart> VisualizePFgroups(MsDataFile dataFile, List<PsmFromTsv> psms, CommonParameters commonParameters, DIAparameters diaParam)

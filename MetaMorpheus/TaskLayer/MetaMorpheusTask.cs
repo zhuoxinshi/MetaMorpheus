@@ -125,10 +125,11 @@ namespace TaskLayer
             var ms3Scans = msNScans.Where(p => p.MsnOrder == 3).ToArray();
             List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
 
-            if (!ms2Scans.Any())
-            {
-                return scansWithPrecursors;
-            }
+            //Change back!!
+            //if (!ms2Scans.Any())
+            //{
+            //    return scansWithPrecursors;
+            //}
 
             Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                 (partitionRange, loopState) =>

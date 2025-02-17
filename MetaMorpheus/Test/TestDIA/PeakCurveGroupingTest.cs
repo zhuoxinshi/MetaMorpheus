@@ -11,6 +11,7 @@ using EngineLayer;
 using TaskLayer;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Org.BouncyCastle.Crypto.Encodings;
+using Plotly.NET.CSharp;
 
 namespace Test.TestDIA
 {
@@ -74,7 +75,7 @@ namespace Test.TestDIA
             {
                 var ms1Scans = testCase.Scans.Where(s => s.MsnOrder == 1).ToArray();
                 var ms2Scans = testCase.Scans.Where(s => s.MsnOrder == 2).ToArray();
-                var diaParam = new DIAparameters(new PpmTolerance(5), new PpmTolerance(5), 1, numScanPerCycle: 2, correlationCutOff: 0.5, apexRtTolerance: 0.2,
+                var diaParam = new DIAparameters(new PpmTolerance(5), new PpmTolerance(5), 1, numScanPerCycle: 2, correlationCutOff: 0.9, apexRtTolerance: 0.2,
                     overlapRatioCutOff: 0.3, pfGroupingType: PFGroupingType.RetentionTime);
                 var allMs1PeakCurves = ISDEngine_static.GetAllPeakCurves(ms1Scans, new CommonParameters(), diaParam, XICType.DeconHighestPeak, new PpmTolerance(5), 0.5, out List<Peak>[] peaks);
                 var allMs2PeakCurves = ISDEngine_static.GetAllPeakCurves(ms2Scans, new CommonParameters(), diaParam, XICType.Peak, new PpmTolerance(5), 0.5, out List<Peak>[] peaks2);
@@ -86,6 +87,7 @@ namespace Test.TestDIA
                     frag.GetRawXYData();
                 }
                 var pfGroup = ISDEngine_static.PFgrouping(precursorPC, allMs2PeakCurves, diaParam);
+                pfGroup.VisualizeNormalized().Show();
                 var matchedFragPCs = pfGroup.PFpairs.Select(p => p.FragmentPeakCurve).ToList();
                 foreach (var frag in testCase.ExpectedFragMz)
                 {

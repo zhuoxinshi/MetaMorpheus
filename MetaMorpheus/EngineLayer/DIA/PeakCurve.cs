@@ -40,6 +40,7 @@ namespace EngineLayer.DIA
 
         public PeakCurve()
         {
+            Peaks = new List<Peak>();
             PFpairs = new List<PrecursorFragmentPair>();
         }
 
@@ -464,7 +465,8 @@ namespace EngineLayer.DIA
             int missedScans = 0;
             for (int t = targetPeak.ZeroBasedScanIndex + 1; t < peakTable.Length; t++)
             {
-                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, tolerance, binSize);
+                //Changed for test!! Remember to change back!!!
+                var peak = GetPeakFromScan(targetPeak.Mz, peakTable, t, tolerance, binSize);
 
                 if (peak == null)
                 {
@@ -499,7 +501,8 @@ namespace EngineLayer.DIA
             missedScans = 0;
             for (int t = targetPeak.ZeroBasedScanIndex - 1; t >= 0; t--)
             {
-                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, tolerance, binSize);
+                //Changed for test!! Remember to change back!!!
+                var peak = GetPeakFromScan(targetPeak.Mz, peakTable, t, tolerance, binSize);
 
                 if (peak == null)
                 {
@@ -534,149 +537,149 @@ namespace EngineLayer.DIA
             return newPeakCurve;
         }
 
-        public static PeakCurve FindPeakCurve_cutPeak(Peak targetPeak, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
-            , Tolerance mzTolerance, int binSize, double maxRTrange = 2)
-        {
-            var xic = new List<Peak>();
-            var peakList = new List<Peak>();
-            peakList.Add(targetPeak);
-            PeakCurve newPeakCurve = new PeakCurve(xic, targetPeak.MsLevel, isolationWindow);
-            targetPeak.PeakCurve = newPeakCurve;
+        //public static PeakCurve FindPeakCurve_cutPeak(Peak targetPeak, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
+        //    , Tolerance mzTolerance, int binSize, double maxRTrange = 2)
+        //{
+        //    var xic = new List<Peak>();
+        //    var peakList = new List<Peak>();
+        //    peakList.Add(targetPeak);
+        //    PeakCurve newPeakCurve = new PeakCurve(xic, targetPeak.MsLevel, isolationWindow);
+        //    targetPeak.PeakCurve = newPeakCurve;
 
-            // go right
-            int missedScans = 0;
-            for (int t = targetPeak.ZeroBasedScanIndex + 1; t < scans.Length; t++)
-            {
-                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
+        //    // go right
+        //    int missedScans = 0;
+        //    for (int t = targetPeak.ZeroBasedScanIndex + 1; t < scans.Length; t++)
+        //    {
+        //        var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
 
-                if (peak == null)
-                {
-                    missedScans++;
-                }
-                else if (peak != null)
-                {
-                    if (peak.RetentionTime - targetPeak.RetentionTime > maxRTrange)
-                    {
-                        break;
-                    }
-                    //if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
-                    if (peak.PeakCurve == null)
-                    {
-                        missedScans = 0;
-                        peakList.Add(peak);
-                    }
-                    else
-                    {
-                        missedScans++;
-                    }
-                }
+        //        if (peak == null)
+        //        {
+        //            missedScans++;
+        //        }
+        //        else if (peak != null)
+        //        {
+        //            if (peak.RetentionTime - targetPeak.RetentionTime > maxRTrange)
+        //            {
+        //                break;
+        //            }
+        //            //if(peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
+        //            if (peak.PeakCurve == null)
+        //            {
+        //                missedScans = 0;
+        //                peakList.Add(peak);
+        //            }
+        //            else
+        //            {
+        //                missedScans++;
+        //            }
+        //        }
 
-                if (missedScans > maxMissedScans)
-                {
-                    break;
-                }
-            }
+        //        if (missedScans > maxMissedScans)
+        //        {
+        //            break;
+        //        }
+        //    }
 
-            // go left
-            missedScans = 0;
-            for (int t = targetPeak.ZeroBasedScanIndex - 1; t >= 0; t--)
-            {
-                var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
+        //    // go left
+        //    missedScans = 0;
+        //    for (int t = targetPeak.ZeroBasedScanIndex - 1; t >= 0; t--)
+        //    {
+        //        var peak = GetPeakFromScan(newPeakCurve.AveragedMz, peakTable, t, mzTolerance, binSize);
 
-                if (peak == null)
-                {
-                    missedScans++;
-                }
-                else if (peak != null)
-                {
-                    if (peak.RetentionTime - targetPeak.RetentionTime > maxRTrange)
-                    {
-                        break;
-                    }
-                    //if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
-                    if (peak.PeakCurve == null)
-                    {
-                        missedScans = 0;
-                        peakList.Add(peak);
-                    }
-                    else
-                    {
-                        missedScans++;
-                    }
-                }
+        //        if (peak == null)
+        //        {
+        //            missedScans++;
+        //        }
+        //        else if (peak != null)
+        //        {
+        //            if (peak.RetentionTime - targetPeak.RetentionTime > maxRTrange)
+        //            {
+        //                break;
+        //            }
+        //            //if (peak.PeakCurve == null || Math.Abs(peak.Mz - newPeakCurve.AveragedMz) < Math.Abs(peak.Mz - peak.PeakCurve.AveragedMz))
+        //            if (peak.PeakCurve == null)
+        //            {
+        //                missedScans = 0;
+        //                peakList.Add(peak);
+        //            }
+        //            else
+        //            {
+        //                missedScans++;
+        //            }
+        //        }
 
-                if (missedScans > maxMissedScans)
-                {
-                    break;
-                }
-            }
+        //        if (missedScans > maxMissedScans)
+        //        {
+        //            break;
+        //        }
+        //    }
 
-            if (peakList.Count > 5)
-            {
-                //DiscriminationFactorToCutPeak is a parameter, default 0.6 in FlashLFQ
-                double DiscriminationFactorToCutPeak = 0.6;
+        //    if (peakList.Count > 5)
+        //    {
+        //        //DiscriminationFactorToCutPeak is a parameter, default 0.6 in FlashLFQ
+        //        double DiscriminationFactorToCutPeak = 0.6;
 
-                peakList = peakList.OrderBy(p => p.RetentionTime).ToList();
-                var apexPeak = peakList.OrderByDescending(p => p.Intensity).First();
-                int apexIndex = peakList.IndexOf(apexPeak);
-                Peak valleyPeak = null;
-                int indexOfValley = 0;
+        //        peakList = peakList.OrderBy(p => p.RetentionTime).ToList();
+        //        var apexPeak = peakList.OrderByDescending(p => p.Intensity).First();
+        //        int apexIndex = peakList.IndexOf(apexPeak);
+        //        Peak valleyPeak = null;
+        //        int indexOfValley = 0;
 
-                //go left
-                for (int i = apexIndex; i >= 0; i--)
-                {
-                    Peak timepoint = peakList[i];
+        //        //go left
+        //        for (int i = apexIndex; i >= 0; i--)
+        //        {
+        //            Peak timepoint = peakList[i];
 
-                    if (valleyPeak == null || timepoint.Intensity < valleyPeak.Intensity)
-                    {
-                        valleyPeak = timepoint;
-                        indexOfValley = peakList.IndexOf(valleyPeak);
-                    }
+        //            if (valleyPeak == null || timepoint.Intensity < valleyPeak.Intensity)
+        //            {
+        //                valleyPeak = timepoint;
+        //                indexOfValley = peakList.IndexOf(valleyPeak);
+        //            }
 
-                    double discriminationFactor =
-                        (timepoint.Intensity - valleyPeak.Intensity) / timepoint.Intensity;
+        //            double discriminationFactor =
+        //                (timepoint.Intensity - valleyPeak.Intensity) / timepoint.Intensity;
 
-                    if (discriminationFactor > DiscriminationFactorToCutPeak)
-                    {
-                        peakList.RemoveAll(p => p.RetentionTime < valleyPeak.RetentionTime);
-                        break;
-                    }
-                }
+        //            if (discriminationFactor > DiscriminationFactorToCutPeak)
+        //            {
+        //                peakList.RemoveAll(p => p.RetentionTime < valleyPeak.RetentionTime);
+        //                break;
+        //            }
+        //        }
 
-                //go right
-                valleyPeak = null;
-                for (int i = apexIndex; i < peakList.Count; i++)
-                {
-                    Peak timepoint = peakList[i];
+        //        //go right
+        //        valleyPeak = null;
+        //        for (int i = apexIndex; i < peakList.Count; i++)
+        //        {
+        //            Peak timepoint = peakList[i];
 
-                    if (valleyPeak == null || timepoint.Intensity < valleyPeak.Intensity)
-                    {
-                        valleyPeak = timepoint;
-                        indexOfValley = peakList.IndexOf(valleyPeak);
-                    }
+        //            if (valleyPeak == null || timepoint.Intensity < valleyPeak.Intensity)
+        //            {
+        //                valleyPeak = timepoint;
+        //                indexOfValley = peakList.IndexOf(valleyPeak);
+        //            }
 
-                    double discriminationFactor =
-                        (timepoint.Intensity - valleyPeak.Intensity) / timepoint.Intensity;
+        //            double discriminationFactor =
+        //                (timepoint.Intensity - valleyPeak.Intensity) / timepoint.Intensity;
 
-                    if (discriminationFactor > DiscriminationFactorToCutPeak)
-                    {
-                        peakList.RemoveAll(p => p.RetentionTime > valleyPeak.RetentionTime);
-                        break;
-                    }
-                }
-            }
+        //            if (discriminationFactor > DiscriminationFactorToCutPeak)
+        //            {
+        //                peakList.RemoveAll(p => p.RetentionTime > valleyPeak.RetentionTime);
+        //                break;
+        //            }
+        //        }
+        //    }
 
-            foreach(var peak in peakList)
-            {
-                xic.Add(peak);
-                peak.PeakCurve = newPeakCurve;
-            }
+        //    foreach(var peak in peakList)
+        //    {
+        //        xic.Add(peak);
+        //        peak.PeakCurve = newPeakCurve;
+        //    }
 
-            xic.Sort((x, y) => x.RetentionTime.CompareTo(y.RetentionTime));
+        //    xic.Sort((x, y) => x.RetentionTime.CompareTo(y.RetentionTime));
 
-            return newPeakCurve;
-        }
-   
+        //    return newPeakCurve;
+        //}
+
         public GenericChart VisualizeBspline(out List<float> rtSeq)
         {
             var rawData = Peaks.Select(p => ((float)p.RetentionTime, (float)p.Intensity)).ToList();
@@ -720,36 +723,36 @@ namespace EngineLayer.DIA
             return combinedPlot;
         }
 
-        public GenericChart VisualizeCubicSpline(float timeInterval)
-        {
-            var smoothedData = Interpolte_cubic(timeInterval);
-            var raw = Chart2D.Chart.Point<float, float, string>(
-                x: Peaks.Select(p => (float)p.RetentionTime),
-                y: Peaks.Select(p => (float)p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
-            var plot = Chart2D.Chart.Point<float, float, string>(
-                x: smoothedData.Select(p => p.Item1),
-                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
-            var combined = Chart.Combine(new[] { plot, raw });
-            return combined;
-        }
-        public List<(float, float)> Interpolte_cubic(float timeInterval)
-        {
-            if (CubicSpline == null)
-            {
-                GetCubicSpline();
-            }
-            var rtSeq = new List<float>();
-            for (float i = (float)StartRT; i < (float)EndRT; i += timeInterval)
-            {
-                rtSeq.Add(i);
-            }
-            var smoothedData = new List<(float, float)>();
-            for (int i = 0; i < rtSeq.Count; i++)
-            {
-                smoothedData.Add((rtSeq[i], (float)CubicSpline.Interpolate(rtSeq[i])));
-            }
-            return smoothedData;
-        }
+        //public GenericChart VisualizeCubicSpline(float timeInterval)
+        //{
+        //    var smoothedData = Interpolte_cubic(timeInterval);
+        //    var raw = Chart2D.Chart.Point<float, float, string>(
+        //        x: Peaks.Select(p => (float)p.RetentionTime),
+        //        y: Peaks.Select(p => (float)p.Intensity)).WithTraceInfo("raw").WithMarkerStyle(Color: Color.fromString("red"));
+        //    var plot = Chart2D.Chart.Point<float, float, string>(
+        //        x: smoothedData.Select(p => p.Item1),
+        //        y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
+        //    var combined = Chart.Combine(new[] { plot, raw });
+        //    return combined;
+        //}
+        //public List<(float, float)> Interpolte_cubic(float timeInterval)
+        //{
+        //    if (CubicSpline == null)
+        //    {
+        //        GetCubicSpline();
+        //    }
+        //    var rtSeq = new List<float>();
+        //    for (float i = (float)StartRT; i < (float)EndRT; i += timeInterval)
+        //    {
+        //        rtSeq.Add(i);
+        //    }
+        //    var smoothedData = new List<(float, float)>();
+        //    for (int i = 0; i < rtSeq.Count; i++)
+        //    {
+        //        smoothedData.Add((rtSeq[i], (float)CubicSpline.Interpolate(rtSeq[i])));
+        //    }
+        //    return smoothedData;
+        //}
 
         public void DetectPeakRegions()
         {

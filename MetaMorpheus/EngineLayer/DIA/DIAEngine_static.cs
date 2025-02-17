@@ -41,6 +41,12 @@ namespace EngineLayer.DIA
                 }
             }
             ISDEngine_static.PeakCurveSpline(allMs1PeakCurves.Values.SelectMany(p => p).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
+            var ms1PeakCurveGroups = new Dictionary<(double min, double max), List<PeakCurve>>();
+            foreach(var group in allMs1PeakCurves)
+            {
+                var pcs = group.Value.GroupBy(pc => new { mass = Math.Round(pc.MonoisotopicMass, 1), apexRt = pc.ApexRT }).ToList();
+
+            }
 
             //Get rtMap
             var rtMap = ISDEngine_static.GetRtMap(ms1Scans, ms2Scans);
@@ -60,7 +66,7 @@ namespace EngineLayer.DIA
             {
                 var precursorsInRange = allMs1PeakCurves[ms2group.Key].ToArray();
 
-                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 18 },
+                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 15 },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)

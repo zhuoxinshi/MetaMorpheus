@@ -46,9 +46,6 @@ namespace Test.TestDIA
             public double ExpectedEndRT { get; set; }
             public int ExpectedStartCycle { get; set; }
             public int ExpectedEndCycle { get; set; }
-            public List<double> SelectedRTs { get; set; }
-            public List<double> SelectedIntensities { get; set; }
-            public override string ToString() => "Mz: " + ExpectedAveragedMz.ToString() + ", Apex: " + ExpectedApexRT.ToString();
 
             public SinglePeakCurveTestCase(PeakCurve peakCurve, double expectedMz, double expectedApexRt, double expectedStartRt,  double expectedEndRt, int expectedApexCycle, int expectedStartCycle, int expectedEndCycle)
             {
@@ -204,6 +201,23 @@ namespace Test.TestDIA
             {
                 var ms1Scan = ms1Scans.First(s => s.OneBasedScanNumber == scan.OneBasedPrecursorScanNumber);
                 Assert.That(rtMap[scan.RetentionTime], Is.EqualTo(ms1Scan.RetentionTime));
+            }
+        }
+
+        [Test]
+        public static void TestFindPrecursors()
+        {
+            var path = @"E:\ISD Project\ISD_bu\12-18-24_bu-ISD100_5pro_mix1_labelCorrected.mzML";
+            var myFileManagers = new MyFileManager(true);
+            var commonParam = new CommonParameters(trimMsMsPeaks: false);
+            var dataFile = myFileManagers.LoadFile(path, commonParam);
+            var ms1scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 1).ToArray();
+
+            var allEnvelopes = new List<IsotopicEnvelope>();
+            foreach(var scan in ms1scans)
+            {
+                var envelopes = Deconvoluter.Deconvolute(scan, commonParam.PrecursorDeconvolutionParameters);
+                allEnvelopes.AddRange(envelopes);
             }
         }
 
