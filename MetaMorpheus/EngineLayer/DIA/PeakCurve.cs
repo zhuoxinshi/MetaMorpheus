@@ -89,6 +89,7 @@ namespace EngineLayer.DIA
         public (float, float)[] SavgolSmoothedData { get; set; }
         public CubicSpline SavgolSmoothedCubicSpline { get; set; }
         public (double, double)[] XYData { get; set; }
+        
 
         public double AverageMz()
         {
@@ -179,6 +180,22 @@ namespace EngineLayer.DIA
             }
             int numPoints = (int)Math.Floor((EndRT - StartRT) / splineRtInterval) + 1;
             XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, CubicSpline);
+        }
+
+        public void GetBSplineXYData(double splineRtInterval, int smoothDegree)
+        {
+            int PtNum = (int)Math.Floor((EndRT - StartRT) / splineRtInterval) + 1;
+            var rawData = Peaks.Select(p => (p.RetentionTime, p.Intensity)).ToList();
+            var smoothedData = new Bspline2().Run(rawData, PtNum, smoothDegree);
+            XYData = smoothedData.ToArray();
+        }
+
+        public void GetMS1SpaceBSplineXYData(double splineRtInterval, int smoothDegree, Dictionary<double, double> rtMap)
+        {
+            int PtNum = (int)Math.Floor((EndRT - StartRT) / splineRtInterval) + 1;
+            var peaks = Peaks.Select(p => (rtMap[p.RetentionTime], p.Intensity)).ToList();
+            var splineData = new Bspline2().Run(peaks, PtNum, smoothDegree);
+            XYData = splineData.ToArray();
         }
 
         public List<(float, float)> GetBsplineData(int PtNum, int smoothDegree)

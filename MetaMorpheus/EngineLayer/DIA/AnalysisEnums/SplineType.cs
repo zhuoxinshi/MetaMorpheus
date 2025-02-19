@@ -11,6 +11,7 @@ namespace EngineLayer.DIA
         NoSpline,
         LinearSpline,
         CubicSpline,
+        BSpline,
         ScanCycleCubicSpline,
         Normalized,
         Ms1SpaceCubicSpline,

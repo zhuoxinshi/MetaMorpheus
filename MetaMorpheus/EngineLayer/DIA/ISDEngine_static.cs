@@ -149,6 +149,10 @@ namespace EngineLayer.DIA
                     foreach (var pc in allPeakCurves)
                         pc.GetCubicSplineXYData(diaParam.SplineRtInterval);
                     break;
+                case SplineType.BSpline:
+                    foreach (var pc in allPeakCurves)
+                        pc.GetBSplineXYData(diaParam.SplineRtInterval, 2);
+                    break;
                 case SplineType.ScanCycleCubicSpline:
                     foreach (var pc in allPeakCurves)
                         pc.GetScanCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);

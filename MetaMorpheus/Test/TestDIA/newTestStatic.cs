@@ -1113,5 +1113,11 @@ namespace Test.TestDIA
 
             int stop2 = 0;
         }
+
+        [Test]
+        public static void TestBSpline()
+        {
+
+        }
     }
 }

@@ -26,7 +26,7 @@ namespace Test.TestDIA
             var task = new SearchTask();
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\testPeakFindChange_DIAEngine_static_corr0.5_ms1Tol5ppmMs2Tol20ppm_RetentionTime_cubicSpline_apexRT0.25_overlap0.2_corr0.5_maxRT0.5_Frank100_Prank10_miss1";
+            string outputFolder = @"E:\DIA\TestSearch\testPeakFindChange_DIAEngine_static_corr0.5_ms1Tol5ppmMs2Tol20ppm_RetentionTime_cubicSpline_apexRT0.2_overlap0.2_corr0.5_maxRT0.5_Frank100_Prank10_miss1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -36,7 +36,8 @@ namespace Test.TestDIA
                 fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
                 scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, pfGroupingType: PFGroupingType.RetentionTime,
-                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.CubicSpline);
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.CubicSpline, 
+                splineRtInterval: 0.005);
             // Use reflection to set max threads
             //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
             //var type = task.CommonParameters.GetType();

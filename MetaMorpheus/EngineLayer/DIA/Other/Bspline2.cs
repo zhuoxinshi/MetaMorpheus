@@ -8,34 +8,37 @@ using static Plotly.NET.StyleParam;
 
 namespace EngineLayer.DIA
 {
-    public class Bspline
+    public class Bspline2
     {
-        private float[] bspline_T_ = null;
+        private double[] bspline_T_ = null;
 
-        public List<(float, float)> Run(List<(float, float)> data, int PtNum, int smoothDegree)
+        public List<(double, double)> Run(List<(double, double)> data, int PtNum, int smoothDegree)
         {
-            List<(float, float)> bsplineCollection = new List<(float, float)>();
+            List<(double, double)> bsplineCollection = new List<(double, double)>();
             int p = smoothDegree;
             int n = data.Count() - 1;
             int m = data.Count() + p;
-            bspline_T_ = new float[m + p];
+            bspline_T_ = new double[m + p];
+
             if (data.Count() <= p)
             {
                 return data;
             }
+
             for (int i = 0; i <= n; i++)
             {
                 bspline_T_[i] = 0;
                 bspline_T_[m - i] = 1;
             }
-            float intv = 1.0f / (m - 2 * p);
+            double intv = 1.0f / (m - 2 * p);
             for (int i = 1; i <= m - 1; i++)
             {
                 bspline_T_[p + i] = bspline_T_[p + i - 1] + intv;
             }
+
             for (int i = 0; i <= PtNum; i++)
             {
-                float t = (float)i / PtNum;
+                double t = (double)i / PtNum;
                 var pt = getbspline(data, t, n, p);
                 bsplineCollection.Add(pt);
             }
@@ -50,23 +53,24 @@ namespace EngineLayer.DIA
             return bsplineCollection;
         }
 
-        public (float, float) getbspline(List<(float, float)> data, float t, int n, int p)
+        public (double, double) getbspline(List<(double, double)> data, double t, int n, int p)
         {
-            float x = 0, y = 0;
+            double x = 0, y = 0;
             for (int i = 0; i <= n; i++)
             {
-                float a = bspline_base(i, p, t);
+                double a = bspline_base(i, p, t);
                 var pt = data[i];
                 x += pt.Item1 * a;
                 y += pt.Item2 * a;
             }
             return new(x, y);
         }
-        public float bspline_base(int i, int p, float t)
+
+        public double bspline_base(int i, int p, double t)
         {
-            float n, c1, c2;
-            float tn1 = 0;
-            float tn2 = 0;
+            double n, c1, c2;
+            double tn1 = 0;
+            double tn2 = 0;
             if (p == 0)
             {
                 if (bspline_T_[i] <= t && t < bspline_T_[i + 1] && bspline_T_[i] < bspline_T_[i + 1])
