@@ -450,7 +450,7 @@ namespace TaskLayer
 
         public static CommonParameters SetAllFileSpecificCommonParams(CommonParameters commonParams, FileSpecificParameters fileSpecificParams)
         {
-            if (fileSpecificParams == null)
+            if (fileSpecificParams == null || commonParams.DIAparameters != null)
             {
                 return commonParams;
             }
@@ -523,6 +523,12 @@ namespace TaskLayer
                 productDeconParams: commonParams.ProductDeconvolutionParameters,
                 useMostAbundantPrecursorIntensity: commonParams.UseMostAbundantPrecursorIntensity);
 
+            //set DIAparameters
+            if (commonParams.DIAparameters != null)
+            {
+                returnParams.DIAparameters = commonParams.DIAparameters;
+            }
+
             return returnParams;
         }
 
@@ -533,7 +539,7 @@ namespace TaskLayer
             StartingSingleTask(displayName);
 
             var tomlFileName = Path.Combine(Directory.GetParent(output_folder).ToString(), "Task Settings", displayName + "config.toml");
-            Toml.WriteFile(this, tomlFileName, tomlConfig);
+            //Toml.WriteFile(this, tomlFileName, tomlConfig);
             FinishedWritingFile(tomlFileName, new List<string> { displayName });
 
             FileSpecificParameters = new List<(string FileName, CommonParameters Parameters)>();

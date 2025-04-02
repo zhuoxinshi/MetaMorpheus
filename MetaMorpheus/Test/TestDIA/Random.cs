@@ -44,8 +44,7 @@ namespace Test.TestDIA
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                        allMs1Scans[i].OneBasedScanNumber, i);
+                    var precursor = new DeconvolutedMass(envelope, allMs1Scans[i].RetentionTime, 1, allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }
             }

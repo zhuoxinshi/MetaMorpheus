@@ -166,7 +166,7 @@ namespace EngineLayer.DIA
                                 foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
                                     precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
                                 {
-                                    if (envelope.MonoisotopicMass < diaParam.MinMass)
+                                    if (envelope.MonoisotopicMass < diaParam.MinMS1Mass)
                                     {
                                         continue;
                                     }

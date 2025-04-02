@@ -129,18 +129,23 @@ namespace EngineLayer
         //    If you forget this, and the user uses file-specific parameters, your settings will be overwritten by default values!
 
         public string TaskDescriptor { get; private set; }
-        public int MaxThreadsToUsePerFile { get; private set; }
+
+        //changed to set
+        public int MaxThreadsToUsePerFile { get; set; }
         public IEnumerable<(string, string)> ListOfModsFixed { get; private set; }
         public IEnumerable<(string, string)> ListOfModsVariable { get; private set; }
         public bool DoPrecursorDeconvolution { get; private set; }
         public bool UseProvidedPrecursorInfo { get; private set; }
-        [TomlIgnore] public double DeconvolutionIntensityRatio { get; private set; }
+
+        //changed to set
+        [TomlIgnore] public double DeconvolutionIntensityRatio { get; set; }
         public int DeconvolutionMaxAssumedChargeState
         {
             get => PrecursorDeconvolutionParameters.MaxAssumedChargeState;
             private set => PrecursorDeconvolutionParameters.MaxAssumedChargeState = value;
         }
-        [TomlIgnore] public DeconvolutionParameters PrecursorDeconvolutionParameters { get; private set; }
+        //changed to set
+        [TomlIgnore] public DeconvolutionParameters PrecursorDeconvolutionParameters { get;  set; }
         [TomlIgnore] public DeconvolutionParameters ProductDeconvolutionParameters { get; private set; }
         [TomlIgnore] public Tolerance DeconvolutionMassTolerance { get; private set; }
         public int TotalPartitions { get; set; }
@@ -189,7 +194,8 @@ namespace EngineLayer
         public bool UseMostAbundantPrecursorIntensity { get; set; }
 
         public DIAparameters DIAparameters { get; set; }
-        
+        public List<DIAPFgroupsMetricsFile> DIAPFgroupsMetricsFiles { get; set; }
+
         public CommonParameters Clone()
         {
             CommonParameters c = new CommonParameters();

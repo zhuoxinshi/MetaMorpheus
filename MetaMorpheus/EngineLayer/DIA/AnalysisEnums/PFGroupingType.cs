@@ -12,6 +12,8 @@ namespace EngineLayer.DIA
         ScanCycle,
         OverlapAreaRatio,
         Area_correlation,
-        OverlapFirst
+        OverlapFirst,
+        Umpire,
+        MassCurveRT
     }
 }

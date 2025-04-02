@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Easy.Common;
@@ -28,19 +29,26 @@ namespace EngineLayer.DIA
             PrecursorPeakCurve = pre;
             FragmentPeakCurve = frag;
         }
-
+        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag, double overlap, double corr)
+        {
+            PrecursorPeakCurve = pre;
+            FragmentPeakCurve = frag;
+            Overlap = overlap;
+            Correlation = corr;
+        }
         public PeakCurve PrecursorPeakCurve { get; set; }
         public PeakCurve FragmentPeakCurve { get; set; }    
         public double Correlation { get; set; }
         public int FragmentRank { get; set; }
         public int PrecursorRank { get; set; }
+        public double Overlap { get; set; }
 
         public static double CalculateCorrelation((double, double)[] xy1, (double, double)[] xy2)
         {
-            if (xy1.Length < 5 || xy2.Length < 5)
-            {
-                return 0;
-            }
+            //if (xy1.Length < 5 || xy2.Length < 5)
+            //{
+            //    return 0;
+            //}
 
             double start = Math.Max(xy1[0].Item1, xy2[0].Item1);
             double end = Math.Min(xy1[xy1.Length - 1].Item1, xy2[xy2.Length - 1].Item1);
@@ -59,6 +67,87 @@ namespace EngineLayer.DIA
         public static double CalculatePeakCurveCorrXYData(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
             double corr = CalculateCorrelation(peakCurve1.XYData, peakCurve2.XYData);
+            return corr;
+        }
+
+        public static double CalculatePeakCurveCorrXYData_Umpire(PeakCurve curve1, PeakCurve curve2, int NoPointPerInterval)
+        {
+            double start = Math.Max(curve1.UmpireBsplineData[0].Item1, curve2.UmpireBsplineData[0].Item1);
+
+            //int num = Math.Min(curve1.SmoothedData.Count, curve2.SmoothedData.Count) / 2;
+            int num = Math.Max(curve1.UmpireBsplineData.Count(), curve2.UmpireBsplineData.Count()) / 2;
+            double timeInterval = (double) 2 / NoPointPerInterval;
+
+            if (num < 6)
+            {
+                return 0f;
+            }
+            double[] arrayA = new double[num];
+            double[] arrayB = new double[num];
+
+            int i = 0;
+            double low = start;
+            double up = start + timeInterval;
+
+            for (int j = 0; j < curve1.UmpireBsplineData.Count; j++)
+            {
+                while (curve1.UmpireBsplineData[j].Item1 > up)
+                {
+                    i++;
+                    low = up;
+                    up = low + timeInterval;
+                }
+                if (i >= num)
+                {
+                    break;
+                }
+                if (curve1.UmpireBsplineData[j].Item1 >= low && curve1.UmpireBsplineData[j].Item1 < up)
+                {
+                    if (curve1.UmpireBsplineData[j].Item2 > arrayA[i])
+                    {
+                        arrayA[i] = curve1.UmpireBsplineData[j].Item2;
+                    }
+                }
+            }
+
+            i = 0;
+            low = start;
+            up = start + timeInterval;
+
+            for (int j = 0; j < curve2.UmpireBsplineData.Count; j++)
+            {
+                while (curve2.UmpireBsplineData[j].Item1 > up)
+                {
+                    i++;
+                    low = up;
+                    up = low + timeInterval;
+                }
+                if (i >= num)
+                {
+                    break;
+                }
+                if (curve2.UmpireBsplineData[j].Item1 >= low && curve2.UmpireBsplineData[j].Item1 < up)
+                {
+                    if (curve2.UmpireBsplineData[j].Item2 > arrayB[i])
+                    {
+                        arrayB[i] = curve2.UmpireBsplineData[j].Item2;
+                    }
+                }
+            }
+
+            for (int idx = 1; idx < num - 1; idx++)
+            {
+                if (arrayA[idx] == 0f)
+                {
+                    arrayA[idx] = (arrayA[idx - 1] + arrayA[idx + 1]) / 2;
+                }
+                if (arrayB[idx] == 0f)
+                {
+                    arrayB[idx] = (arrayB[idx - 1] + arrayB[idx + 1]) / 2;
+                }
+            }
+
+            double corr = MathNet.Numerics.Statistics.Correlation.Pearson(arrayA, arrayB);
             return corr;
         }
 
@@ -142,8 +231,8 @@ namespace EngineLayer.DIA
                     rtSeqB.Add(i);
                 }
                 int numPt = rtSeqB.Count;
-                var smoothedIntensities1 = peakCurve1.GetBsplineData(numPt, 2).Select(p => (double)p.Item2).ToArray();
-                var smoothedIntensities2 = peakCurve2.GetBsplineData(numPt, 2).Select(p => (double)p.Item2).ToArray();
+                var smoothedIntensities1 = peakCurve1.GetUmpireBSplineFloatData(numPt, 2).Select(p => (double)p.Item2).ToArray();
+                var smoothedIntensities2 = peakCurve2.GetUmpireBSplineFloatData(numPt, 2).Select(p => (double)p.Item2).ToArray();
 
                 double corr = MathNet.Numerics.Statistics.Correlation.Pearson(smoothedIntensities1, smoothedIntensities2);
                 return corr;
@@ -220,13 +309,15 @@ namespace EngineLayer.DIA
         }
 
 
-        public static double CalculateCorr_diaUmpire(PeakCurve curve1, PeakCurve curve2, float timeInterval)
+        public static double CalculateCorr_diaUmpire(PeakCurve curve1, PeakCurve curve2, int NoPointPerInterval)
         {
-            float start = Math.Max(curve1.SmoothedData[0].Item1, curve2.SmoothedData[0].Item1);
-            float end = Math.Min(curve1.SmoothedData[curve1.SmoothedData.Count - 1].Item1, curve2.SmoothedData[curve2.SmoothedData.Count - 1].Item1);
+            float start = Math.Max(curve1.BsplineSmoothedData[0].Item1, curve2.BsplineSmoothedData[0].Item1);
+            float end = Math.Min(curve1.BsplineSmoothedData[curve1.BsplineSmoothedData.Count - 1].Item1, curve2.BsplineSmoothedData[curve2.BsplineSmoothedData.Count - 1].Item1);
 
             //int num = Math.Min(curve1.SmoothedData.Count, curve2.SmoothedData.Count) / 2;
-            int num = (int)((end - start) / timeInterval + 1);
+            int num = Math.Max(curve1.BsplineSmoothedData.Count(), curve2.BsplineSmoothedData.Count()) / 2;
+            float timeInterval = 2f / (float)NoPointPerInterval;
+
             if (num < 6)
             {
                 return 0f;
@@ -238,9 +329,9 @@ namespace EngineLayer.DIA
             float low = start;
             float up = start + timeInterval;
 
-            for (int j = 0; j < curve1.SmoothedData.Count; j++)
+            for (int j = 0; j < curve1.BsplineSmoothedData.Count; j++)
             {
-                while (curve1.SmoothedData[j].Item1 > up)
+                while (curve1.BsplineSmoothedData[j].Item1 > up)
                 {
                     i++;
                     low = up;
@@ -250,11 +341,11 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
-                if (curve1.SmoothedData[j].Item1 >= low && curve1.SmoothedData[j].Item1 < up)
+                if (curve1.BsplineSmoothedData[j].Item1 >= low && curve1.BsplineSmoothedData[j].Item1 < up)
                 {
-                    if (curve1.SmoothedData[j].Item2 > arrayA[i])
+                    if (curve1.BsplineSmoothedData[j].Item2 > arrayA[i])
                     {
-                        arrayA[i] = curve1.SmoothedData[j].Item2;
+                        arrayA[i] = curve1.BsplineSmoothedData[j].Item2;
                     }
                 }
             }
@@ -263,9 +354,9 @@ namespace EngineLayer.DIA
             low = start;
             up = start + timeInterval;
 
-            for (int j = 0; j < curve2.SmoothedData.Count; j++)
+            for (int j = 0; j < curve2.BsplineSmoothedData.Count; j++)
             {
-                while (curve2.SmoothedData[j].Item1 > up)
+                while (curve2.BsplineSmoothedData[j].Item1 > up)
                 {
                     i++;
                     low = up;
@@ -275,11 +366,11 @@ namespace EngineLayer.DIA
                 {
                     break;
                 }
-                if (curve2.SmoothedData[j].Item1 >= low && curve2.SmoothedData[j].Item1 < up)
+                if (curve2.BsplineSmoothedData[j].Item1 >= low && curve2.BsplineSmoothedData[j].Item1 < up)
                 {
-                    if (curve2.SmoothedData[j].Item2 > arrayB[i])
+                    if (curve2.BsplineSmoothedData[j].Item2 > arrayB[i])
                     {
-                        arrayB[i] = curve2.SmoothedData[j].Item2;
+                        arrayB[i] = curve2.BsplineSmoothedData[j].Item2;
                     }
                 }
             }
@@ -296,33 +387,8 @@ namespace EngineLayer.DIA
                 }
             }
 
-            float sumA = 0;
-            float sumB = 0;
-            float sumA2 = 0;
-            float sumB2 = 0;
-            float sumAB = 0;
 
-            for (int k = 0; k < num; k++)
-            {
-                float a = arrayA[k];
-                float b = arrayB[k];
-
-                sumA += a;
-                sumB += b;
-                sumA2 += a * a;
-                sumB2 += b * b;
-                sumAB += a * b;
-            }
-
-            float numerator = num * sumAB - sumA * sumB;
-            var denominator = Math.Sqrt((num * sumA2 - sumA * sumA) * (num * sumB2 - sumB * sumB));
-
-            if (denominator == 0)
-            {
-                return 0; // Avoid division by zero
-            }
-
-            return numerator / denominator;
+            return 0;
         }
 
         public static double CalculatePeakCurveCorr(PeakCurve peakCurve1, PeakCurve peakCurve2)

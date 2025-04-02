@@ -12,6 +12,7 @@ namespace EngineLayer.DIA
         DeconHighestPeak,
         isoEnvelopeTotal,
         isoEnvelopeHighestPeak,
-        Peak_cutPeak
+        Peak_cutPeak,
+        MassCurve
     }
 }

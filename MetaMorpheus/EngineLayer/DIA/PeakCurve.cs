@@ -47,6 +47,7 @@ namespace EngineLayer.DIA
         public PeakCurve(List<Peak> peaks)
         {
             Peaks = peaks;
+            MsLevel = peaks.First().MsLevel;
         }
 
         public List<Peak> Peaks { get; set; }
@@ -80,21 +81,18 @@ namespace EngineLayer.DIA
 
         public WaveletMassDetector WaveletMassDetector { get; set; }
         public CwtParameters CwtParameters { get; set; }
-        public List<(float, float)> SmoothedData { get; set; }
+        public List<(float, float)> BsplineSmoothedData { get; set; }
+        public List<(double, double)> UmpireBsplineData { get; set; }
         public List<(double, double)> ScanCycleSmoothedData { get; set; }
         public (int, double)[] NormalizedPeaks { get; set; }
-        public Normal GaussianFit { get; set; }
-        public List<(double, double)> GaussianFitData { get; set; }
         public double NL { get; set; }
-        public (float, float)[] SavgolSmoothedData { get; set; }
-        public CubicSpline SavgolSmoothedCubicSpline { get; set; }
         public (double, double)[] XYData { get; set; }
-        
+
+        public double AveragedMass => AverageMass();
 
         public double AverageMz()
         {
             double sumIntensity = Peaks.Sum(p => p.Intensity);
-            double sumMz = Peaks.Sum(p => p.Mz);
             double averagedMz = 0;
             foreach (var peak in Peaks)
             {
@@ -114,6 +112,19 @@ namespace EngineLayer.DIA
                 averagedIntensity += weight * peak.Intensity;
             }
             return averagedIntensity;
+        }
+
+
+        public double AverageMass()
+        {
+            double sumIntensity = Peaks.Sum(p => p.Intensity * p.Intensity);
+            double averagedMass = 0;
+            foreach (var mass in Peaks)
+            {
+                double weight = mass.Intensity * mass.Intensity / sumIntensity;
+                averagedMass += weight * mass.MonoisotopicMass;
+            }
+            return averagedMass;
         }
 
         public void CalculateNL()
@@ -190,7 +201,7 @@ namespace EngineLayer.DIA
             XYData = smoothedData.ToArray();
         }
 
-        public void GetMS1SpaceBSplineXYData(double splineRtInterval, int smoothDegree, Dictionary<double, double> rtMap)
+        public void GetMs1SpaceBSplineXYData(double splineRtInterval, int smoothDegree, Dictionary<double, double> rtMap)
         {
             int PtNum = (int)Math.Floor((EndRT - StartRT) / splineRtInterval) + 1;
             var peaks = Peaks.Select(p => (rtMap[p.RetentionTime], p.Intensity)).ToList();
@@ -198,11 +209,19 @@ namespace EngineLayer.DIA
             XYData = splineData.ToArray();
         }
 
-        public List<(float, float)> GetBsplineData(int PtNum, int smoothDegree)
+        public List<(float, float)> GetUmpireBSplineFloatData(int NoPeakPerMin, int smoothDegree)
         {
             var rawData = Peaks.Select(p => ((float)p.RetentionTime, (float)p.Intensity)).ToList();
-            var smoothedData = new Bspline().Run(rawData, PtNum, smoothDegree);
+            var smoothedData = new Bspline().Run(rawData, (int)Math.Max((EndRT - StartRT) * NoPeakPerMin, Peaks.Count), smoothDegree);
+            BsplineSmoothedData = smoothedData;
             return smoothedData;
+        }
+
+        public void GetUmpireBSplineData(int NoPeakPerMin, int smoothDegree)
+        {
+            var rawData = Peaks.Select(p => (p.RetentionTime, p.Intensity)).ToList();
+            var smoothedData = new Bspline2().Run(rawData, (int)Math.Max((EndRT - StartRT) * NoPeakPerMin, Peaks.Count), smoothDegree);
+            UmpireBsplineData = smoothedData;
         }
 
         public void GetRawXYData()
@@ -470,8 +489,8 @@ namespace EngineLayer.DIA
             return m;
         }
 
-        public static PeakCurve FindPeakCurve(Peak targetPeak, List<Peak>[] peakTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
-            , Tolerance tolerance, int binSize, double maxRTrange, double splineInterval = 0.025)
+        public static PeakCurve FindPeakCurve(Peak targetPeak, List<Peak>[] massTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
+            , Tolerance tolerance, int binSize, double maxRTrange)
         {
             var xic = new List<Peak>();
             xic.Add(targetPeak);
@@ -480,10 +499,10 @@ namespace EngineLayer.DIA
 
             // go right
             int missedScans = 0;
-            for (int t = targetPeak.ZeroBasedScanIndex + 1; t < peakTable.Length; t++)
+            for (int t = targetPeak.ZeroBasedScanIndex + 1; t < massTable.Length; t++)
             {
                 //Changed for test!! Remember to change back!!!
-                var peak = GetPeakFromScan(targetPeak.Mz, peakTable, t, tolerance, binSize);
+                var peak = GetPeakFromScan(targetPeak.Mz, massTable, t, tolerance, binSize);
 
                 if (peak == null)
                 {
@@ -519,7 +538,7 @@ namespace EngineLayer.DIA
             for (int t = targetPeak.ZeroBasedScanIndex - 1; t >= 0; t--)
             {
                 //Changed for test!! Remember to change back!!!
-                var peak = GetPeakFromScan(targetPeak.Mz, peakTable, t, tolerance, binSize);
+                var peak = GetPeakFromScan(targetPeak.Mz, massTable, t, tolerance, binSize);
 
                 if (peak == null)
                 {
@@ -707,9 +726,9 @@ namespace EngineLayer.DIA
             }
             int numPt = rtSeq.Count;
             var smoothedData = new Bspline().Run(rawData, numPt, 2);
-            var plot = Chart2D.Chart.Point<float, float, string>(
+            var plot = Chart2D.Chart.Line<float, float, string>(
                 x: smoothedData.Select(p => p.Item1),
-                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("green"));
+                y: smoothedData.Select(p => p.Item2)).WithTraceInfo("spline").WithMarkerStyle(Color: Color.fromString("blue"));
             return plot;
         }
 
@@ -802,7 +821,7 @@ namespace EngineLayer.DIA
             //    peakArrayList[2 * i + 1] = (float)CubicSpline.Interpolate(rtSeq[i]);
             //}
             
-            var smoothedData = GetBsplineData(rtSeq.Count, 2);
+            var smoothedData = GetUmpireBSplineFloatData(rtSeq.Count, 2);
             rtSeq = smoothedData.Select(p => p.Item1).ToList();
             var peakArrayList = new float[rtSeq.Count * 2];
             for (int i = 0; i < rtSeq.Count; i++)
@@ -1129,7 +1148,7 @@ namespace EngineLayer.DIA
                 var newPeakCurve = new PeakCurve();
                 newPeakCurve.Peaks = new List<Peak>();
                 newPeakCurve.MsLevel = MsLevel;
-                newPeakCurve.SmoothedData = new List<(float, float)>();
+                newPeakCurve.BsplineSmoothedData = new List<(float, float)>();
                 newPeakCurves[i] = newPeakCurve;
                 i++;
             }
@@ -1310,7 +1329,7 @@ namespace EngineLayer.DIA
             }
             var plot_spline = VisualizeBspline(out List<float> rtSeq);
             var markedRTs = new List<float> { PeakRegionList[0].rt1 };
-            var smoothedData = GetBsplineData(rtSeq.Count, 2);
+            var smoothedData = GetUmpireBSplineFloatData(rtSeq.Count, 2);
             float yMin = smoothedData.Min(p => p.Item2);
             float yMax = smoothedData.Max(p => p.Item2);
             foreach (var region in PeakRegionList)
@@ -1590,7 +1609,54 @@ namespace EngineLayer.DIA
             return peakCurve;
         }
 
-        
+        public void Spline(SplineType splineType, DIAparameters diaParam, MsDataScan[] ms1Scans = null, MsDataScan[] ms2Scans = null)
+        {
+            //var rtIndexMap = GetRtIndexMap(ms1Scans);
+            //var rtMap = GetRtMap(ms1Scans, ms2Scans);
+
+            switch (splineType)
+            {
+                case SplineType.NoSpline:
+                    GetRawXYData();
+                    break;
+                case SplineType.CubicSpline:
+                    GetCubicSplineXYData(diaParam.SplineRtInterval);
+                    break;
+                case SplineType.BSpline:
+                    GetBSplineXYData(diaParam.SplineRtInterval, 2);
+                    break;
+                case SplineType.UmpireBSpline:
+                    GetUmpireBSplineData(diaParam.NoPointsPerMin, 2);
+                    break;
+                //case SplineType.Ms1SpaceBSpline:
+                //    GetMs1SpaceBSplineXYData(diaParam.SplineRtInterval, 2, rtMap);
+                //    break;
+                case SplineType.ScanCycleCubicSpline:
+                    GetScanCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
+                    break;
+                case SplineType.SavgolSmoothed:
+                    GetSavgolSmoothedXYData(diaParam.SGfilterWindowSize);
+                    break;
+                case SplineType.CubicSplineSavgolSmoothed:
+                    GetCubicSplineSavgolSmoothedXYData(diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                    break;
+                case SplineType.ScanCycleCubicSplineSavgolSmoothed:
+                    GetScanCycleCubicSplineSavgolSmoothedXYData(diaParam.SGfilterWindowSize, diaParam.ScanCycleSplineTimeInterval);
+                    break;
+                case SplineType.SavgolSmoothedCubicSpline:
+                    GetSavgolSmoothedCubicSplineXYData(diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                    break;
+                //case SplineType.Ms1SpaceCubicSpline:
+                //    GetMs1SpaceCubicSplineXYData(rtMap, diaParam.SplineRtInterval);
+                //    break;
+                //case SplineType.Ms1SpaceCubicSplineSavgolSmoothed:
+                //    GetMs1SpaceCubicSplineSavgolSmoothedXYData(rtMap, diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                //    break;
+                //case SplineType.Ms1SpaceSavgolSmoothedCubicSpline:
+                //    GetMs1SpaceSavgolSmoothedCubicSplineXYData(rtMap, diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                //    break;
+            }
+        }
     }
  
     }

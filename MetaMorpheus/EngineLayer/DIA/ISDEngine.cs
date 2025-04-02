@@ -150,15 +150,14 @@ namespace EngineLayer.DIA
                 var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters).OrderByDescending(E => E.MonoisotopicMass);
                 foreach (var envelope in envelopes)
                 {
-                    if (envelope.Charge < 6  || envelope.Peaks.Count < 3 || envelope.MonoisotopicMass < DIAparameters.MinMass)
+                    if (envelope.Charge < 6  || envelope.Peaks.Count < 3 || envelope.MonoisotopicMass < DIAparameters.MinMS1Mass)
                     {
                         continue;
                     }
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                        allMs1Scans[i].OneBasedScanNumber, i);
+                    var precursor = new DeconvolutedMass(envelope, allMs1Scans[i].RetentionTime, 1, allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }
             }
@@ -295,7 +294,7 @@ namespace EngineLayer.DIA
                         var charge = envelope.Charge;
                         double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                         double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                        var mass = new DeconvolutedMass(envelope, charge, ms2scans[i].RetentionTime, 2, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                        var mass = new DeconvolutedMass(envelope, ms2scans[i].RetentionTime, 2,
                             ms2scans[i].OneBasedScanNumber, i);
                         allMasses.Add(mass);
                     }
@@ -386,23 +385,60 @@ namespace EngineLayer.DIA
                 //{
                 //    continue;
                 //}
-                if (ms2curve.ApexRT >= precursor.StartRT && ms2curve.ApexRT <= precursor.EndRT)
+                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                 {
-                    if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                    if (overlap > DIAparameters.OverlapRatioCutOff)
                     {
-                        var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
-                        if (overlap > DIAparameters.OverlapRatioCutOff)
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                        if (corr > DIAparameters.CorrelationCutOff)
                         {
-                            double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
-                            if (corr > DIAparameters.CorrelationCutOff)
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr);
+                            lock (ms2curve.PFpairs)
                             {
-                                var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
-                                lock (ms2curve.PFpairs)
-                                {
-                                    ms2curve.PFpairs.Add(PFpair);
-                                }
-                                preFragGroup.PFpairs.Add(PFpair);
+                                ms2curve.PFpairs.Add(PFpair);
                             }
+                            preFragGroup.PFpairs.Add(PFpair);
+                        }
+                    }
+                }
+                
+            }
+            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+            //{
+            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+            //    preFragGroup.PFpairs = filtered.ToList();
+            //}
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static PrecursorFragmentsGroup UmpireGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in ms2curves)
+            {
+                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
+                {
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                    if (overlap > DIAparameters.OverlapRatioCutOff)
+                    {
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData_Umpire(precursor, ms2curve, DIAparameters.NoPointsPerMin);
+                        if (corr > DIAparameters.CorrelationCutOff)
+                        {
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr);
+                            lock (ms2curve.PFpairs)
+                            {
+                                ms2curve.PFpairs.Add(PFpair);
+                            }
+                            preFragGroup.PFpairs.Add(PFpair);
                         }
                     }
                 }
@@ -453,7 +489,7 @@ namespace EngineLayer.DIA
                 var mzs = new double[] { 1 };
                 var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.Envelope.TotalIntensity) };
                 var spectrum = new MzSpectrum(mzs, intensities, false);
-                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.PFgroupIndex, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
@@ -475,14 +511,14 @@ namespace EngineLayer.DIA
                 var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters).OrderByDescending(E => E.MonoisotopicMass);
                 foreach (var envelope in envelopes)
                 {
-                    if (envelope.MonoisotopicMass < DIAparameters.MinMass || envelope.Charge < 5)
+                    if (envelope.MonoisotopicMass < DIAparameters.MinMS1Mass || envelope.Charge < 5)
                     {
                         continue;
                     }
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, allMs1Scans[i].RetentionTime, 1,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors.Add(precursor);
                 }
@@ -525,14 +561,14 @@ namespace EngineLayer.DIA
                 var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters).OrderByDescending(E => E.MonoisotopicMass);
                 foreach (var envelope in envelopes)
                 {
-                    if (envelope.MonoisotopicMass < DIAparameters.MinMass || envelope.Charge < 5)
+                    if (envelope.MonoisotopicMass < DIAparameters.MinMS1Mass || envelope.Charge < 5)
                     {
                         continue;
                     }
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1,highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, allMs1Scans[i].RetentionTime, 1,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors[i].Add(precursor);
                 }
@@ -576,7 +612,7 @@ namespace EngineLayer.DIA
                         var charge = envelope.Charge;
                         double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                         double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                        var mass = new DeconvolutedMass(envelope, charge, ms2scans[i].RetentionTime, 2, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                        var mass = new DeconvolutedMass(envelope, ms2scans[i].RetentionTime, 2,
                             ms2scans[i].OneBasedScanNumber, i);
                         allMasses[i].Add(mass);
                     }
@@ -635,14 +671,14 @@ namespace EngineLayer.DIA
                 var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters).OrderByDescending(E => E.MonoisotopicMass);
                 foreach (var envelope in envelopes)
                 {
-                    if (envelope.MonoisotopicMass < DIAparameters.MinMass || envelope.Charge < 5)
+                    if (envelope.MonoisotopicMass < DIAparameters.MinMS1Mass || envelope.Charge < 5)
                     {
                         continue;
                     }
                     var charge = envelope.Charge;
                     double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                     double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                    var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
+                    var precursor = new DeconvolutedMass(envelope, allMs1Scans[i].RetentionTime, 1,
                         allMs1Scans[i].OneBasedScanNumber, i);
                     allPrecursors[i].Add(precursor);
                 }
@@ -701,8 +737,7 @@ namespace EngineLayer.DIA
                         var charge = envelope.Charge;
                         double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                         double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                        var mass = new DeconvolutedMass(envelope, charge, ms2scans[i].RetentionTime, 2, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                            ms2scans[i].OneBasedScanNumber, i);
+                        var mass = new DeconvolutedMass(envelope, ms2scans[i].RetentionTime, 2 ,ms2scans[i].OneBasedScanNumber, i);
                         allMasses[i].Add(mass);
                     }
                 }
@@ -755,13 +790,13 @@ namespace EngineLayer.DIA
                 var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.TotalIntensity) };
                 var spectrum = new MzSpectrum(mzs, intensities, false);
                 var newMs2Scan = new MsDataScan(spectrum, oneBasedScanNum, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
-                            MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null, oneBasedPrecursorScanNumber: pfGroup.Index);
+                            MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null, oneBasedPrecursorScanNumber: pfGroup.PFgroupIndex);
                 oneBasedScanNum++;
                 var neutralExperimentalFragments = new List<IsotopicEnvelope>();
                 foreach (var pf in pfGroup.PFpairs)
                 {
                     var envelope = new IsotopicEnvelope(new List<(double mz, double intensity)> { (pf.FragmentPeakCurve.AveragedMz, pf.FragmentPeakCurve.AveragedIntensity)}, 
-                        pf.FragmentPeakCurve.MonoisotopicMass, pf.FragmentPeakCurve.Charge, pf.FragmentPeakCurve.TotalIntensity, 0, 0);
+                        pf.FragmentPeakCurve.MonoisotopicMass, pf.FragmentPeakCurve.Charge, pf.FragmentPeakCurve.TotalIntensity, 0);
                     neutralExperimentalFragments.Add(envelope);
                 }
                 Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, pfGroup.PrecursorPeakCurve.AveragedMz, 
@@ -926,32 +961,15 @@ namespace EngineLayer.DIA
                     continue;
                 }
                 var newMs2curve = new PeakCurve(ms2peaks);
-                newMs2curve.GetScanCycleCubicSplineXYData(DIAparameters.ScanCycleSplineTimeInterval);
-                if (Math.Abs(newMs2curve.ApexCycle - precursor.ApexCycle) <= DIAparameters.ApexCycleTolerance)
+                if (Math.Abs(newMs2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                 {
                     var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, newMs2curve);
                     if (overlap > DIAparameters.OverlapRatioCutOff)
                     {
-                        double corr = double.NaN;
-                        switch (DIAparameters.CorrelationType)
-                        {
-                            case CorrelationType.NoSpline:
-                                corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, newMs2curve);
-                                break;
-                            case CorrelationType.CubicSpline_scanCycle_preCalc:
-                                corr = PrecursorFragmentPair.CalculateCorr_scanCycleSpline_preCalculated(precursor, newMs2curve);
-                                break;
-                            case CorrelationType.CubicSpline_RT:
-                                corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, newMs2curve, "cubic", DIAparameters.SplineTimeInterval);
-                                break;
-                            default:
-                                corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, newMs2curve);
-                                break;
-                        }
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
                         if (corr > DIAparameters.CorrelationCutOff)
                         {
-                            //use the new ms2curve for constructing pseudo ms2 scans but add the precursor to the original ms2curve?
-                            var PFpair = new PrecursorFragmentPair(precursor, newMs2curve, corr);
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
                             lock (ms2curve.PFpairs)
                             {
                                 ms2curve.PFpairs.Add(PFpair);
@@ -1016,7 +1034,7 @@ namespace EngineLayer.DIA
                     foreach (var ms2 in fragments)
                     {
                         var envelope = new IsotopicEnvelope(new List<(double, double)> { (ms2.Mass.ToMz(ms2.ChargeStateMax), ms2.Intensity)}, ms2.Mass, ms2.ChargeStateMax, 
-                            ms2.Intensity, 0.1, 1);
+                            ms2.Intensity, 0);
                         neutralExperimentalFragments.Add(envelope);
                     }
                     var newMs2WithMass = new Ms2ScanWithSpecificMass(newMs2Scan, ms1.Mass.ToMz(ms1.ChargeStateMax), ms1.ChargeStateMax, MyMSDataFile.FilePath,

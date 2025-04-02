@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Omics.Modifications;
+using System.Diagnostics;
+using pepXML.Generated;
 
 namespace EngineLayer.ClassicSearch
 {
@@ -68,6 +70,9 @@ namespace EngineLayer.ClassicSearch
             }
 
             Status("Performing classic search...");
+
+            //debug
+            var scanIndexList = new List<int>();
 
             if (Proteins.Any())
             {
@@ -161,6 +166,16 @@ namespace EngineLayer.ClassicSearch
                         }
                     }
                 });
+            }
+
+            //debug
+            var scansToLook = new List<SpectralMatch>();
+            for (int i = 0; i < PeptideSpectralMatches.Length; i++)
+            {
+                if (scanIndexList.Contains(i))
+                {
+                    scansToLook.Add(PeptideSpectralMatches[i]);
+                }
             }
 
             foreach (SpectralMatch psm in PeptideSpectralMatches.Where(p => p != null))

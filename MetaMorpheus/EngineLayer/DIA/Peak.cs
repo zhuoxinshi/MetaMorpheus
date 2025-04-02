@@ -33,6 +33,8 @@ namespace EngineLayer
         public int MsLevel { get; set; }
         public PeakCurve PeakCurve { get; set; }
         public PeakEnvelope PeakEnvelope { get; set; }
+        public double MonoisotopicMass { get; set; }
+        public int Charge { get; set; }
 
         public static List<Peak> GetAllPeaks(MsDataScan[] scans, int binsPerDalton)
         {

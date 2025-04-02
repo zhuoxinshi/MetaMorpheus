@@ -1,45 +1,75 @@
-﻿using MassSpectrometry;
+﻿using EngineLayer.DIA.Other;
+using MassSpectrometry;
 using MzLibUtil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EngineLayer.DIA.Other;
 
 
 namespace EngineLayer.DIA
 {
-    public class DeconvolutedMass
+    public class DeconvolutedMass : Peak
     {
-        public int Charge { get; set; }
-        public double RetentionTime { get; set; }
+        //public double RetentionTime { get; set; }
         public int MsLevel { get; set; }
-        public double HighestPeakMz { get; set; }
-        public double HighestPeakIntensity { get; set; }
-        public double MonoisotopicMass { get; set; }
+        public double HighestPeakMz => Envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;   
+        public double HighestPeakIntensity => Envelope.Peaks.Max(p => p.intensity); 
 
-        public int ScanNumber { get; set; }
-        public int ZeroBasedScanIndex {  get; set; }
         public IsotopicEnvelope Envelope { get; set; }
-        public int MassIndex => Envelope.MassIndex;
         public EnvelopeCurve EnvelopeCurve { get; set; }
         public double TotalIntensity => Envelope.TotalIntensity;
         public List<Peak> Isotopes { get; set; }
         public double AdjustedTotalIntensity { get; set; }
+        public MassCurve MassCurve { get; set; }
 
-        public DeconvolutedMass(IsotopicEnvelope envelope, int charge, double rt, int msLevel, double highestPeakMz, double highestPeakIntensity, double monoisotopicMass, int scanNumber, 
-            int zeroBasedScanNum)
+        public DeconvolutedMass(IsotopicEnvelope envelope, double rt, int msLevel, int scanNumber, int zeroBasedScanNum)
         {
             Envelope = envelope;
-            Charge = charge;
             RetentionTime = rt;
+            Charge = envelope.Charge;
             MsLevel = msLevel;
-            HighestPeakMz = highestPeakMz;
-            HighestPeakIntensity = highestPeakIntensity;
-            MonoisotopicMass = monoisotopicMass;
             ScanNumber = scanNumber;
             ZeroBasedScanIndex = zeroBasedScanNum;
+            MonoisotopicMass = envelope.MonoisotopicMass;
+            Intensity = envelope.Peaks.Max(p => p.intensity);
+        }
+
+        public static List<Peak>[] GetAllNeutralMassesByScan(MsDataScan[] scans, DeconvolutionParameters deconParameters, MzRange mzRange = null, double minMass = 0, int minCharge = 1)
+        {
+            var maxScanNum = scans[scans.Length - 1].OneBasedScanNumber;
+            var massesByScan = new List<Peak>[maxScanNum + 1];
+            int index = 0;
+            for (int i = 0; i < scans.Length; i++)
+            {
+                massesByScan[scans[i].OneBasedScanNumber] = new List<Peak>();
+                var envelopes = Deconvoluter.Deconvolute(scans[i].MassSpectrum, deconParameters, mzRange);
+                foreach(var envelope in envelopes)
+                {
+                    if (envelope.MonoisotopicMass < minMass || envelope.Charge < minCharge)
+                        continue;
+                    DeconvolutedMass newMass = new DeconvolutedMass(envelope, scans[i].RetentionTime, scans[i].MsnOrder, scans[i].OneBasedScanNumber, i);
+                    massesByScan[scans[i].OneBasedScanNumber].Add(newMass);
+                    index++;
+                }
+            }
+            return massesByScan;
+        }
+
+        public static List<DeconvolutedMass>[] GetMassTable(List<Peak> allMasses, int binsPerDalton)
+        {
+            var maxMass = allMasses.Max(p => p.MonoisotopicMass);
+            var table = new List<DeconvolutedMass>[(int)Math.Ceiling(allMasses.Max(p => p.MonoisotopicMass) * binsPerDalton) + 1];
+            for (int i = 0; i < allMasses.Count; i++)
+            {
+                int roundedMass = (int)Math.Round(allMasses[i].MonoisotopicMass * binsPerDalton, 0);
+
+                if (table[roundedMass] == null)
+                {
+                    table[roundedMass] = new List<DeconvolutedMass>();
+                }
+                table[roundedMass].Add((DeconvolutedMass)allMasses[i]);
+            }
+            return table;
         }
 
         //public static List<Precursor> FindPrecursor(Precursor precursor, List<Precursor> allPrecursors, int maxMissedScans, double massTolerance)
@@ -48,6 +78,6 @@ namespace EngineLayer.DIA
         //    precursorList.Add(precursor);
         //    int numScans = allPrecursors.Max(p => p.ZeroBasedScanIndex) + 1;
 
-        
+
     }
 }

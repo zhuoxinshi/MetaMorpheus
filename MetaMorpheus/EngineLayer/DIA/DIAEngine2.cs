@@ -99,15 +99,14 @@ namespace EngineLayer.DIA
                     var envelopes = Deconvoluter.Deconvolute(allMs1Scans[i], CommonParameters.PrecursorDeconvolutionParameters, ms1Range);
                     foreach (var envelope in envelopes)
                     {
-                        if (envelope.MonoisotopicMass < DIAparameters.MinMass || envelope.Charge < DIAparameters.MinCharge)
+                        if (envelope.MonoisotopicMass < DIAparameters.MinMS1Mass || envelope.Charge < DIAparameters.MinMS1Charge)
                         {
                             continue;
                         }
                         var charge = envelope.Charge;
                         double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                         double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                        var precursor = new DeconvolutedMass(envelope, charge, allMs1Scans[i].RetentionTime, 1, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                            allMs1Scans[i].OneBasedScanNumber, i);
+                        var precursor = new DeconvolutedMass(envelope, allMs1Scans[i].RetentionTime, 1, allMs1Scans[i].OneBasedScanNumber, i);
                         allPrecursors.Add(precursor);
                     }
                 }
@@ -238,8 +237,7 @@ namespace EngineLayer.DIA
                         var charge = envelope.Charge;
                         double highestPeakMz = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().mz;
                         double highestPeakIntensity = envelope.Peaks.OrderByDescending(p => p.intensity).FirstOrDefault().intensity;
-                        var mass = new DeconvolutedMass(envelope, charge, ms2scans[i].RetentionTime, 2, highestPeakMz, highestPeakIntensity, envelope.MonoisotopicMass,
-                            ms2scans[i].OneBasedScanNumber, i);
+                        var mass = new DeconvolutedMass(envelope, ms2scans[i].RetentionTime, 2, ms2scans[i].OneBasedScanNumber, i);
                         allMasses.Add(mass);
                     }
                 }
@@ -321,7 +319,7 @@ namespace EngineLayer.DIA
                 var mzs = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedMz).ToArray();
                 var intensities = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.AveragedIntensity).ToArray();
                 var spectrum = new MzSpectrum(mzs, intensities, false);
-                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.PFgroupIndex, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, CommonParameters);
                 var charge = pfGroup.PrecursorPeakCurve.Charge;
@@ -341,7 +339,7 @@ namespace EngineLayer.DIA
                 var mzs = new double[] { 1 };
                 var intensities = new double[] { pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.Envelope.TotalIntensity) };
                 var spectrum = new MzSpectrum(mzs, intensities, false);
-                var newMs2Scan = new MsDataScan(spectrum, pfGroup.Index, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                var newMs2Scan = new MsDataScan(spectrum, pfGroup.PFgroupIndex, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
                             MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
                 var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Envelope).ToArray();
                 var charge = pfGroup.PrecursorPeakCurve.Charge;

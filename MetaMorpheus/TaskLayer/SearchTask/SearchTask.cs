@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using Omics.Digestion;
 using Omics.Modifications;
 using Omics;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -409,6 +410,12 @@ namespace TaskLayer
                 ReportProgress(new ProgressEventArgs(completedFiles / currentRawFileList.Count, "Searching...", new List<string> { taskId, "Individual Spectra Files" }));
             }
 
+            //DIA PSM first search
+            if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.AnalysisType == AnalysisType.PsmFirst)
+            {
+                Status("Running DIA PSM first search...", taskId);
+            }
+
             if (spectralLibrary != null && SearchParameters.UpdateSpectralLibrary == false)
             {
                 spectralLibrary.CloseConnections();
@@ -448,6 +455,7 @@ namespace TaskLayer
                 DatabaseFilenameList = dbFilenameList,
                 SpectralLibrary = spectralLibrary
             };
+           
             PostSearchAnalysisTask postProcessing = new PostSearchAnalysisTask
             {
                 Parameters = parameters,

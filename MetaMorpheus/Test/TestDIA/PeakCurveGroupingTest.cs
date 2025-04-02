@@ -138,6 +138,12 @@ namespace Test.TestDIA
             var corr2 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorPC, fragmentPC1);
             Assert.That(corr2, Is.EqualTo(1).Within(0.01));
 
+            //Test using cubic spline
+            precursorPC.GetBSplineXYData(0.005, 2);
+            fragmentPC2.GetBSplineXYData(0.005, 2);
+            var corr4 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorPC, fragmentPC2);
+            Assert.That(corr4, Is.EqualTo(1).Within(0.01));
+
             //Test converting ms2 retention times to ms1 retention times
             var rtMap = new Dictionary<double, double>();
             for (int i = 0; i < 6; i++)
@@ -149,6 +155,9 @@ namespace Test.TestDIA
             fragmentPC1.GetMs1SpaceCubicSplineXYData(rtMap, 0.005);
             var corr3 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorPC, fragmentPC1);
             Assert.That(corr3, Is.EqualTo(1));
+
+            fragmentPC2.GetMs1SpaceBSplineXYData(0.005, 2, rtMap);
+            var corr5 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorPC, fragmentPC2);
         }
 
         [Test]

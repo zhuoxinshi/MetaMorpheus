@@ -22,6 +22,7 @@ using Chemistry;
 using MzLibUtil;
 using Omics.Modifications;
 using Omics.SpectrumMatch;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -972,6 +973,47 @@ namespace TaskLayer
                 }
 
                 ReportProgress(new ProgressEventArgs(100, "Done!", new List<string> { Parameters.SearchTaskId, "Individual Spectra Files", fullFilePath }));
+            }
+
+            //just for DIA pf grouping
+            if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.PFgroupsDictionary != null)
+            {
+                var DIApsmsGroupedByFile = FilteredPsms.Filter(Parameters.AllPsms,
+                CommonParameters,
+                includeDecoys: true,
+                includeContaminants: false,
+                includeAmbiguous: true,
+                includeHighQValuePsms: true).FilteredPsmsList.GroupBy(f => f.FullFilePath);
+
+                var folderPath = Path.Combine(Parameters.OutputFolder, "PFgrouping");
+                Directory.CreateDirectory(folderPath);
+                foreach(var file in CommonParameters.DIAparameters.PFgroupsDictionary)
+                {
+                    var pfPairsToWrite = new List<PFpairMetrics>();
+                    var psmsOfThisFile = DIApsmsGroupedByFile.Where(g => g.Key == file.Key).First().OrderBy(psm => psm.ScanNumber).ToArray();
+
+                    var pfPairMetricsFile = PFpairMetricFile.GetPFpairsFromPsms(file.Value, psmsOfThisFile);
+                    string name = Path.GetFileNameWithoutExtension(file.Key);
+                    string pfPairMetricsFilePath = Path.Combine(folderPath, name + "_PFpairMetrics.tsv");
+                    pfPairMetricsFile.WriteResults(pfPairMetricsFilePath);
+
+                    var DiaPFgroupsMetricsFile = DIAPFgroupsMetricsFile.GetFromPFgroups(file.Value, file.Key);
+                    DiaPFgroupsMetricsFile.SetTargetDecoyForPFgroupsFromPsms(psmsOfThisFile);
+                    var pfGroupMetricsFilePath = Path.Combine(folderPath, name + "_PFgroupingMetrics.tsv");
+                    DiaPFgroupsMetricsFile.WriteResults(pfGroupMetricsFilePath);
+
+                    var allPeakCurveMetrics = new List<PeakCurveMetrics>();
+                    foreach (var pc in CommonParameters.DIAparameters.PeakCurveDictionary[file.Key])
+                    {
+                        var pcm = new PeakCurveMetrics(pc);
+                        allPeakCurveMetrics.Add(pcm);
+                    }
+                    var peakCurveMetricsFile = new PeakCurveMetricsFile
+                    {
+                        Results = allPeakCurveMetrics,
+                    };
+                    peakCurveMetricsFile.WriteResults(Path.Combine(folderPath, name + "_PeakCurveMetrics.tsv"));
+                }
             }
         }
 

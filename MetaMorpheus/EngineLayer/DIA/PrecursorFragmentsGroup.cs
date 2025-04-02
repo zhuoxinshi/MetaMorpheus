@@ -27,11 +27,31 @@ namespace EngineLayer.DIA
             }
             PrecursorPeakCurve = precursorPeakCurve;
             PFpairs = pfPairs;
-        } 
+        }
+
+        public PrecursorFragmentsGroup(PeakCurve precursorPeakCurve, List<PeakCurve> fragments, int index)
+        {
+            var pfPairs = new List<PrecursorFragmentPair>();
+            foreach (var fragment in fragments)
+            {
+                var pair = new PrecursorFragmentPair(precursorPeakCurve, fragment);
+                pfPairs.Add(pair);
+            }
+            PrecursorPeakCurve = precursorPeakCurve;
+            PFpairs = pfPairs;
+            PFgroupIndex = index;
+        }
+
+        public PrecursorFragmentsGroup(PeakCurve precursorPeakCurve, List<PrecursorFragmentPair> pfPairs, int index)
+        {
+            PrecursorPeakCurve = precursorPeakCurve;
+            PFpairs = pfPairs;
+            PFgroupIndex = index;
+        }
 
         public PeakCurve PrecursorPeakCurve { get; set; }
         public List<PrecursorFragmentPair> PFpairs { get; set; }
-        public int Index => PrecursorPeakCurve.Index;
+        public int PFgroupIndex;
         public int NumHighCorrFragments { get; set; }
 
         //TODO: finish this
