@@ -1220,7 +1220,7 @@ namespace Test.TestDIA
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
                 ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.massCurve, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 5, numPeaksThreshold: 4);
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 5, ms1NumPeaksThreshold: 4);
 
             var myFileManager = new MyFileManager(true);
             var myMsDataFile = myFileManager.LoadFile(filePath1, task.CommonParameters);

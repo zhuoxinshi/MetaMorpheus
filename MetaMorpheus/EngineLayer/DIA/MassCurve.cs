@@ -195,11 +195,12 @@ namespace EngineLayer.DIA
         }
 
         public static List<PeakCurve> GetAllMassCurves(MsDataScan[] scans, CommonParameters commonParameters, DIAparameters diaParam,
-            Tolerance peakFindingTolerance, double maxRTRange, out List<Peak>[] allMassesByScan, bool cutPeak = false, MzRange isolationWindow = null
-            , double minMass = 0, int minCharge = 1)
+            Tolerance peakFindingTolerance, double maxRTRange, double minMass, int minCharge, out List<Peak>[] allMassesByScan, bool cutPeak = false, MzRange isolationWindow = null
+            )
         {
             var allMassCurves = new List<PeakCurve>();
-            allMassesByScan = DeconvolutedMass.GetAllNeutralMassesByScan(scans, commonParameters.PrecursorDeconvolutionParameters, isolationWindow, minMass, minCharge);
+            var deconParam = scans[0].MsnOrder == 1? commonParameters.PrecursorDeconvolutionParameters : commonParameters.ProductDeconvolutionParameters;
+            allMassesByScan = DeconvolutedMass.GetAllNeutralMassesByScan(scans, deconParam, isolationWindow, minMass, minCharge);
             var allMasses = allMassesByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var massTable = DeconvolutedMass.GetMassTable(allMasses, diaParam.PeakSearchBinSize);
             var sortedMasses = allMasses.OrderByDescending(p => p.Intensity).ToList();
@@ -210,6 +211,10 @@ namespace EngineLayer.DIA
                 {
                     var newMassCurve = MassCurve.FindMassCurve((DeconvolutedMass)mass, massTable, scans, null, diaParam.MaxNumMissedScan,
                     peakFindingTolerance, diaParam.PeakSearchBinSize, maxRTRange);
+                    if (cutPeak)
+                    {
+                        newMassCurve.CutPeak();
+                    }
                     allMassCurves.Add((MassCurve)newMassCurve);
                 }
             }

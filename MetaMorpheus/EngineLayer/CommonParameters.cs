@@ -146,7 +146,8 @@ namespace EngineLayer
         }
         //changed to set
         [TomlIgnore] public DeconvolutionParameters PrecursorDeconvolutionParameters { get;  set; }
-        [TomlIgnore] public DeconvolutionParameters ProductDeconvolutionParameters { get; private set; }
+        //changed to set
+        [TomlIgnore] public DeconvolutionParameters ProductDeconvolutionParameters { get; set; }
         [TomlIgnore] public Tolerance DeconvolutionMassTolerance { get; private set; }
         public int TotalPartitions { get; set; }
         public Tolerance ProductMassTolerance { get; set; } // public setter required for calibration task

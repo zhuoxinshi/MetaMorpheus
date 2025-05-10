@@ -22,6 +22,9 @@ namespace EngineLayer.DIA
         Ms1SpaceSavgolSmoothedCubicSpline,
         CubicSplineSavgolSmoothed,
         ScanCycleCubicSplineSavgolSmoothed,
-        Ms1SpaceCubicSplineSavgolSmoothed
+        Ms1SpaceCubicSplineSavgolSmoothed,
+        GaussianFit,
+        SimpleGaussian,
+        SimpleGaussianSpline
     }
 }

@@ -19,6 +19,10 @@ using Numerics.NET.Statistics;
 using System.Xml.Linq;
 using EngineLayer.DIA.CWT;
 using Accord.Statistics.Kernels;
+using Accord.Statistics.Distributions.DensityKernels;
+using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.Optimization;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace EngineLayer.DIA
 {
@@ -113,7 +117,6 @@ namespace EngineLayer.DIA
             }
             return averagedIntensity;
         }
-
 
         public double AverageMass()
         {
@@ -344,6 +347,93 @@ namespace EngineLayer.DIA
             var cubicSpline = CubicSpline.InterpolateAkima(x, smoothedY);
             XYData = CalculateSpline(x[0], x[x.Length - 1], splineRTinterval, cubicSpline);
         }
+
+        public void GetSimpleGaussianXYData()
+        {
+            var x = Peaks.Select(p => p.RetentionTime).ToArray();
+            var y = Peaks.Select(p => p.Intensity).ToArray();
+            var normalizedY = y.Select(p => p / y.Max() * 100).ToArray();
+
+            double A = y.Max();
+            double mu = x[Array.IndexOf(y, A)];
+            double sigma = (x.Max() - x.Min()) / 4;
+
+            XYData = new (double, double)[x.Length];
+            for (int i = 0; i < x.Length; i++)
+            {
+                var yFit = A * Math.Exp(-(x[i] - mu) * (x[i] - mu) / (2 * sigma * sigma));
+                XYData[i] = (x[i], yFit);
+            }
+        }
+
+        public void GetSimpleGaussianSplineXYData(double splineRTinterval)
+        {
+            var x = Peaks.Select(p => p.RetentionTime).ToArray();
+            var y = Peaks.Select(p => p.Intensity).ToArray();
+            var normalizedY = y.Select(p => p / y.Max() * 100).ToArray();
+
+            double A = y.Max();
+            double mu = x[Array.IndexOf(y, A)];
+            double sigma = (x.Max() - x.Min()) / 4;
+
+            int numPoints = (int)Math.Floor((EndRT - StartRT) / splineRTinterval) + 1;
+            XYData = new (double, double)[numPoints];
+            for (int i = 0; i < numPoints; i++)
+            {
+                var rt = StartRT + i * splineRTinterval;
+                var intensity = A * Math.Exp(-(rt - mu) * (rt - mu) / (2 * sigma * sigma));
+                XYData[i] = (rt, intensity);
+            }
+        }
+
+        public void GetGaussianFitXYData()
+        {
+            var x = Peaks.Select(p => p.RetentionTime).ToArray();
+            var y = Peaks.Select(p => p.Intensity).ToArray();
+            var normalizedY = y.Select(p => p / y.Max() * 100).ToArray();
+
+            var (A, mu, sigma) = FitGaussian(x, normalizedY);
+            XYData = new (double, double)[x.Length];
+            for (int i = 0; i < x.Length; i++)
+            {
+                var yFit = A * Math.Exp(-(x[i] - mu) * (x[i] - mu) / (2 * sigma * sigma));
+                XYData[i] = (x[i], yFit);
+            }
+        }
+
+        public static (double A, double mu, double sigma) FitGaussian(double[] x, double[] y)
+        {
+            double A_guess = y.Max();
+            double mu_guess = x[Array.IndexOf(y, A_guess)];
+            double sigma_guess = (x.Max() - x.Min()) / 4;
+
+            Func<Vector<double>, double, double> model = (parameters, x) =>
+            {
+                double A = parameters[0];
+                double mu = parameters[1];
+                double sigma = parameters[2];
+                return A * Math.Exp(-(x - mu) * (x - mu) / (2 * sigma * sigma));
+            };
+
+            var xdata = Vector<double>.Build.DenseOfArray(x);
+            var ydata = Vector<double>.Build.DenseOfArray(y);
+
+            // Define the objective function (sum of squared errors)
+            var objective = ObjectiveFunction.NonlinearModel(
+                model,
+                observedX: xdata,
+                observedY: ydata,
+                weight: null,
+                accuracyOrder: 2
+            );
+
+            var initialGuess = Vector<double>.Build.DenseOfArray(new double[] { A_guess, mu_guess, sigma_guess });
+            var solver = new LevenbergMarquardtMinimizer();
+            var result = solver.FindMinimum(objective, initialGuess);
+
+            return (result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
+        }
+
         private double CalculateAverageInterval()
         {
             var intervals = new List<double>();

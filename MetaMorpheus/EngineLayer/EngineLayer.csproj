@@ -17,6 +17,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="DIA\ISDEngine_massCurve.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Accord.Math" Version="3.8.2-alpha" />
     <PackageReference Include="Accord.Statistics" Version="3.8.2-alpha" />
     <PackageReference Include="CsvHelper" Version="32.0.3" />

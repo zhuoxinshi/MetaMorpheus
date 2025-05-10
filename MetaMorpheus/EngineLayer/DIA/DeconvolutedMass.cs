@@ -12,12 +12,12 @@ namespace EngineLayer.DIA
     {
         //public double RetentionTime { get; set; }
         public int MsLevel { get; set; }
-        public double HighestPeakMz => Envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;   
-        public double HighestPeakIntensity => Envelope.Peaks.Max(p => p.intensity); 
+        public override double HighestPeakMz => Envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;   
+        public override double HighestPeakIntensity => Envelope.Peaks.Max(p => p.intensity); 
 
         public IsotopicEnvelope Envelope { get; set; }
         public EnvelopeCurve EnvelopeCurve { get; set; }
-        public double TotalIntensity => Envelope.TotalIntensity;
+        public override double TotalIntensity => Envelope.Peaks.Sum(p => p.intensity);
         public List<Peak> Isotopes { get; set; }
         public double AdjustedTotalIntensity { get; set; }
         public MassCurve MassCurve { get; set; }

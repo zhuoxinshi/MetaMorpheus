@@ -35,6 +35,9 @@ namespace EngineLayer
         public PeakEnvelope PeakEnvelope { get; set; }
         public double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
+        public virtual double HighestPeakMz { get { return Mz; } }
+        public virtual double TotalIntensity { get { return Intensity; } }
+        public virtual double HighestPeakIntensity { get { return Intensity; } }
 
         public static List<Peak> GetAllPeaks(MsDataScan[] scans, int binsPerDalton)
         {

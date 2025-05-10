@@ -28,6 +28,7 @@ namespace EngineLayer.DIA
             var isdScanVoltageMap = ISDEngine_static.ConstructMs2Groups(ms2Scans);
 
             //precursor fragment grouping for each precursor
+            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves.ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
             var pfGroups = new List<PrecursorFragmentsGroup>();
             Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Length), new ParallelOptions { MaxDegreeOfParallelism = 15 },
                 (partitionRange, loopState) =>
@@ -37,7 +38,7 @@ namespace EngineLayer.DIA
                         var precursor = allMs1PeakCurves[i];
                         foreach (var ms2group in isdScanVoltageMap.Values)
                         {
-                            var preFragGroup = ISD_slow.FindFragments(precursor, ms2group.ToArray(), commonParameters, diaParam);
+                            var preFragGroup = ISD_slow.FindFragments(precursor, ms1Scans, ms2group.ToArray(), commonParameters, diaParam);
                             if (preFragGroup != null)
                             {
                                 lock (pfGroups)
@@ -58,7 +59,7 @@ namespace EngineLayer.DIA
             return pseudoMs2Scans;
         }
 
-        public static PrecursorFragmentsGroup FindFragments(PeakCurve precursor, MsDataScan[] ms2scans, CommonParameters commonParameters, DIAparameters diaParam)
+        public static PrecursorFragmentsGroup FindFragments(PeakCurve precursor, MsDataScan[] ms1scans, MsDataScan[] ms2scans, CommonParameters commonParameters, DIAparameters diaParam)
         {
             //Get all ms2 XICs in range
             double cycleTime = Math.Ceiling((ms2scans[1].RetentionTime - ms2scans[0].RetentionTime) * 100) / 100;
@@ -66,52 +67,10 @@ namespace EngineLayer.DIA
             var scans = ms2scans.Where(s => s.RetentionTime >= precursor.StartRT - cycleTime && s.RetentionTime <= precursor.EndRT + cycleTime).ToArray();
             var allMs2PeakCurves = ISDEngine_static.GetAllPeakCurves(scans, commonParameters, diaParam, diaParam.Ms2XICType, diaParam.Ms2PeakFindingTolerance, maxRTRange, 
                 out List<Peak>[] peaksByScan);
-            foreach (var pc in allMs2PeakCurves)
-            {
-                pc.GetScanCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
-            }
+            ISDEngine_static.PeakCurveSpline(allMs2PeakCurves, diaParam.Ms2SplineType, diaParam, ms1scans, ms2scans);
 
-            var pfGroup = new PrecursorFragmentsGroup(precursor);
-            foreach (var ms2curve in allMs2PeakCurves)
-            {
-                if (Math.Abs(precursor.ApexCycle - ms2curve.ApexCycle) <= diaParam.ApexCycleTolerance)
-                {
-                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
-                    if (overlap >= diaParam.OverlapRatioCutOff)
-                    {
-                        double corr = double.NaN;
-                        switch (diaParam.CorrelationType)
-                        {
-                            case CorrelationType.NoSpline:
-                                corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
-                                break;
-                            case CorrelationType.CubicSpline_scanCycle_preCalc:
-                                corr = PrecursorFragmentPair.CalculateCorr_scanCycleSpline_preCalculated(precursor, ms2curve);
-                                break;
-                            case CorrelationType.CubicSpline_RT:
-                                corr = PrecursorFragmentPair.CalculateCorr_spline(precursor, ms2curve, "cubic", diaParam.SplineTimeInterval);
-                                break;
-                            default:
-                                corr = PrecursorFragmentPair.CalculatePeakCurveCorr(precursor, ms2curve);
-                                break;
-                        }
-                        if (corr >= diaParam.CorrelationCutOff)
-                        {
-                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
-                            pfGroup.PFpairs.Add(PFpair);
-                        }
-                    }
-                }
-            }
-            if (pfGroup.PFpairs.Count > 10)
-            {
-                pfGroup.PFpairs = pfGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
-                return pfGroup;
-            }
-            else
-            {
-                return null;
-            }
+            var pfGroup = ISDEngine_static.PFgrouping(precursor, allMs2PeakCurves, diaParam);
+            return pfGroup;
         }
 
         

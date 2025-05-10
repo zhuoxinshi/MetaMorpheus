@@ -154,6 +154,7 @@ namespace EngineLayer.DIA
     {
         public double PrecursorMass { get; set; }
         public double PrecursorCharge{ get; set; }
+        public double PrecursorMz { get; set; }
         public double PrecursorIntensity { get; set; }
         public double PrecursorApexRt { get; set; }
         public double PrecursorNumOfPoints { get; set; }
@@ -169,11 +170,14 @@ namespace EngineLayer.DIA
         public string FullSequence { get; set; }
         public double PsmScore { get; set; }
         public double PsmQValue { get; set; }
+        public double IntegratedMs1Intensity { get; set; }
+        public double IntegratedHighestIsoPeakIntensity { get; set; }
 
         public PFgroupMetrics(PrecursorFragmentsGroup pfGroup)
         {
             PrecursorMass = pfGroup.PrecursorPeakCurve.MonoisotopicMass;
             PrecursorCharge = pfGroup.PrecursorPeakCurve.Charge;
+            PrecursorMz = pfGroup.PrecursorPeakCurve.Peaks.OrderByDescending(p => p.Intensity).First().HighestPeakMz;
             PrecursorIntensity = pfGroup.PrecursorPeakCurve.ApexIntensity;
             PrecursorApexRt = pfGroup.PrecursorPeakCurve.ApexRT;
             PrecursorNumOfPoints = pfGroup.PrecursorPeakCurve.Peaks.Count;
@@ -192,6 +196,8 @@ namespace EngineLayer.DIA
             MedianApexRtDelta = pfGroup.PFpairs.Select(pf => Math.Abs(pf.FragmentPeakCurve.ApexRT - pf.PrecursorPeakCurve.ApexRT)).Median();
             MedianOverlap = pfGroup.PFpairs.Select(pf => pf.Overlap).Median();
             PFgroupIndex = pfGroup.PFgroupIndex;
+            IntegratedMs1Intensity = pfGroup.PrecursorPeakCurve.Peaks.Sum(p => p.TotalIntensity);
+            IntegratedHighestIsoPeakIntensity = pfGroup.PrecursorPeakCurve.Peaks.Sum(p => p.HighestPeakIntensity);
         }
 
         public void SetTargetDecoy(SpectralMatch psm)
