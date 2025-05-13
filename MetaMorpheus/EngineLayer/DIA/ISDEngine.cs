@@ -172,7 +172,7 @@ namespace EngineLayer.DIA
                 //}
                 var peak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, Ms1PeakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0),
                     DIAparameters.PeakSearchBinSize);
-                if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorIntensityCutOff)
+                if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorSNCutOff)
                 {
                     var newPeakCurve = PeakCurve.FindPeakCurve(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
                     DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS1);
@@ -422,6 +422,11 @@ namespace EngineLayer.DIA
 
         public static PrecursorFragmentsGroup UmpireGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
         {
+            //if (Math.Abs(precursor.MonoisotopicMass - 9461) < 1 && precursor.Charge == 12)
+            //{
+            //    //debug
+            //    int stop = 0;
+            //}
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
@@ -448,6 +453,9 @@ namespace EngineLayer.DIA
             //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
             //    preFragGroup.PFpairs = filtered.ToList();
             //}
+
+            //debug
+            var allFragMzs = preFragGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Peaks.First().HighestPeakMz).OrderBy(p=>p).ToList();
             if (preFragGroup.PFpairs.Count > 0)
             {
                 preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();

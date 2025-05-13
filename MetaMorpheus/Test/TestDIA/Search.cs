@@ -58,8 +58,8 @@ namespace Test.TestDIA
             string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_noFixedMods = @"E:\ISD Project\ISD_240606\2024-10-24-15-44-25\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_withFixedMods = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
-            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_withFixedMods, MetaMorpheusTask.tomlConfig);
-            string outputFolder = @"E:\DIA\TestSearch\TopDIA\Umpire_GPTMD_20ppm_corr0.5_apexRT0.3_overlap0_num2";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_noFixedMods, MetaMorpheusTask.tomlConfig);
+            string outputFolder = @"E:\DIA\TestSearch\TopDIA\Umpire_GPTMD_20ppm_corr0.5_apexRT0.3_overlap0_num2_maxRT0.5_mass0";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -73,26 +73,27 @@ namespace Test.TestDIA
 
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
-                fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 1, maxRTrangeMS2: 1, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 30000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
-                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 0, minMS1Charge: 2, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.DIAEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.SimpleGaussian, ms2SplineType: SplineType.SimpleGaussian, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false,
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false,
                 rankFilter: false, minPFpairCount: 1);
 
+           //set threads
+           task.CommonParameters.MaxThreadsToUsePerFile = 15;
             //match all charge fragment ions
             task.SearchParameters.WriteSpectralLibrary = true;
 
             //Use IsoDec
-            var isoDecDeconParamMS1 = new IsoDecDeconvolutionParameters();
-            var isoDecDeconParamMS2 = new IsoDecDeconvolutionParameters();
-            isoDecDeconParamMS2.MaxAssumedChargeState = 20;
-            task.CommonParameters.PrecursorDeconvolutionParameters = isoDecDeconParamMS1;
-            task.CommonParameters.ProductDeconvolutionParameters = isoDecDeconParamMS2;
+            task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
-            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            var GPTMD_noFixedMod = @"E:\DIA\TopDIA\2025-05-10-14-22-53\Task Settings\Task1-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(GPTMD_noFixedMod, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = task.CommonParameters.Clone();
             var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", task) };//("GPTMD", gptmdTask),
 
@@ -101,6 +102,7 @@ namespace Test.TestDIA
             string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
             string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             string ecoli_fasta = @"E:\DIA\TopDIA\Ecoli.fasta";
+            string gptmd_ecoli = @"E:\DIA\TopDIA\2025-05-10-14-22-53\Task1-GPTMDTask\EcoliGPTMD.xml";
             //task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(YC_gptmd, false) }, fileList, "test");
 
             var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(ecoli_fasta, false) }, outputFolder);
@@ -191,8 +193,8 @@ namespace Test.TestDIA
             var filePath32 = @"E:\ISD Project\ISD_250428\05-03-25_MixS6_60min_ISD100_preFilter1200_labelCorrected.mzML";
             var filePath33 = @"E:\ISD Project\ISD_250428\05-03-25_MixS7_60min_ISD100_preFilter1200_labelCorrected.mzML";
 
-            var fileList = new List<string> { filePath33 };
-            var outputFolder = @"E:\ISD Project\TestSearch\Mix\debug_MixS7_NoSpline_20ppm_apex0.15_corr0.75_overlap0_maxRT0.5_preIntensity1e5_num4_minCount10";
+            var fileList = new List<string> { filePath21, filePath22, filePath23, filePath24, filePath25, filePath26 };
+            var outputFolder = @"E:\ISD Project\TestSearch\0504YB_rep_preFilter\rep123+cali-avg_IsoDec_Umpire_GPTMD_20ppm_apex0.15_corr0.5_overlap0_maxRT0.5_preIntensity1e5_num2_2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -204,30 +206,30 @@ namespace Test.TestDIA
             string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             string tomlFile_noMods = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
 
-            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_noMods, MetaMorpheusTask.tomlConfig);
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.15,
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.15,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 100000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 4, combineFragments: false, 
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false, 
                 rankFilter:false, minPFpairCount: 10);
 
             //match all charge fragment ions
             task.SearchParameters.WriteSpectralLibrary = true;
 
             //Use IsoDec
-            //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters();
-            //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters();
-            //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
+            task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var GPTMD_max2 = @"E:\ISD Project\ISD_250428\GPTMD_max2\Task Settings\Task1-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = task.CommonParameters.Clone();
-            var taskList = new List<(string, MetaMorpheusTask)> {  ("search", task), }; //("GPTMD", gptmdTask), 
+            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", task), }; //("GPTMD", gptmdTask), 
 
             string YC_gptmd = @"E:\CE\250318_CE\YC_cali-avged_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
@@ -237,7 +239,7 @@ namespace Test.TestDIA
             string ecoli_fasta = @"E:\DIA\FW-DIA data\uniprotkb_taxonomy_id_469008_2025_04_24.fasta";
             //task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(YC_gptmd, false) }, fileList, "test");
 
-            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
+            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
             engine.Run();
 
             var outputFolder2 = @"E:\ISD Project\TestSearch\0504YB_rep_preFilter\rep123_CubicSpline_GPTMD_20ppm_apex0.15_corr0.5_overlap0.5_maxRT0.5_preIntensity1e5_num4_minCount10";
@@ -277,6 +279,56 @@ namespace Test.TestDIA
             engine3.Run();
         }
         //remove minimum number of points required for correlation?
+
+        [Test]
+        public static void DDAQuant()
+        {
+            var filePath1 = @"E:\ISD Project\ISD_250428\05-03-25_MixS4_60min_DDA.raw";
+            var filePath2 = @"E:\ISD Project\ISD_250428\05-03-25_MixS5_60min_DDA.raw";
+            var filePath3 = @"E:\ISD Project\ISD_250428\05-03-25_MixS6_60min_DDA.raw";  
+            var filePath4 = @"E:\ISD Project\ISD_250428\05-03-25_MixS7_60min_DDA.raw";
+
+            var fileList = new List<string> { filePath1, filePath2, filePath3, filePath4 };
+            var outputFolder = @"E:\ISD Project\TestSearch\Mix\all_DDAQuant"; 
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_searchOnly = @"E:\ISD Project\CE_241118\1122_DDA&ISD-rep123\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_neutralLossSearch = @"E:\CE\250318_CE\YB_seq400-1100_300mz_100overlap_neutralLossSearch\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_noMods = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
+
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_noMods, MetaMorpheusTask.tomlConfig);
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.15,
+                fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.DDAQuant, cutMs1Peaks: false, cutMs2Peaks: false,
+                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 4, combineFragments: false,
+                rankFilter: false, minPFpairCount: 10);
+
+            //Use IsoDec
+            //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
+
+            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
+            var GPTMD_max2 = @"E:\ISD Project\ISD_250428\GPTMD_max2\Task Settings\Task1-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            gptmdTask.CommonParameters = task.CommonParameters.Clone();
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", task), }; //("GPTMD", gptmdTask), 
+
+            string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+            string ecoli_fasta = @"E:\DIA\FW-DIA data\uniprotkb_taxonomy_id_469008_2025_04_24.fasta";
+
+            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
+            engine.Run();
+        }
 
         [Test]
         public static void SearchCEISD()

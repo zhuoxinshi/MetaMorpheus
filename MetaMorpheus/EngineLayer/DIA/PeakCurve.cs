@@ -68,6 +68,7 @@ namespace EngineLayer.DIA
         public MzRange MzRange => new MzRange(StartMz, EndMz);
         public double ApexRT => Peaks.OrderByDescending(p => p.Intensity).First().RetentionTime;
         public int ApexCycle => Peaks.OrderByDescending(p => p.Intensity).First().ZeroBasedScanIndex;
+        public double ApexSN => Peaks.OrderByDescending(p => p.Intensity).First().SN;
         public double ApexIntensity => Peaks.Max(p => p.Intensity);
         public double TotalIntensity => Peaks.Sum(p => p.Intensity);
         public double AveragedMz => AverageMz();

@@ -170,8 +170,6 @@ namespace EngineLayer.DIA
         public string FullSequence { get; set; }
         public double PsmScore { get; set; }
         public double PsmQValue { get; set; }
-        public double IntegratedMs1Intensity { get; set; }
-        public double IntegratedHighestIsoPeakIntensity { get; set; }
 
         public PFgroupMetrics(PrecursorFragmentsGroup pfGroup)
         {
@@ -196,8 +194,6 @@ namespace EngineLayer.DIA
             MedianApexRtDelta = pfGroup.PFpairs.Select(pf => Math.Abs(pf.FragmentPeakCurve.ApexRT - pf.PrecursorPeakCurve.ApexRT)).Median();
             MedianOverlap = pfGroup.PFpairs.Select(pf => pf.Overlap).Median();
             PFgroupIndex = pfGroup.PFgroupIndex;
-            IntegratedMs1Intensity = pfGroup.PrecursorPeakCurve.Peaks.Sum(p => p.TotalIntensity);
-            IntegratedHighestIsoPeakIntensity = pfGroup.PrecursorPeakCurve.Peaks.Sum(p => p.HighestPeakIntensity);
         }
 
         public void SetTargetDecoy(SpectralMatch psm)
@@ -283,4 +279,5 @@ namespace EngineLayer.DIA
         public override SupportedFileType FileType { get; }
         public override Software Software { get; set; }
     }
+
 }

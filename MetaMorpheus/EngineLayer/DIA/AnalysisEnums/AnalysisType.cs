@@ -16,5 +16,6 @@ namespace EngineLayer.DIA
         DIA_scanBased,
         ISD_slow,
         PsmFirst,
+        DDAQuant
     }
 }

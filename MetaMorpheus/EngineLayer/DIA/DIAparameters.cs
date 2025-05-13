@@ -25,7 +25,7 @@ namespace EngineLayer.DIA
         public int NumHighCorrFragments { get; set; }
         public double MaxRTRangeMS1 { get; set; }
         public double MaxRTRangeMS2 { get; set; }
-        public double PrecursorIntensityCutOff { get; set; }
+        public double PrecursorSNCutOff { get; set; }
         public double MinRTRangeForCWT { get; set; }
         public CwtParameters CwtParameters => new CwtParameters(2f, 150, 0.1f, 0.3f);
         public bool SplitMS2Peak { get; set; } 
@@ -89,7 +89,7 @@ namespace EngineLayer.DIA
             HighCorrThreshold = highCorrThreshold;
             MaxRTRangeMS1 = maxRTrangeMS1;
             MaxRTRangeMS2 = maxRTrangeMS2;
-            PrecursorIntensityCutOff = precursorIntensityCutOff;
+            PrecursorSNCutOff = precursorIntensityCutOff;
             MinRTRangeForCWT = minRTRangeForCWT;
             SplitMS2Peak = splitMS2Peak;
             SplitMS1Peak = splitMS1Peak;
@@ -154,7 +154,7 @@ namespace EngineLayer.DIA
             settings.Append("\n");
             settings.AppendLine("TrimMss2Peaks: " + TrimMs2Peaks);
             settings.AppendLine("TrimMs2MinSNR: " + TrimMs2MinSNR);
-            settings.AppendLine("PrecursorIntensityCutOff: " + PrecursorIntensityCutOff);
+            settings.AppendLine("PrecursorIntensityCutOff: " + PrecursorSNCutOff);
             settings.AppendLine("MinRTRangeForCWT: " + MinRTRangeForCWT);
             settings.AppendLine("SplitMS2Peak: " + SplitMS2Peak);
             settings.AppendLine("SplitMS1Peak: " + SplitMS1Peak);

@@ -22,7 +22,7 @@ namespace EngineLayer.DIA
         public double AdjustedTotalIntensity { get; set; }
         public MassCurve MassCurve { get; set; }
 
-        public DeconvolutedMass(IsotopicEnvelope envelope, double rt, int msLevel, int scanNumber, int zeroBasedScanNum)
+        public DeconvolutedMass(IsotopicEnvelope envelope, double rt, int msLevel, int scanNumber, int zeroBasedScanNum, double basePeakIntensity = 1)
         {
             Envelope = envelope;
             RetentionTime = rt;
@@ -32,6 +32,7 @@ namespace EngineLayer.DIA
             ZeroBasedScanIndex = zeroBasedScanNum;
             MonoisotopicMass = envelope.MonoisotopicMass;
             Intensity = envelope.Peaks.Max(p => p.intensity);
+            SN = Intensity / basePeakIntensity;
         }
 
         public static List<Peak>[] GetAllNeutralMassesByScan(MsDataScan[] scans, DeconvolutionParameters deconParameters, MzRange mzRange = null, double minMass = 0, int minCharge = 1)
@@ -47,7 +48,7 @@ namespace EngineLayer.DIA
                 {
                     if (envelope.MonoisotopicMass < minMass || envelope.Charge < minCharge)
                         continue;
-                    DeconvolutedMass newMass = new DeconvolutedMass(envelope, scans[i].RetentionTime, scans[i].MsnOrder, scans[i].OneBasedScanNumber, i);
+                    DeconvolutedMass newMass = new DeconvolutedMass(envelope, scans[i].RetentionTime, scans[i].MsnOrder, scans[i].OneBasedScanNumber, i, scans[i].MassSpectrum.YofPeakWithHighestY.Value);
                     massesByScan[scans[i].OneBasedScanNumber].Add(newMass);
                     index++;
                 }

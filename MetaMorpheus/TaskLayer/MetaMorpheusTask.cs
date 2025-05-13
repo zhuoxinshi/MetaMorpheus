@@ -359,6 +359,8 @@ namespace TaskLayer
                     case AnalysisType.DIA_scanBased:
                         var scansWithPre7 = DIA_scanBased.GetPseudoMs2Scans(myMSDataFile, commonParameters, commonParameters.DIAparameters);
                         return scansWithPre7;
+                    case AnalysisType.DDAQuant:
+                        break;
                 }
             }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);

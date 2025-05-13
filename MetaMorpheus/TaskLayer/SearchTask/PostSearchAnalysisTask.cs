@@ -81,6 +81,7 @@ namespace TaskLayer
             HistogramAnalysis();
             WritePsmResults();
             WritePeptideResults();
+
             if (Parameters.CurrentRawFileList.Count > 1 && (Parameters.SearchParameters.WriteIndividualFiles
                                                             || Parameters.SearchParameters.WriteMzId ||
                                                             Parameters.SearchParameters.WritePepXml))
@@ -725,7 +726,6 @@ namespace TaskLayer
                                         peptidesToWrite.TargetPsmsAboveThreshold;
                 ResultsDictionary[(strippedFileName, GlobalVariables.AnalyteType)] = peptideResultsText;
             }
-
         }
         private void UpdateSpectralLibrary()
         {
@@ -975,7 +975,7 @@ namespace TaskLayer
                 ReportProgress(new ProgressEventArgs(100, "Done!", new List<string> { Parameters.SearchTaskId, "Individual Spectra Files", fullFilePath }));
             }
 
-            //just for DIA pf grouping
+            //DIA pf grouping & quant
             if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.PFgroupsDictionary != null)
             {
                 var DIApsmsGroupedByFile = FilteredPsms.Filter(Parameters.AllPsms,
@@ -986,8 +986,11 @@ namespace TaskLayer
                 includeHighQValuePsms: true).FilteredPsmsList.GroupBy(f => f.FullFilePath);
 
                 var folderPath = Path.Combine(Parameters.OutputFolder, "PFgrouping");
-                Directory.CreateDirectory(folderPath);
-                foreach(var file in CommonParameters.DIAparameters.PFgroupsDictionary)
+                if (!Directory.Exists(folderPath))
+                {
+                    Directory.CreateDirectory(folderPath);
+                }
+                foreach (var file in CommonParameters.DIAparameters.PFgroupsDictionary)
                 {
                     var pfPairsToWrite = new List<PFpairMetrics>();
                     var psmsOfThisFile = DIApsmsGroupedByFile.Where(g => g.Key == file.Key).First().OrderBy(psm => psm.ScanNumber).ToArray();
@@ -1013,6 +1016,55 @@ namespace TaskLayer
                         Results = allPeakCurveMetrics,
                     };
                     peakCurveMetricsFile.WriteResults(Path.Combine(folderPath, name + "_PeakCurveMetrics.tsv"));
+
+                    //quant
+                    var psmsForQuant = FilteredPsms.Filter(Parameters.AllPsms,
+                        CommonParameters,
+                        includeDecoys: false,
+                        includeContaminants: false,
+                        includeAmbiguous: true,
+                        includeHighQValuePsms: false).FilteredPsmsList.GroupBy(f => f.FullFilePath);
+                    var quantFolderPath = Path.Combine(Parameters.OutputFolder, "Quant");
+                    if (!Directory.Exists(quantFolderPath))
+                    {
+                        Directory.CreateDirectory(quantFolderPath);
+                    }
+                    var diaQuantFilePath = Path.Combine(quantFolderPath, name + "_Quant.tsv");
+                    var psmsOfThisFileForQuant = psmsForQuant.Where(g => g.Key == file.Key).First().ToArray();
+                    var psmsToWrite = psmsOfThisFileForQuant.OrderByDescending(psm => psm.Score).GroupBy(p => ( p.FullSequence, p.ScanPrecursorCharge)).Select(g => g.FirstOrDefault());
+                    var pfGroupsForThisFile = file.Value.OrderBy(g => g.PFgroupIndex).ToArray();
+                    var sortedPfGroupIndex = pfGroupsForThisFile.Select(g => g.PFgroupIndex).ToArray();
+                    var diaQuantFile = DIAQuantFile.CreateDIAQuantFile( psmsOfThisFileForQuant, pfGroupsForThisFile);
+                    diaQuantFile.WriteResults(diaQuantFilePath);
+                }
+            }
+
+            //DDA quant
+            if (CommonParameters.DIAparameters != null & CommonParameters.DIAparameters.AnalysisType == AnalysisType.DDAQuant)
+            {
+                var quantFolderPath = Path.Combine(Parameters.OutputFolder, "Quant");
+                if (!Directory.Exists(quantFolderPath))
+                {
+                    Directory.CreateDirectory(quantFolderPath);
+                }
+
+                var DDApsmsGroupedByFile = FilteredPsms.Filter(Parameters.AllPsms,
+                    CommonParameters,
+                    includeDecoys: true,
+                    includeContaminants: false,
+                    includeAmbiguous: true,
+                    includeHighQValuePsms: true).FilteredPsmsList.GroupBy(f => f.FullFilePath);
+
+                foreach (var file in DDApsmsGroupedByFile)
+                {
+                    var results = new List<DIAQuantResult>();
+                    string name = Path.GetFileNameWithoutExtension(file.Key);
+                    var psmsToWrite = file.OrderByDescending(psm => psm.Score).GroupBy(p => (p.FullSequence, p.ScanPrecursorCharge)).Select(g => g.FirstOrDefault()).ToArray();
+                    var dataFile = Parameters.MyFileManager.LoadFile(file.Key, CommonParameters);
+                    var ms1Scans = dataFile.GetMS1Scans().ToArray();
+                    var quantFilePath = Path.Combine(quantFolderPath, name + "_Quant.tsv");
+                    var ddaQuantFile = DIAQuantFile.DDAQuant(psmsToWrite, ms1Scans, CommonParameters);
+                    ddaQuantFile.WriteResults(quantFilePath);
                 }
             }
         }

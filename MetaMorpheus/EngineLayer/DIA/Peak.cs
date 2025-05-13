@@ -12,7 +12,7 @@ namespace EngineLayer
 {
     public class Peak
     {
-        public Peak(double mz = 0, double rt = 0, double intensity = 0, int msLevel = 0, int scanNumber = 0, int ZeroBasedScanNumber = 0, int index = 0, PeakCurve peakCurve = null)
+        public Peak(double mz = 0, double rt = 0, double intensity = 0, int msLevel = 0, int scanNumber = 0, int ZeroBasedScanNumber = 0, int index = 0, PeakCurve peakCurve = null, double sn = 0)
         {
             Mz = mz;
             Intensity = intensity;
@@ -22,6 +22,7 @@ namespace EngineLayer
             MsLevel = msLevel;
             PeakCurve = peakCurve;
             ZeroBasedScanIndex = ZeroBasedScanNumber;
+            SN = sn;
         }
 
         public double Mz { get; set; }
@@ -38,6 +39,7 @@ namespace EngineLayer
         public virtual double HighestPeakMz { get { return Mz; } }
         public virtual double TotalIntensity { get { return Intensity; } }
         public virtual double HighestPeakIntensity { get { return Intensity; } }
+        public double SN { get; set; }
 
         public static List<Peak> GetAllPeaks(MsDataScan[] scans, int binsPerDalton)
         {

@@ -116,13 +116,13 @@ namespace EngineLayer.DIA
 
                 foreach (var precursor in allPrecursors)
                 {
-                    if(precursor.HighestPeakIntensity < DIAparameters.PrecursorIntensityCutOff)
+                    if(precursor.HighestPeakIntensity < DIAparameters.PrecursorSNCutOff)
                     {
                         continue;
                     }
                     var peak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, Ms1PeakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0),
                         DIAparameters.PeakSearchBinSize);
-                    if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorIntensityCutOff)
+                    if (peak.PeakCurve == null && peak.Intensity >= DIAparameters.PrecursorSNCutOff)
                     {
                         var newPeakCurve = PeakCurve.FindPeakCurve(peak, Ms1PeakTable, allMs1Scans, null, DIAparameters.MaxNumMissedScan,
                         DIAparameters.Ms1PeakFindingTolerance, DIAparameters.PeakSearchBinSize, DIAparameters.MaxRTRangeMS1);

@@ -69,13 +69,13 @@ namespace EngineLayer.DIA
             {
                 var precursorsInRange = allMs1PeakCurves[ms2group.Key].ToArray();
 
-                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 10 },
+                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 15 },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursorsInRange[i];
-                        if (precursor.ApexIntensity < diaParam.PrecursorIntensityCutOff)
+                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
                         {
                             continue;
                         }
@@ -164,6 +164,9 @@ namespace EngineLayer.DIA
                 var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, diaParam.PseudoMs2ConstructionType, dataFile.FilePath);
                 pseudoMs2Scans.Add(newScans);
             }
+
+            //debug
+            var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();
 
             return pseudoMs2Scans;
         }

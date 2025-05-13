@@ -45,21 +45,21 @@ namespace EngineLayer.DIA
             }
 
             //Group precursors
-            var highestIntensityPrecursors = allMs1PeakCurves
-                .GroupBy(p => (Math.Round(p.MonoisotopicMass, 1), p.ApexRT))
-                .Select(g => g.OrderByDescending(p => p.ApexIntensity).First())
-                .ToList();
+            //var highestIntensityPrecursors = allMs1PeakCurves
+            //    .GroupBy(p => (Math.Round(p.MonoisotopicMass, 1), p.ApexRT))
+            //    .Select(g => g.OrderByDescending(p => p.ApexIntensity).First())
+            //    .ToList();
 
             //precursor fragment grouping
             var pfGroups = new List<PrecursorFragmentsGroup>();
             var allFragments = allMs2PeakCurves.Values.SelectMany(p => p).ToList();
-            Parallel.ForEach(Partitioner.Create(0, highestIntensityPrecursors.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+            Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
-                        var precursor = highestIntensityPrecursors[i];
-                        if (precursor.ApexIntensity < diaParam.PrecursorIntensityCutOff)
+                        var precursor = allMs1PeakCurves[i];
+                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
                         {
                             continue;
                         }
@@ -132,6 +132,9 @@ namespace EngineLayer.DIA
                 var newScans = ConstructNewMs2Scans(pfGroup, commonParameters, diaParam.PseudoMs2ConstructionType, dataFile.FilePath);
                 pseudoMs2Scans.Add(newScans);
             }
+
+            //debug
+            var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();
 
             return pseudoMs2Scans;
         }
@@ -356,7 +359,7 @@ namespace EngineLayer.DIA
                 //}
                 var peak = PeakCurve.GetPeakFromScan(precursor.HighestPeakMz, peakTable, precursor.ZeroBasedScanIndex, new PpmTolerance(0),
                     diaParam.PeakSearchBinSize);
-                if (peak.PeakCurve == null && peak.Intensity >= diaParam.PrecursorIntensityCutOff)
+                if (peak.PeakCurve == null && peak.Intensity >= diaParam.PrecursorSNCutOff)
                 {
                     var newPeakCurve = PeakCurve.FindPeakCurve(peak, peakTable, scans, null, diaParam.MaxNumMissedScan,
                     peakFindingTolerance, diaParam.PeakSearchBinSize, maxRTRange);
