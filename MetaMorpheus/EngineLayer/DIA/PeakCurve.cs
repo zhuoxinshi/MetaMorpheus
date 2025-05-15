@@ -226,6 +226,7 @@ namespace EngineLayer.DIA
             var rawData = Peaks.Select(p => (p.RetentionTime, p.Intensity)).ToList();
             var smoothedData = new Bspline2().Run(rawData, (int)Math.Max((EndRT - StartRT) * NoPeakPerMin, Peaks.Count), smoothDegree);
             UmpireBsplineData = smoothedData;
+            XYData = UmpireBsplineData.ToArray();
         }
 
         public void GetRawXYData()

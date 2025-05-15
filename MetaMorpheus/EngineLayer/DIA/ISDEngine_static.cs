@@ -31,7 +31,7 @@ namespace EngineLayer.DIA
             var allMs1PeakCurves = GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1,
                 out List<Peak>[] peaksByScan, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
             PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
-            PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
+            PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), SplineType.UmpireBSpline, diaParam, ms1Scans, ms2Scans);
 
             //Get ms2 XICs
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
@@ -41,7 +41,7 @@ namespace EngineLayer.DIA
                 allMs2PeakCurves[ms2Group.Key] = GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
                 PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
-                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
+                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), SplineType.UmpireBSpline, diaParam, ms1Scans, ms2Scans);
             }
 
             //Group precursors
@@ -258,14 +258,16 @@ namespace EngineLayer.DIA
                         pc.GetMs1SpaceSavgolSmoothedCubicSplineXYData(rtMap, diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
                     break;
                 case SplineType.GaussianFit:
-                    Parallel.ForEach(Partitioner.Create(0, allPeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
-                (partitionRange, loopState) =>
-                {
-                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-                    {
-                        allPeakCurves[i].GetGaussianFitXYData();
-                    }
-                });
+                    //    Parallel.ForEach(Partitioner.Create(0, allPeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+                    //(partitionRange, loopState) =>
+                    //{
+                    //    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    //    {
+                    //        allPeakCurves[i].GetGaussianFitXYData();
+                    //    }
+                    //});
+                    foreach (var pc in allPeakCurves)
+                        pc.GetGaussianFitXYData();
                     break;
                 case SplineType.SimpleGaussian:
                     foreach (var pc in allPeakCurves)
