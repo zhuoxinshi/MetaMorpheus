@@ -73,6 +73,39 @@ namespace EngineLayer.DIA
             return bestMass;
         }
 
+        public static DeconvolutedMass GetMassFromScan(double monoMass, int charge, List<DeconvolutedMass>[] massTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
+        {
+            DeconvolutedMass bestMass = null;
+            int ceilingMz = (int)Math.Ceiling(tolerance.GetMaximumValue(monoMass) * binSize);
+            int floorMz = (int)Math.Floor(tolerance.GetMinimumValue(monoMass) * binSize);
+
+            for (int j = floorMz; j <= ceilingMz; j++)
+            {
+                if (j < massTable.Length && massTable[j] != null)
+                {
+                    List<DeconvolutedMass> bin = massTable[j];
+                    int index = BinarySearchForIndexedMass(bin, zeroBasedScanIndex);
+
+                    for (int i = index; i < bin.Count; i++)
+                    {
+                        DeconvolutedMass mass = bin[i];
+
+                        if (mass.ZeroBasedScanIndex > zeroBasedScanIndex)
+                        {
+                            break;
+                        }
+
+                        if (tolerance.Within(mass.MonoisotopicMass, monoMass) && mass.ZeroBasedScanIndex == zeroBasedScanIndex && mass.Charge == charge
+                            && (bestMass == null || Math.Abs(mass.MonoisotopicMass - monoMass) < Math.Abs(bestMass.MonoisotopicMass - monoMass)))
+                        {
+                            bestMass = mass;
+                        }
+                    }
+                }
+            }
+            return bestMass;
+        }
+
         private static int BinarySearchForIndexedMass(List<DeconvolutedMass> massList, int zeroBasedScanIndex)
         {
             int m = 0;
