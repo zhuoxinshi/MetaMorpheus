@@ -44,6 +44,7 @@ namespace EngineLayer.DIA
         public double RoundedOverlap => Math.Round(Overlap, 1);
         public int Ms2Group { get; set; }
         public double PsmScore { get; set; }
+        public int Ms2ScanNumber { get; set; }
 
         public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup)
         {
@@ -56,7 +57,7 @@ namespace EngineLayer.DIA
             PrecursorCharge = pfGroup.PrecursorPeakCurve.Charge;
             PrecursorApexRt = pfGroup.PrecursorPeakCurve.ApexRT;
             FragmentIonMz = pfPair.FragmentPeakCurve.MonoisotopicMass.ToMz(pfPair.FragmentPeakCurve.Charge);
-
+            Ms2ScanNumber = pfPair.FragmentPeakCurve.Peaks.First().ScanNumber;
         }
 
         public void SetMs2Group(int ms2Group)

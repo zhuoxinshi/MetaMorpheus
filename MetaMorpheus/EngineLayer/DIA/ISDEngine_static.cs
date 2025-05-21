@@ -31,7 +31,7 @@ namespace EngineLayer.DIA
             var allMs1PeakCurves = GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1,
                 out List<Peak>[] peaksByScan, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
             PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
-            PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), SplineType.UmpireBSpline, diaParam, ms1Scans, ms2Scans);
+            PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
 
             //Get ms2 XICs
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
@@ -41,7 +41,7 @@ namespace EngineLayer.DIA
                 allMs2PeakCurves[ms2Group.Key] = GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
                 PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
-                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), SplineType.UmpireBSpline, diaParam, ms1Scans, ms2Scans);
+                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
             }
 
             //Group precursors
@@ -277,6 +277,10 @@ namespace EngineLayer.DIA
                     foreach(var pc in allPeakCurves)
                         pc.GetSimpleGaussianSplineXYData(diaParam.SplineRtInterval);
                     break;
+                case SplineType.NormalizedLinearSpline:
+                    foreach (var pc in allPeakCurves)
+                        pc.GetNormalizedLinearSplinePeaks();
+                    break;
             }
         }
 
@@ -479,7 +483,7 @@ namespace EngineLayer.DIA
             switch (diaParam.PFGroupingType)
             {
                 case PFGroupingType.RetentionTime:
-                    return ISDEngine.GroupPrecursorFragments(precursor, fragments, diaParam);
+                    return PrecursorFragmentsGroup.GroupPrecursorFragments(precursor, fragments, diaParam);
                 //case PFGroupingType.ScanCycle:
                 //    return ISDEngine.GroupPrecursorFragments_scanCycle(precursor, fragments, diaParam);
                 //case PFGroupingType.OverlapAreaRatio:
@@ -487,9 +491,11 @@ namespace EngineLayer.DIA
                 //case PFGroupingType.Area_correlation:
                 //    return ISDEngine.GroupPrecursorFragments_area_correlation(precursor, fragments, diaParam);
                 case PFGroupingType.OverlapFirst:
-                    return ISDEngine.GroupPrecursorFragments_overlapFirst(precursor, fragments, diaParam);
+                    return PrecursorFragmentsGroup.GroupPrecursorFragments_overlapFirst(precursor, fragments, diaParam);
                 case PFGroupingType.Umpire:
-                    return ISDEngine.UmpireGrouping(precursor, fragments, diaParam);
+                    return PrecursorFragmentsGroup.UmpireGrouping(precursor, fragments, diaParam);
+                case PFGroupingType.SharedXIC:
+                    return PrecursorFragmentsGroup.SharedXICGrouping(precursor, fragments, diaParam);
                 default: return null;
             }
         }

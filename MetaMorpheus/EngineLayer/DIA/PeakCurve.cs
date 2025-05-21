@@ -92,6 +92,7 @@ namespace EngineLayer.DIA
         public (int, double)[] NormalizedPeaks { get; set; }
         public double NL { get; set; }
         public (double, double)[] XYData { get; set; }
+        public (int, double)[] NormalizedLinearSplinePeaks { get; set; }
 
         public double AveragedMass => AverageMass();
 
@@ -139,12 +140,40 @@ namespace EngineLayer.DIA
 
         public void GetNormalizedPeaks()
         {
-            var normalizedPeaks = new List<(int, double)>();
-            foreach (var peak in Peaks)
+            double sumIntensity = Peaks.Sum(p => p.Intensity);
+            NormalizedPeaks = new (int, double)[Peaks.Count];
+            for (int i =0; i < Peaks.Count; i++)
             {
-                normalizedPeaks.Add((peak.ZeroBasedScanIndex, peak.Intensity / TotalIntensity));
+                NormalizedPeaks[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity / sumIntensity);
             }
-            NormalizedPeaks = normalizedPeaks.ToArray();
+        }
+
+        public void GetNormalizedLinearSplinePeaks()
+        {
+            var cycleArray = Peaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
+            var intensityArray = Peaks.Select(p => p.Intensity).ToArray();
+            var linearSpline = LinearSpline.InterpolateSorted(cycleArray, intensityArray);
+
+            int maxLength = EndCycle - StartCycle + 1;
+            var linearSplinePeaks = new (int, double)[maxLength];
+            NormalizedLinearSplinePeaks = new (int, double)[maxLength];
+            for (int i = 0; i < maxLength; i++)
+            {
+                int j = 0;
+                if (Peaks[j].ZeroBasedScanIndex == StartCycle + i)
+                {
+                    linearSplinePeaks[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity);
+                    j++;
+                }
+                else
+                {
+                    linearSplinePeaks[i] = (StartCycle + i, linearSpline.Interpolate((double) (StartCycle + i)));
+                }
+            }
+            for (int i = 0; i < maxLength; i++)
+            {
+                NormalizedLinearSplinePeaks[i] = (linearSplinePeaks[i].Item1, linearSplinePeaks[i].Item2 / linearSplinePeaks.Sum(p => p.Item2));
+            }
         }
 
         private void GetLinearSpline()

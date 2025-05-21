@@ -62,6 +62,7 @@ namespace EngineLayer.DIA
         public int Ms2NumPeaksThreshold { get; set; }
         public bool RankFilter { get; set; }
         public int MinPFpairCount { get; set; }
+        public double SharedXICCutOff { get; set; }  
         public Dictionary<string, List<PrecursorFragmentsGroup>> PFgroupsDictionary { get; set; }
         public Dictionary<string, List<PeakCurve>> PeakCurveDictionary { get; set; }
 
@@ -74,7 +75,7 @@ namespace EngineLayer.DIA
             AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,
             bool cutMs1Peaks = false, bool cutMs2Peaks = false, int sgFilterWindowSize = 5, SplineType ms1SplineType = SplineType.NoSpline, SplineType ms2SplineType = SplineType.NoSpline, 
             float splineTimeInterval = 0.05f, int numScanPerCycle = 0, bool trimMs2Peaks = false, double trimMs2MinSNR = 0.01, int noPointsPerMin = 150, int ms1NumPeaksThreshold = 4, int ms2NumPeaksThreshold = 2, 
-            bool rankFilter = false, int minPFpairCount = 0)
+            bool rankFilter = false, int minPFpairCount = 0, double sharedXICCutOff = 0.8)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -124,6 +125,7 @@ namespace EngineLayer.DIA
             Ms2NumPeaksThreshold = ms2NumPeaksThreshold;
             RankFilter = rankFilter;
             MinPFpairCount = minPFpairCount;
+            SharedXICCutOff = sharedXICCutOff;
         }
 
         public StringBuilder WriteDIASettings()

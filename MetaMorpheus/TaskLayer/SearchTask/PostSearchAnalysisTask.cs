@@ -1054,7 +1054,7 @@ namespace TaskLayer
             }
 
             //DDA quant
-            if (CommonParameters.DIAparameters != null & CommonParameters.DIAparameters.AnalysisType == AnalysisType.DDAQuant)
+            if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.AnalysisType == AnalysisType.DDAQuant)
             {
                 var quantFolderPath = Path.Combine(Parameters.OutputFolder, "Quant");
                 if (!Directory.Exists(quantFolderPath))

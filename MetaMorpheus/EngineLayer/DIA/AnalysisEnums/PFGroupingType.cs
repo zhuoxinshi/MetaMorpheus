@@ -14,6 +14,7 @@ namespace EngineLayer.DIA
         Area_correlation,
         OverlapFirst,
         Umpire,
-        MassCurveRT
+        MassCurveRT,
+        SharedXIC,
     }
 }

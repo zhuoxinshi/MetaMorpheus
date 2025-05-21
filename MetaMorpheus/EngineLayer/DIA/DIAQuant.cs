@@ -39,6 +39,8 @@ namespace EngineLayer.DIA
         public double PsmScore { get; set; }
         public double PsmQvalue { get; set; }
         public string PrecursorRTs { get; set; }
+        public double StartRT { get; set; }
+        public double EndRT { get; set; }
         public string PrecursorHighestIsotopeIntensities { get; set; }
         public string PrecursorEnvelopeTotalIntensities { get; set; }
         public double IntegratedMs1TotalIntensity { get; set; }
@@ -58,6 +60,8 @@ namespace EngineLayer.DIA
             PsmScore = psm.Score;
             PsmQvalue = psm.PsmFdrInfo.QValue;
             PrecursorRTs = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.RetentionTime).ToList());
+            StartRT = precursorPeakCurve.StartRT;
+            EndRT = precursorPeakCurve.EndRT;
             PrecursorHighestIsotopeIntensities = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.HighestPeakIntensity).ToList());
             PrecursorEnvelopeTotalIntensities = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.TotalIntensity).ToList());
             IntegratedMs1TotalIntensity = precursorPeakCurve.Peaks.Sum(p => p.TotalIntensity);
@@ -169,8 +173,10 @@ namespace EngineLayer.DIA
         public string PrecursorBaseSequence { get; set; }
         public string PrecursorFullSequence { get; set; }
         public double PsmScore { get; set; }
+        public double PrecursorMaxNumPoints { get; set; }
         public string PrecursorRTs { get; set; }
-        public string ElutionTimeWindow { get; set; } 
+        public double StartRT { get; set; }
+        public double EndRT { get; set; }
         public double IntegratedMs1TotalIntensityAllCharges { get; set; }
         public double IntegratedMs1TotalIntensityHighestThreeCharges { get; set; }
         public double IntegratedMs1TotalIntensityHighestCharge { get; set; }
@@ -186,8 +192,10 @@ namespace EngineLayer.DIA
             PrecursorBaseSequence = quantResults.First().PrecursorBaseSequence;
             PrecursorFullSequence = quantResults.First().PrecursorFullSequence;
             PsmScore = quantResults.Max(q => q.PsmScore);
+            PrecursorMaxNumPoints = quantResults.Max(q => q.PrecursorNumOfPoints);
             PrecursorRTs = string.Join(", ", quantResults.Select(q => q.PrecursorRTs).ToList());
-            ElutionTimeWindow = string.Join(PrecursorRTs.Min(t => t),", ", PrecursorRTs.Max(t => t));
+            StartRT = quantResults.Min(q => q.StartRT);
+            EndRT = quantResults.Max(q => q.EndRT);
             IntegratedMs1TotalIntensityAllCharges = quantResults.Sum(q => q.IntegratedMs1TotalIntensity);
             IntegratedMs1TotalIntensityHighestThreeCharges = quantResults.OrderByDescending(q => q.IntegratedMs1TotalIntensity).Take(3).Sum(q => q.IntegratedMs1TotalIntensity);
             IntegratedMs1TotalIntensityHighestCharge = quantResults.Max(q => q.IntegratedMs1TotalIntensity);
@@ -232,6 +240,7 @@ namespace EngineLayer.DIA
         public static DIAProteoformQuantFile DDAQuantFromExistingSearch(MsDataFile dataFile, string psmFilePath, CommonParameters commonParameters)
         {
             var ms1Scans = dataFile.GetMS1Scans().ToArray();
+            var fileName = Path.GetFileNameWithoutExtension(dataFile.FilePath);
             var allPsms = PsmTsvReader.ReadTsv(psmFilePath, out List<string> warnings);
             var filteredPsms = allPsms.Where(psm => psm.DecoyContamTarget == "T" && psm.QValue <= 0.01 && psm.QValueNotch <= 0.01).ToList();
             var psmsGroupedBySeq = filteredPsms.OrderByDescending(psm => psm.PrecursorIntensity).GroupBy(psm => psm.FullSequence).Select(g => g.FirstOrDefault());
@@ -240,9 +249,10 @@ namespace EngineLayer.DIA
             var allMassesByScan = DeconvolutedMass.GetAllNeutralMassesByScan(ms1Scans, commonParameters.PrecursorDeconvolutionParameters);
             var allMasses = allMassesByScan.Where(v => v != null).SelectMany(p => p).ToList();
             var massTable = DeconvolutedMass.GetMassTable(allMasses, commonParameters.DIAparameters.PeakSearchBinSize);
+
             foreach (var proteoform in psmsGroupedBySeq)
             {
-                var results = new List<DIAQuantResult>();
+                var quantResultsForThisProteoform = new List<DIAQuantResult>();
                 int zeroBasedScanIndex = (proteoform.PrecursorScanNum - 2) / commonParameters.DIAparameters.NumScansPerCycle + 1;
                 var targetMass = MassCurve.GetMassFromScan(proteoform.PrecursorMass, proteoform.PrecursorCharge, massTable, zeroBasedScanIndex, 
                     commonParameters.DIAparameters.Ms1PeakFindingTolerance, commonParameters.DIAparameters.PeakSearchBinSize);
@@ -250,38 +260,43 @@ namespace EngineLayer.DIA
                 {
                     continue;
                 }
-                var newMassCurve = MassCurve.FindMassCurve((DeconvolutedMass)targetMass, massTable, ms1Scans, null, commonParameters.DIAparameters.MaxNumMissedScan,
+                var targetMassCurve = MassCurve.FindMassCurve((DeconvolutedMass)targetMass, massTable, ms1Scans, null, commonParameters.DIAparameters.MaxNumMissedScan,
                                   commonParameters.DIAparameters.Ms1PeakFindingTolerance, commonParameters.DIAparameters.PeakSearchBinSize, commonParameters.DIAparameters.MaxRTRangeMS1);
-                newMassCurve.GetRawXYData();
-                var quantResult = new DIAQuantResult(proteoform, newMassCurve);
-                results.Add(quantResult);
-                var charges = new List<int> { -3, -2, -1, 1, 2, 3 };
-                foreach (var n in charges)
+
+                var quantResult = new DIAQuantResult(proteoform, targetMassCurve);
+                quantResultsForThisProteoform.Add(quantResult);
+
+                int charge = proteoform.PrecursorCharge;
+                var directions = new List<int> { -1, 1 };
+                foreach(int n in directions)
                 {
-                    var otherChargeState = MassCurve.GetMassFromScan(proteoform.PrecursorMass, proteoform.PrecursorCharge + n, massTable, zeroBasedScanIndex,
-                    commonParameters.DIAparameters.Ms1PeakFindingTolerance, commonParameters.DIAparameters.PeakSearchBinSize);
-                    if (otherChargeState == null)
+                    for (int i = charge; i < 50 && i >= 0; i += n)
                     {
-                        continue;
-                    }
-                    var otherMassCurve = MassCurve.FindMassCurve((DeconvolutedMass)otherChargeState, massTable, ms1Scans, null, commonParameters.DIAparameters.MaxNumMissedScan,
-                                         commonParameters.DIAparameters.Ms1PeakFindingTolerance, commonParameters.DIAparameters.PeakSearchBinSize, commonParameters.DIAparameters.MaxRTRangeMS1);
-                    otherMassCurve.GetRawXYData();
-                    if (otherMassCurve != null)
-                    {
-                        if (Math.Abs(otherMassCurve.ApexRT - newMassCurve.ApexRT) > commonParameters.DIAparameters.ApexRtTolerance)
+                        if (i == charge) continue;
+                        int missed = 0;
+                        var mass = MassCurve.GetMassFromScan(proteoform.PrecursorMass, i, massTable, zeroBasedScanIndex,
+                        commonParameters.DIAparameters.Ms1PeakFindingTolerance, commonParameters.DIAparameters.PeakSearchBinSize);
+                        if (mass != null)
                         {
-                            continue;
+                            var massCurve = MassCurve.FindMassCurve((DeconvolutedMass)mass, massTable, ms1Scans, null, commonParameters.DIAparameters.MaxNumMissedScan,
+                                             commonParameters.DIAparameters.Ms1PeakFindingTolerance, commonParameters.DIAparameters.PeakSearchBinSize, commonParameters.DIAparameters.MaxRTRangeMS1);
+                            if (massCurve != null && Math.Abs(massCurve.ApexRT - targetMassCurve.ApexRT) <= commonParameters.DIAparameters.ApexRtTolerance)
+                            {
+                                var quantResult2 = new DIAQuantResult(proteoform, massCurve);
+                                quantResultsForThisProteoform.Add(quantResult2);
+                            }
                         }
-                        if (PrecursorFragmentPair.CalculatePeakCurveCorrXYData(newMassCurve, otherMassCurve) < commonParameters.DIAparameters.CorrelationCutOff)
+                        else
                         {
-                            continue;
+                            missed++;
+                            if (missed > 2)
+                            {
+                                break;
+                            }
                         }
-                        var quantResult2 = new DIAQuantResult(proteoform, otherMassCurve);
-                        results.Add(quantResult2);
                     }
                 }
-                var proteoformQuant = new DIAProteoformQuant(dataFile.FilePath, results);
+                var proteoformQuant = new DIAProteoformQuant(fileName, quantResultsForThisProteoform);
                 proteoformQuantResults.Add(proteoformQuant);
             }
             var diaProteoformQuantFile = new DIAProteoformQuantFile { Results = proteoformQuantResults };

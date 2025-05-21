@@ -162,10 +162,11 @@ namespace TaskLayer
                                 ms2scan.ComputeMonoisotopicPeakIntensity(precursorSpectrum.MassSpectrum);
                             }
 
+                            //changed for testing
                             if (commonParameters.DoPrecursorDeconvolution)
                             {
-                                foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
-                                    precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
+                                foreach (IsotopicEnvelope envelope in Deconvoluter.Deconvolute(precursorSpectrum, commonParameters.PrecursorDeconvolutionParameters, 
+                                    new MzRange(ms2scan.IsolationRange.Minimum - 0.5, ms2scan.IsolationRange.Maximum + 0.5)))
                                 {
                                     double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
                                     int peakCount = envelope.Peaks.Count();

@@ -59,7 +59,7 @@ namespace Test.TestDIA
             string tomlFile_noFixedMods = @"E:\ISD Project\ISD_240606\2024-10-24-15-44-25\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_withFixedMods = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_withFixedMods, MetaMorpheusTask.tomlConfig);
-            string outputFolder = @"E:\DIA\TestSearch\050125YC\Umpire_GPTMD_20ppm_corr0.5_apexRT0.5_overlap0.2_num2";
+            string outputFolder = @"E:\DIA\TestSearch\050425YB\Ms1SpaceCubicSpline_GPTMD_20ppm_corr0.75_apexRT0.5_overlap0.2_num4";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -72,18 +72,19 @@ namespace Test.TestDIA
             string DIAfile5 = @"E:\ISD Project\ISD_250428\0504YB_rep_DIA_cali-avg-gptmd-xml_1.0.8_library-prunedDb\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_td-DIA_700-1000_25mz-2overlap_21-23-25HCD_rep2-calib-averaged.mzML";
             string DIAfile6 = @"E:\ISD Project\ISD_250428\0504YB_rep_DIA_cali-avg-gptmd-xml_1.0.8_library-prunedDb\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_td-DIA_700-1000_25mz-2overlap_21-23-25HCD_rep3-calib-averaged.mzML";
             string DIAfile7 = @"E:\ISD Project\ISD_250428\05-01-25_PEPPI-YC_105min_td-DIA_25mz-overlap2_HCD21-23-25_AGC1e6.raw";
+            string DIAfile8 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_td-DIA_700-1000_25mz-2overlap_21-23-25HCD_rep1_Ms2Averaged.mzML";
             string topDIAfile = @"E:\DIA\TopDIA\20231117_DIA_720_800_rep2.mzML";
-            var fileList = new List<string> {DIAfile7}; //DIAfile2, DIAfile3, DIAfile4, DIAfile5, DIAfile6 
+            var fileList = new List<string> {DIAfile8}; //DIAfile2, DIAfile3, DIAfile4, DIAfile5, DIAfile6 
 
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.5,
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.5,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.DIAEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false,
-                rankFilter: false, minPFpairCount: 1);
+                ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.Ms1SpaceCubicSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 4, ms2NumPeaksThreshold: 4,
+                combineFragments: false,rankFilter: false, minPFpairCount: 10);
 
            //set threads
            task.CommonParameters.MaxThreadsToUsePerFile = 15;
@@ -205,9 +206,12 @@ namespace Test.TestDIA
             var filePath39 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
             var filePath40 = @"E:\ISD Project\ISD_250428\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_400-1200_300mz-overlap50_RF_labelCorrected.mzML";
             var filePath41 = @"E:\ISD Project\ISD_250428\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
+            var filePath42 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_averaged_labelCorrected.mzML";
+            var filePath43 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep2_averaged_labelCorrected.mzML";
+            var filePath44 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep3_averaged_labelCorrected.mzML";
 
-            var fileList = new List<string> { filePath40, filePath41};//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\0429YE\all_Umpire_GPTMD_20ppm_IsoDec_apex0.3_corr0.5_overlap0_maxRT0.5_preIntensity0.01_num2_minCount10";
+            var fileList = new List<string> { filePath42, filePath43, filePath44};//filePath21, filePath22, filePath23,
+            var outputFolder = @"E:\ISD Project\TestSearch\0504YB_rep_preFilter\averaged-rep123_Ms1SpaceCubicSpline_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num4_minCount10";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -219,30 +223,35 @@ namespace Test.TestDIA
             string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             string tomlFile_noMods = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
 
-            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
-                fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance: 0.25,
+                fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false, 
-                rankFilter:false, minPFpairCount: 10);
+                ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.Ms1SpaceCubicSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 4, ms2NumPeaksThreshold:4, combineFragments: false,
+                rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5) ;
 
             //match all charge fragment ions
-            task.SearchParameters.WriteSpectralLibrary = true;
+            searchTask.SearchParameters.WriteSpectralLibrary = true;
 
             //Use IsoDec
-            task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
-            task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
-            task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
+            //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+            //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var GPTMD_max2 = @"E:\ISD Project\ISD_250428\GPTMD_max2\Task Settings\Task1-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
-            gptmdTask.CommonParameters = task.CommonParameters.Clone();
-            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", task), }; //("GPTMD", gptmdTask), 
+            gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+
+            var cali_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task1-CalibrateTaskconfig.toml";
+            var cali_task = Toml.ReadFile<CalibrationTask>(cali_toml, MetaMorpheusTask.tomlConfig);
+            cali_task.CommonParameters = searchTask.CommonParameters.Clone();
+
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
 
             string YC_gptmd = @"E:\CE\250318_CE\YC_cali-avged_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
@@ -261,7 +270,7 @@ namespace Test.TestDIA
             {
                 Directory.CreateDirectory(outputFolder2);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
@@ -279,7 +288,7 @@ namespace Test.TestDIA
             {
                 Directory.CreateDirectory(outputFolder3);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.15,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
@@ -298,18 +307,24 @@ namespace Test.TestDIA
         public static void DDAQuant()
         {
             var psmFile1 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS4_60min_DDA_Proteoforms.psmtsv";
-            var psmFile4 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS7_60min_DDA_Proteoforms.psmtsv";
+            var psmFile4 = @"E:\ISD Project\ISD_250428\Mix4-6_DDA\Task1-SearchTask\Individual File Results\05-03-25_MixS7_60min_DDA_PSMs.psmtsv";
             var psmFile2 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS5_60min_DDA_Proteoforms.psmtsv";
             var psmFile3 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS6_60min_DDA_Proteoforms.psmtsv";
+            var psmFile5 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task2-SearchTask\Individual File Results\05-04-25_PEPPI-YB_81min_DDA_rep1_Proteoforms.psmtsv";
+            var psmFile6 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task2-SearchTask\Individual File Results\05-04-25_PEPPI-YB_81min_DDA_rep2_Proteoforms.psmtsv";
+            var psmFile7 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task2-SearchTask\Individual File Results\05-04-25_PEPPI-YB_81min_DDA_rep3_Proteoforms.psmtsv";
 
             var filePath1 = @"E:\ISD Project\ISD_250428\05-03-25_MixS4_60min_DDA.raw";
             var filePath2 = @"E:\ISD Project\ISD_250428\05-03-25_MixS5_60min_DDA.raw";
             var filePath3 = @"E:\ISD Project\ISD_250428\05-03-25_MixS6_60min_DDA.raw";  
             var filePath4 = @"E:\ISD Project\ISD_250428\05-03-25_MixS7_60min_DDA.raw";
+            var filePath5 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep1.raw";
+            var filePath6 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep2.raw";
+            var filePath7 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep3.raw";
 
-            var psmFileList = new List<string> { psmFile1, psmFile2, psmFile3, psmFile4 };
-            var fileList = new List<string> { filePath1, filePath2, filePath3, filePath4 };
-            var outputFolder = @"E:\ISD Project\TestSearch\Mix\test_DDAQuant"; 
+            var psmFileList = new List<string> {  psmFile5, psmFile6, psmFile7 };
+            var fileList = new List<string> { filePath5, filePath6, filePath7 };
+            var outputFolder = @"E:\ISD Project\TestSearch\0504YB_rep_preFilter\DDAQuant_gptmd-xml_2"; 
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -322,7 +337,7 @@ namespace Test.TestDIA
 
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_noMods, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.15,
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.25, apexRtTolerance: 0.5,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
@@ -336,16 +351,21 @@ namespace Test.TestDIA
             //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
             //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
 
-            for (int i = 0; i < 4; i++)
+            var combinedResults = new List<DIAProteoformQuant>();
+            for (int i = 0; i < 3; i++)
             {
                 var myFileManager = new MyFileManager(true);
                 var dataFile = myFileManager.LoadFile(fileList[i], task.CommonParameters);
                 var quantFile = DIAProteoformQuantFile.DDAQuantFromExistingSearch(dataFile, psmFileList[i], task.CommonParameters);
                 var fileName = Path.GetFileNameWithoutExtension(fileList[i]);
                 var resultPath = Path.Combine(outputFolder, fileName + "_DDAQuant.tsv");
+                combinedResults.AddRange(quantFile.Results);
                 quantFile.WriteResults(resultPath);
             }
-            
+            var combinedFilePath = Path.Combine(outputFolder, "Combined_DDAQuant.tsv");
+            var combinedQuantFile = new DIAProteoformQuantFile { FilePath = combinedFilePath, Results = combinedResults };
+            combinedQuantFile.WriteResults(combinedFilePath);
+
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var GPTMD_max2 = @"E:\ISD Project\ISD_250428\GPTMD_max2\Task Settings\Task1-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);

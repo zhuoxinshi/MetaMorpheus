@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using ThermoFisher.CommonCore.Data.Business;
 
 namespace EngineLayer.DIA
 {
@@ -63,6 +64,183 @@ namespace EngineLayer.DIA
         public void GetNumberOfHighCorrFragments(DIAparameters diaParam)
         {
             NumHighCorrFragments = PFpairs.Where(p => p.Correlation >= diaParam.HighCorrThreshold).Count();
+        }
+
+        public static PrecursorFragmentsGroup GroupPrecursorFragments(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in ms2curves)
+            {
+                //if (ms2curve.ApexIntensity > precursor.ApexIntensity)
+                //{
+                //    continue;
+                //}
+                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
+                {
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                    if (overlap > DIAparameters.OverlapRatioCutOff)
+                    {
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                        if (corr > DIAparameters.CorrelationCutOff)
+                        {
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr);
+                            lock (ms2curve.PFpairs)
+                            {
+                                ms2curve.PFpairs.Add(PFpair);
+                            }
+                            preFragGroup.PFpairs.Add(PFpair);
+                        }
+                    }
+                }
+
+            }
+            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+            //{
+            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+            //    preFragGroup.PFpairs = filtered.ToList();
+            //}
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static PrecursorFragmentsGroup UmpireGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
+        {
+            //if (Math.Abs(precursor.MonoisotopicMass - 9461) < 1 && precursor.Charge == 12)
+            //{
+            //    //debug
+            //    int stop = 0;
+            //}
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in ms2curves)
+            {
+                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
+                {
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                    if (overlap > DIAparameters.OverlapRatioCutOff)
+                    {
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData_Umpire(precursor, ms2curve, DIAparameters.NoPointsPerMin);
+                        if (corr > DIAparameters.CorrelationCutOff)
+                        {
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr);
+                            lock (ms2curve.PFpairs)
+                            {
+                                ms2curve.PFpairs.Add(PFpair);
+                            }
+                            preFragGroup.PFpairs.Add(PFpair);
+                        }
+                    }
+                }
+            }
+            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+            //{
+            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+            //    preFragGroup.PFpairs = filtered.ToList();
+            //}
+
+            //debug
+            var allFragMzs = preFragGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Peaks.First().HighestPeakMz).OrderBy(p => p).ToList();
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static PrecursorFragmentsGroup GroupPrecursorFragments_overlapFirst(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+
+            //Get all ms2 XICs in range
+            var ms2curvesInRange = ms2curves.Where(p => (p.StartCycle >= precursor.StartCycle && p.StartCycle <= precursor.EndCycle)
+            || (p.EndCycle >= precursor.StartCycle && p.EndCycle <= precursor.EndCycle)).ToList();
+
+            foreach (var ms2curve in ms2curvesInRange)
+            {
+                var ms2peaks = ms2curve.Peaks.Where(p => p.ZeroBasedScanIndex >= precursor.StartCycle && p.ZeroBasedScanIndex <= precursor.EndCycle).ToList();
+                if (ms2peaks.Count < 5)
+                {
+                    continue;
+                }
+                var newMs2curve = new PeakCurve(ms2peaks);
+                if (Math.Abs(newMs2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
+                {
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, newMs2curve);
+                    if (overlap > DIAparameters.OverlapRatioCutOff)
+                    {
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                        if (corr > DIAparameters.CorrelationCutOff)
+                        {
+                            var PFpair = new PrecursorFragmentPair(precursor, ms2curve, corr);
+                            lock (ms2curve.PFpairs)
+                            {
+                                ms2curve.PFpairs.Add(PFpair);
+                            }
+                            preFragGroup.PFpairs.Add(PFpair);
+                        }
+                    }
+                }
+            }
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+
+        public static PrecursorFragmentsGroup SharedXICGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters diaParam)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in ms2curves)
+            {
+                //if (ms2curve.ApexIntensity > precursor.ApexIntensity)
+                //{
+                //    continue;
+                //}
+                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= diaParam.ApexRtTolerance)
+                {
+                    var sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursor, ms2curve);
+                    if (sharedXIC >= diaParam.SharedXICCutOff)
+                    {
+                        var PFpair = new PrecursorFragmentPair(precursor, ms2curve, sharedXIC);
+                        lock (ms2curve.PFpairs)
+                        {
+                            ms2curve.PFpairs.Add(PFpair);
+                        }
+                        preFragGroup.PFpairs.Add(PFpair);
+                    }
+                }
+
+            }
+            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+            //{
+            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+            //    preFragGroup.PFpairs = filtered.ToList();
+            //}
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
         }
         
         public GenericChart VisualizeLog10()

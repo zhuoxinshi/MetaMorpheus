@@ -5,13 +5,17 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using Accord;
 using Easy.Common;
 using MathNet.Numerics;
 using MathNet.Numerics.Distributions;
 using MathNet.Numerics.Integration;
 using MathNet.Numerics.Statistics;
+using Plotly.NET;
 using Readers;
+using ThermoFisher.CommonCore.Data.Business;
 using ThermoFisher.CommonCore.Data.Interfaces;
+using static Python.Runtime.TypeSpec;
 
 namespace EngineLayer.DIA
 {
@@ -475,8 +479,8 @@ namespace EngineLayer.DIA
                 peakCurve2.GetNormalizedPeaks();
             }
 
-            var overlapArea = new List<(int, double)>();
-            var totalArea = new List<(int, double)>();
+            var overlapArea = new List<(double, double)>();
+            var totalArea = new List<(double, double)>();
             var scanCycles1 = peakCurve1.NormalizedPeaks.Select(p => p.Item1).ToArray();
             var scanCycles2 = peakCurve2.NormalizedPeaks.Select(p => p.Item1).ToArray();
 
@@ -509,6 +513,56 @@ namespace EngineLayer.DIA
             return ratio;
         }
 
+        public static double CalculateSharedXIC(PeakCurve peakCurve1, PeakCurve peakCurve2, bool visualize = false)
+        {
+            if (peakCurve1.EndCycle <= peakCurve2.StartCycle || peakCurve2.EndCycle <= peakCurve1.StartCycle)
+            {
+                return 0;
+            }
+
+            var overlapStart = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
+            var overlapEnd = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var maxLength = overlapEnd - overlapStart + 1;
+
+            var overlapArea = new List<(double, double)>();
+            var scanCycles1 = peakCurve1.NormalizedLinearSplinePeaks.Select(p => p.Item1).ToArray();
+            var scanCycles2 = peakCurve2.NormalizedLinearSplinePeaks.Select(p => p.Item1).ToArray();
+            var index1 = Array.BinarySearch(scanCycles1, overlapStart);
+            var index2 = Array.BinarySearch(scanCycles2, overlapStart);
+
+            for (int i = 0; i < maxLength - 1; i++)
+            {
+                double diff0 = peakCurve1.NormalizedLinearSplinePeaks[index1 + i].Item2 - peakCurve2.NormalizedLinearSplinePeaks[index2 + i].Item2;
+                double diff1 = peakCurve1.NormalizedLinearSplinePeaks[index1 + i + 1].Item2 - peakCurve2.NormalizedLinearSplinePeaks[index2 + i + 1].Item2;
+                
+                overlapArea.Add((overlapStart +i, Math.Min(peakCurve1.NormalizedLinearSplinePeaks[index1 + i].Item2, peakCurve2.NormalizedLinearSplinePeaks[index2 + i].Item2))); 
+                if (diff0 * diff1 < 0)
+                {
+                    double slope = peakCurve1.NormalizedLinearSplinePeaks[index1 + i + 1].Item2 - peakCurve1.NormalizedLinearSplinePeaks[index1 + i].Item2;
+                    double y = peakCurve1.NormalizedLinearSplinePeaks[index1 + i].Item2 + slope * Math.Abs(diff0 / (diff1 - diff0));
+                    overlapArea.Add((overlapStart + i + Math.Abs(diff0 / (diff1 - diff0)), y));
+                }
+            }
+            double overlapAUC = CalculateNormalizedArea(overlapArea);
+
+            if (visualize)
+            {
+                var overlapPlot = Chart2D.Chart.Line<double, double, string>(
+                    x: overlapArea.Select(p => p.Item1),
+                    y: overlapArea.Select(p => p.Item2)).WithMarkerStyle(Color: Color.fromString("green"));
+                var plot1 = Chart2D.Chart.Line<double, double, string>(
+                    x: peakCurve1.NormalizedLinearSplinePeaks.Select(p => (double)p.Item1),
+                    y: peakCurve1.NormalizedLinearSplinePeaks.Select(p => p.Item2)).WithMarkerStyle(Color: Color.fromString("blue"));
+                var plot2 = Chart2D.Chart.Line<double, double, string>(
+                    x: peakCurve2.NormalizedLinearSplinePeaks.Select(p => (double)p.Item1),
+                    y: peakCurve2.NormalizedLinearSplinePeaks.Select(p => p.Item2)).WithMarkerStyle(Color: Color.fromString("red"));
+                var combinedPlot = Chart.Combine(new[] { overlapPlot, plot1, plot2 });
+                combinedPlot.Show();
+            }
+            return overlapAUC;
+        }
+
+
         public static double CalculateOverlapAreaRatio_spline(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
             var start = Math.Min(peakCurve1.StartCycle, peakCurve2.StartCycle);
@@ -525,8 +579,8 @@ namespace EngineLayer.DIA
                 peakCurve2.GetNormalizedPeaks();
             }
 
-            var overlapArea = new List<(int, double)>();
-            var totalArea = new List<(int, double)>();
+            var overlapArea = new List<(double, double)>();
+            var totalArea = new List<(double, double)>();
             var scanCycles1 = peakCurve1.NormalizedPeaks.Select(p => p.Item1).ToArray();
             var scanCycles2 = peakCurve2.NormalizedPeaks.Select(p => p.Item1).ToArray();
 
@@ -549,8 +603,8 @@ namespace EngineLayer.DIA
                 }
                 else
                 {
-                    totalArea.Add((i, Math.Max(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
-                    overlapArea.Add((i, Math.Min(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
+                    totalArea.Add(((double)i, Math.Max(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
+                    overlapArea.Add(((double)i, Math.Min(peakCurve1.NormalizedPeaks[index1].Item2, peakCurve2.NormalizedPeaks[index2].Item2)));
                 }
             }
             double overlapAUC = CalculateArea(overlapArea);
@@ -559,17 +613,32 @@ namespace EngineLayer.DIA
             return ratio;
         }
 
-        public static double CalculateArea(List<(int, double)> data)
+        public static double CalculateArea(List<(double, double)> data)
         {
             double area = 0;
             for (int i = 1; i < data.Count; i++)
             {
-                int x1 = data[i - 1].Item1;
-                int x2 = data[i].Item1;
+                double x1 = data[i - 1].Item1;
+                double x2 = data[i].Item1;
                 double y1 = data[i - 1].Item2;
                 double y2 = data[i].Item2;
                 area += (x2 - x1) * (y1 + y2) / 2;
             }
+            return area;
+        }
+
+        public static double CalculateNormalizedArea(List<(double, double)> data)
+        {
+            double area = data[0].Item2/2;
+            for (int i = 1; i < data.Count; i++)
+            {
+                double x1 = data[i - 1].Item1;
+                double x2 = data[i].Item1;
+                double y1 = data[i - 1].Item2;
+                double y2 = data[i].Item2;
+                area += (x2 - x1) * (y1 + y2) / 2;
+            }
+            area += data[data.Count - 1].Item2 / 2;
             return area;
         }
 
