@@ -15,6 +15,7 @@ using UsefulProteomicsDatabases;
 using System.IO.Compression;
 using Nett;
 using OxyPlot;
+using FlashLFQ.PEP;
 
 namespace Test.TestDIA
 {
@@ -595,7 +596,13 @@ namespace Test.TestDIA
             //    Position = AxisPosition.Bottom,
             //    Minimum = 0
             //});
+        }
 
+        [Test]
+        public static void Hydrophobicity()
+        {
+            var psmFile = @"E:\Aneuploidy\High-pH\250513_high-pH\F1-12_cali-xml\Task2-SearchTask\Individual File Results\05-13-25_Yeast_high-pH_F1-calib_Peptides.psmtsv";
+            var psms = PsmTsvReader.ReadTsv(psmFile, out List<string> errors).Where(p => p.QValue < 0.01 && p.QValueNotch < 0.01 && p.DecoyContamTarget == "T").ToList();
         }
     }
 }

@@ -15,6 +15,7 @@ using Plotly.NET;
 using Nett;
 using System.IO.Compression;
 using static Plotly.NET.StyleParam.Range;
+using System.Windows;
 
 namespace Test.TestDIA
 {
@@ -209,9 +210,13 @@ namespace Test.TestDIA
             var filePath42 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_averaged_labelCorrected.mzML";
             var filePath43 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep2_averaged_labelCorrected.mzML";
             var filePath44 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep3_averaged_labelCorrected.mzML";
+            var filePath45 = @"E:\ISD Project\ISD_250428\0429YD_DDA&ISD_cali-avg-gptmd-xml\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+            var filePath46 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_gradient5_ISD60-80-100_400-1100_300mz-overlap100_RF_labelCorrected-calib-averaged.mzML";
+            var filePath47 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_400-1100_300mz-overlap100_RF_labelCorrected-calib-averaged.mzML";
+            var filePath48 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
 
-            var fileList = new List<string> { filePath42, filePath43, filePath44};//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\0504YB_rep_preFilter\averaged-rep123_Ms1SpaceCubicSpline_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num4_minCount10";
+            var fileList = new List<string> { filePath48};//filePath21, filePath22, filePath23,
+            var outputFolder = @"E:\ISD Project\TestSearch\0501YC\cali-avged-preFilter_Umpire_GPTMD_ClassicDecon_20ppm_apex0.15_corr0.75_overlap0_maxRT0.5_preSN0.01_num2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -225,13 +230,13 @@ namespace Test.TestDIA
 
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance: 0.25,
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.15,
                 fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.Ms1SpaceCubicSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 4, ms2NumPeaksThreshold:4, combineFragments: false,
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold:2, combineFragments: false,
                 rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5) ;
 
             //match all charge fragment ions
@@ -251,11 +256,12 @@ namespace Test.TestDIA
             var cali_task = Toml.ReadFile<CalibrationTask>(cali_toml, MetaMorpheusTask.tomlConfig);
             cali_task.CommonParameters = searchTask.CommonParameters.Clone();
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
 
             string YC_gptmd = @"E:\CE\250318_CE\YC_cali-avged_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";
             string YB_gptmd = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
             string ecoli_fasta = @"E:\DIA\FW-DIA data\uniprotkb_taxonomy_id_469008_2025_04_24.fasta";
@@ -265,7 +271,8 @@ namespace Test.TestDIA
             var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
             engine.Run();
 
-            var outputFolder2 = @"E:\ISD Project\TestSearch\0429YE\all_Umpire_GPTMD_20ppm_apex0.3_corr0.5_overlap0_maxRT0.5_preSN0.01_num2";
+            var fileList2 = new List<string> { filePath34, filePath35, filePath36, filePath46, filePath47, filePath48 };
+            var outputFolder2 = @"E:\ISD Project\TestSearch\0501YC\all+cali-avg_Umpire_GPTMD_ClassicDecon_20ppm_apex0.3_corr0.5_overlap0_maxRT0.5_preSN0.01_num2";
             if (!Directory.Exists(outputFolder2))
             {
                 Directory.CreateDirectory(outputFolder2);
@@ -280,10 +287,10 @@ namespace Test.TestDIA
                 ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false,
                 rankFilter: false, minPFpairCount: 10);
 
-            var engine2 = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder2);
+            var engine2 = new EverythingRunnerEngine(taskList, fileList2, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder2);
             engine2.Run();
 
-            var outputFolder3 = @"E:\ISD Project\TestSearch\0429YE\all_Umpire_GPTMD_20ppm_apex0.15_corr0.75_overlap0_maxRT0.5_preSN0.01_num2_combineFrags";
+            var outputFolder3 = @"E:\ISD Project\TestSearch\0501YC\all+cali-avg_Umpire_GPTMD_ClassicDecon_20ppm_apex0.15_corr0.75_overlap0_maxRT0.5_preSN0.01_num2";
             if (!Directory.Exists(outputFolder3))
             {
                 Directory.CreateDirectory(outputFolder3);
@@ -293,12 +300,12 @@ namespace Test.TestDIA
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.CubicSpline, ms2SplineType: SplineType.CubicSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 4, combineFragments: true,
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, combineFragments: false,
                 rankFilter: false, minPFpairCount: 10);
 
-            var engine3 = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder3);
+            var engine3 = new EverythingRunnerEngine(taskList, fileList2, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder3);
             engine3.Run();
         }
         //remove minimum number of points required for correlation?
