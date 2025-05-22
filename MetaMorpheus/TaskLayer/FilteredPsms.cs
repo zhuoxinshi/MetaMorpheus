@@ -8,6 +8,12 @@ using System.Threading.Tasks;
 
 namespace TaskLayer
 {
+    public enum FilterType
+    {
+        QValue,
+        PepQValue
+    }
+
     /// <summary>
     /// Contains a filtered list of PSMs.
     /// All properties within this class are read-only, and should only be set on object construction
@@ -18,11 +24,11 @@ namespace TaskLayer
         /// <summary>
         /// Filter type can have only two values: "q-value" or "pep q-value"
         /// </summary>
-        public string FilterType { get; init; }
+        public FilterType FilterType { get; init; }
         public double FilterThreshold { get; init; }
         public bool FilteringNotPerformed { get; init; }
         public bool PeptideLevelFiltering { get; init; }
-        public FilteredPsms(List<SpectralMatch> filteredPsms, string filterType, double filterThreshold, bool filteringNotPerformed, bool peptideLevelFiltering)
+        public FilteredPsms(List<SpectralMatch> filteredPsms, FilterType filterType, double filterThreshold, bool filteringNotPerformed, bool peptideLevelFiltering)
         {
             FilteredPsmsList = filteredPsms;
             FilterType = filterType;
@@ -37,11 +43,16 @@ namespace TaskLayer
 
             switch (FilterType)
             {
-                case "pep q-value":
+                case FilterType.PepQValue:
                     return psm.GetFdrInfo(PeptideLevelFiltering).PEP_QValue <= FilterThreshold;
                 default:
                     return psm.GetFdrInfo(PeptideLevelFiltering).QValue <= FilterThreshold && psm.GetFdrInfo(PeptideLevelFiltering).QValueNotch <= FilterThreshold;
             }
+        }
+
+        public string GetFilterTypeString()
+        {
+            return FilterType == FilterType.PepQValue ? "pep q-value" : "q-value";
         }
 
         /// <summary>
@@ -87,7 +98,7 @@ namespace TaskLayer
             List<SpectralMatch> filteredPsms = new List<SpectralMatch>();
 
             // set the filter type
-            string filterType = "q-value";
+            FilterType filterType = FilterType.QValue;
             if (pepQValueThreshold < qValueThreshold)
             {
                 if (psms.Count() < 100)
@@ -97,47 +108,18 @@ namespace TaskLayer
                 }
                 else
                 {
-                    filterType = "pep q-value";
+                    filterType = FilterType.PepQValue;
                 }
             }
 
-            if (!includeHighQValuePsms)
-            {
-                filteredPsms = filterType.Equals("q-value")
-                    ? psms.Where(p => p.GetFdrInfo(filterAtPeptideLevel) != null
-                        && p.GetFdrInfo(filterAtPeptideLevel).QValue <= filterThreshold
-                        && p.GetFdrInfo(filterAtPeptideLevel).QValueNotch <= filterThreshold).ToList()
-                    : psms.Where(p => p.GetFdrInfo(filterAtPeptideLevel) != null && p.GetFdrInfo(filterAtPeptideLevel).PEP_QValue <= filterThreshold).ToList();
-            }
-            else
-            {
-                filteredPsms = psms.ToList();
-            }
-
-            if (!includeDecoys)
-            {
-                filteredPsms.RemoveAll(p => p.IsDecoy);
-            }
-            if (!includeContaminants)
-            {
-                filteredPsms.RemoveAll(p => p.IsContaminant);
-            }
-            if (!includeAmbiguous)
-            {
-                filteredPsms.RemoveAll(p => p.BaseSequence.IsNullOrEmpty());
-            }
-            if (!includeAmbiguousMods)
-            {
-                filteredPsms.RemoveAll(p => p.FullSequence.IsNullOrEmpty());
-            }
-            if (filterAtPeptideLevel)
-            {
-                //Choose the top scoring PSM for each peptide
-                filteredPsms = filteredPsms
-                    .OrderByDescending(p => p)
-                    .GroupBy(b => b.FullSequence)
-                    .Select(b => b.FirstOrDefault()).ToList();
-            }
+            filteredPsms = psms.Where(psm => 
+                    (includeDecoys || !psm.IsDecoy) 
+                    && (includeContaminants || !psm.IsContaminant)
+                    && (includeAmbiguous || !psm.BaseSequence.IsNullOrEmpty())
+                    && (includeAmbiguousMods || !psm.FullSequence.IsNullOrEmpty()))
+                .FilterByQValue(includeHighQValuePsms, filterThreshold, filterAtPeptideLevel, filterType)
+                .CollapseToPeptides(filterAtPeptideLevel)
+                .ToList();
 
             return new FilteredPsms(filteredPsms, filterType, filterThreshold, filteringNotPerformed, filterAtPeptideLevel);
         }
@@ -150,6 +132,56 @@ namespace TaskLayer
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
         {
             return FilteredPsmsList.GetEnumerator();
+        }
+    }
+
+    public static class FilteredPsmsExtensions
+    {
+        public static IEnumerable<SpectralMatch> CollapseToPeptides(this IEnumerable<SpectralMatch> psms, bool filterAtPeptideLevel)
+        {
+            if (!filterAtPeptideLevel)
+            {
+                return psms;
+            }
+            else
+            {
+                return psms
+                    .OrderBy(p => p.FdrInfo.PEP) // Order by PEP first
+                    .ThenByDescending(p => p) // Use the default comparer to break ties
+                    .GroupBy(p => p.FullSequence) 
+                    .Select(p => p.FirstOrDefault()) // Choose the PSM with the lowest PEP for each peptide
+                    .OrderByDescending(p => p); // Use the default comparer to order the resulting list, so that the output is ordered by MetaMorpheus Score
+            }
+        }
+
+        public static IEnumerable<SpectralMatch> FilterByQValue(this IEnumerable<SpectralMatch> psms, bool includeHighQValuePsms, double qValueThreshold, bool filterAtPeptideLevel, FilterType filterType)
+        {
+            foreach (var psm in psms)
+            {
+                if (includeHighQValuePsms)
+                {
+                    yield return psm;
+                }
+                else if (psm.GetFdrInfo(filterAtPeptideLevel) != null)
+                {
+                    switch(filterType)
+                    {
+                        case FilterType.PepQValue:
+                            if (psm.GetFdrInfo(filterAtPeptideLevel).PEP_QValue <= qValueThreshold)
+                            {
+                                yield return psm;
+                            }
+                            break;
+                        case FilterType.QValue:
+                        default:
+                            if (psm.GetFdrInfo(filterAtPeptideLevel).QValue <= qValueThreshold && psm.GetFdrInfo(filterAtPeptideLevel).QValueNotch <= qValueThreshold)
+                            {
+                                yield return psm;
+                            }
+                            break;
+                    }
+                }
+            }
         }
     }
 }

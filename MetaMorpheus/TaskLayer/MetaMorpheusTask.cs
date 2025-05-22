@@ -15,13 +15,14 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Omics.Digestion;
 using Omics.Fragmentation.Peptide;
 using Omics.Modifications;
 using Omics.SpectrumMatch;
 using SpectralAveraging;
 using UsefulProteomicsDatabases;
-using Easy.Common.Extensions;
-using EngineLayer.DIA;
+using Transcriptomics.Digestion;
+using Proteomics.AminoAcidPolymer;
 
 namespace TaskLayer
 {
@@ -66,12 +67,51 @@ namespace TaskLayer
                         tmlString.Value == "AverageDdaScansWithOverlap"
                             ? SpectraFileAveragingType.AverageDdaScans
                             : Enum.Parse<SpectraFileAveragingType>(tmlString.Value))))
+            .ConfigureType<IDigestionParams>(type => type
+                .WithConversionFor<TomlTable>(c => c
+                    .FromToml(tmlTable =>
+                        tmlTable.ContainsKey("Protease")
+                            ? tmlTable.Get<DigestionParams>()
+                            : tmlTable.Get<RnaDigestionParams>())))
             .ConfigureType<DigestionParams>(type => type
                 .IgnoreProperty(p => p.DigestionAgent)
                 .IgnoreProperty(p => p.MaxMods)
                 .IgnoreProperty(p => p.MaxLength)
                 .IgnoreProperty(p => p.MinLength))
-        );
+            .ConfigureType<RnaDigestionParams>(type => type
+                .IgnoreProperty(p => p.DigestionAgent))
+            .ConfigureType<Rnase>(type => type
+                .WithConversionFor<TomlString>(convert => convert
+                    .ToToml(custom => custom.Name)
+                    .FromToml(tmlString => RnaseDictionary.Dictionary[tmlString.Value])))
+            // Switch on DeconvolutionParameters
+            .ConfigureType<DeconvolutionParameters>(type => type
+                .WithConversionFor<TomlTable>(c => c
+                    .FromToml(tmlTable => tmlTable.Get<string>("DeconvolutionType") switch
+                        {
+                            "ClassicDeconvolution" => tmlTable.Get<ClassicDeconvolutionParameters>(),
+                            "IsoDecDeconvolution" => tmlTable.Get<IsoDecDeconvolutionParameters>(),
+                            _ => throw new MetaMorpheusException("Unrecognized deconvolution type in toml")
+                        })))
+            // Ignore all properties that are not user settable, instantiate with defaults. If the toml differs, defaults will be overridden. 
+            .ConfigureType<ClassicDeconvolutionParameters>(type => type
+                .CreateInstance(() => new ClassicDeconvolutionParameters(1, 20, 4, 3))
+                .IgnoreProperty(p => p.IntensityRatioLimit)
+                .IgnoreProperty(p => p.DeconvolutionTolerancePpm))
+            .ConfigureType<IsoDecDeconvolutionParameters>(type => type
+                .CreateInstance(() => new IsoDecDeconvolutionParameters())
+                .IgnoreProperty(p => p.Verbose)
+                .IgnoreProperty(p => p.PeakWindow)
+                .IgnoreProperty(p => p.PeakThreshold)
+                .IgnoreProperty(p => p.MinPeaks)
+                .IgnoreProperty(p => p.PlusOneIntWindow)
+                .IgnoreProperty(p => p.MinScoreDiff)
+                .IgnoreProperty(p => p.IsoLength)
+                .IgnoreProperty(p => p.MassDiffC)
+                .IgnoreProperty(p => p.MinusOneAreasZero)
+                .IgnoreProperty(p => p.IsotopeThreshold)
+                .IgnoreProperty(p => p.ZScoreThreshold))
+            );
        
 
         protected readonly StringBuilder ProseCreatedWhileRunning = new StringBuilder();
@@ -459,24 +499,36 @@ namespace TaskLayer
             }
 
             // set file-specific digestion parameters
-            Protease protease = fileSpecificParams.Protease ?? commonParams.DigestionParams.SpecificProtease; //set to specific for nonspecific searches to update
-            int minPeptideLength = fileSpecificParams.MinPeptideLength ?? commonParams.DigestionParams.MinPeptideLength;
-            int maxPeptideLength = fileSpecificParams.MaxPeptideLength ?? commonParams.DigestionParams.MaxPeptideLength;
+            int minPeptideLength = fileSpecificParams.MinPeptideLength ?? commonParams.DigestionParams.MinLength;
+            int maxPeptideLength = fileSpecificParams.MaxPeptideLength ?? commonParams.DigestionParams.MaxLength;
             int maxMissedCleavages = fileSpecificParams.MaxMissedCleavages ?? commonParams.DigestionParams.MaxMissedCleavages;
-            int maxModsForPeptide = fileSpecificParams.MaxModsForPeptide ?? commonParams.DigestionParams.MaxModsForPeptide;
-            DigestionParams fileSpecificDigestionParams = new DigestionParams(
-                protease: protease.Name,
-                maxMissedCleavages: maxMissedCleavages,
-                minPeptideLength: minPeptideLength,
-                maxPeptideLength: maxPeptideLength,
-                maxModsForPeptides: maxModsForPeptide,
+            int maxModsForPeptide = fileSpecificParams.MaxModsForPeptide ?? commonParams.DigestionParams.MaxMods;
 
-                //NEED THESE OR THEY'LL BE OVERWRITTEN
-                maxModificationIsoforms: commonParams.DigestionParams.MaxModificationIsoforms,
-                initiatorMethionineBehavior: commonParams.DigestionParams.InitiatorMethionineBehavior,
-                fragmentationTerminus: commonParams.DigestionParams.FragmentationTerminus,
-                searchModeType: commonParams.DigestionParams.SearchModeType
-                );
+            // set file-specific digestion params based upon the type of digestion params
+            IDigestionParams fileSpecificDigestionParams = commonParams.DigestionParams switch
+            {
+                DigestionParams digestionParams => new DigestionParams(
+                    protease: (fileSpecificParams.DigestionAgent ?? digestionParams.SpecificProtease).Name,
+                    maxMissedCleavages: maxMissedCleavages,
+                    minPeptideLength: minPeptideLength,
+                    maxPeptideLength: maxPeptideLength,
+                    maxModsForPeptides: maxModsForPeptide,
+                    maxModificationIsoforms: digestionParams.MaxModificationIsoforms,
+                    initiatorMethionineBehavior: digestionParams.InitiatorMethionineBehavior,
+                    fragmentationTerminus: digestionParams.FragmentationTerminus,
+                    searchModeType: digestionParams.SearchModeType
+                ),
+                RnaDigestionParams => new RnaDigestionParams(
+                    rnase: (fileSpecificParams.DigestionAgent ?? commonParams.DigestionParams.DigestionAgent).Name,
+                    maxMissedCleavages: maxMissedCleavages,
+                    minLength: minPeptideLength,
+                    maxLength: maxPeptideLength,
+                    maxMods: maxModsForPeptide,
+                    maxModificationIsoforms: commonParams.DigestionParams.MaxModificationIsoforms,
+                    fragmentationTerminus: commonParams.DigestionParams.FragmentationTerminus
+                ),
+                _ => throw new MetaMorpheusException($"Unrecognized digestion parameters of type {commonParams.DigestionParams.GetType().FullName} in MetaMorpheusTask.SetAllFileSpecificCommonParams")
+            };
 
             // set the rest of the file-specific parameters
             Tolerance precursorMassTolerance = fileSpecificParams.PrecursorMassTolerance ?? commonParams.PrecursorMassTolerance;
@@ -601,7 +653,7 @@ namespace TaskLayer
             {
                 MetaMorpheusEngine.FinishedSingleEngineHandler -= SingleEngineHandlerInTask;
                 var resultsFileName = Path.Combine(output_folder, "results.txt");
-        e.Data.Add("folder", output_folder);
+                e.Data.Add("folder", output_folder);
                 using (StreamWriter file = new StreamWriter(resultsFileName))
                 {
                     file.WriteLine(GlobalVariables.MetaMorpheusVersion.Equals("1.0.0.0") ? "MetaMorpheus: Not a release version" : "MetaMorpheus: version " + GlobalVariables.MetaMorpheusVersion);
@@ -616,37 +668,35 @@ namespace TaskLayer
                 throw;
             }
 
-{
-                var proseFilePath = Path.Combine(output_folder, "AutoGeneratedManuscriptProse.txt");
-                using (StreamWriter file = new StreamWriter(proseFilePath))
+            var proseFilePath = Path.Combine(output_folder, "AutoGeneratedManuscriptProse.txt");
+            using (StreamWriter file = new StreamWriter(proseFilePath))
+            {
+                file.WriteLine("The data analysis was performed using MetaMorpheus version " + GlobalVariables.MetaMorpheusVersion + ", available at " + "https://github.com/smith-chem-wisc/MetaMorpheus.");
+		        file.WriteLine();
+                file.Write(ProseCreatedWhileRunning.ToString());
+                file.WriteLine(SystemInfo.SystemProse().Replace(Environment.NewLine, "") + " ");
+		        file.WriteLine();
+                file.WriteLine("The total time to perform the " + TaskType + " task on " + currentRawDataFilepathList.Count + " spectra file(s) was " + String.Format("{0:0.00}", MyTaskResults.Time.TotalMinutes) + " minutes.");
+                file.WriteLine();
+                file.WriteLine("Published works using MetaMorpheus software are encouraged to cite the appropriate publications listed in the reference guide, found here: https://github.com/smith-chem-wisc/MetaMorpheus/blob/master/README.md.");
+                file.WriteLine();
+                file.WriteLine("Spectra files: ");
+                file.WriteLine(string.Join(Environment.NewLine, currentRawDataFilepathList.Select(b => '\t' + b)));
+                file.WriteLine("Databases:");
+
+                foreach (var proteinDb in currentProteinDbFilenameList)
                 {
-                    file.WriteLine("The data analysis was performed using MetaMorpheus version " + GlobalVariables.MetaMorpheusVersion + ", available at " + "https://github.com/smith-chem-wisc/MetaMorpheus.");
-                    file.Write(ProseCreatedWhileRunning.ToString());
-                    file.WriteLine(SystemInfo.SystemProse().Replace(Environment.NewLine, "") + " ");
-                    file.WriteLine("The total time to perform the " + TaskType + " task on " + currentRawDataFilepathList.Count + " spectra file(s) was " + String.Format("{0:0.00}", MyTaskResults.Time.TotalMinutes) + " minutes.");
-                    file.WriteLine();
-                    file.WriteLine("Published works using MetaMorpheus software are encouraged to cite: Solntsev, S. K.; Shortreed, M. R.; Frey, B. L.; Smith, L. M. Enhanced Global Post-translational Modification Discovery with MetaMorpheus. Journal of Proteome Research. 2018, 17 (5), 1844-1851.");
-
-                    file.WriteLine();
-                    file.WriteLine("Spectra files: ");
-                    file.WriteLine(string.Join(Environment.NewLine, currentRawDataFilepathList.Select(b => '\t' + b)));
-                    file.WriteLine("Databases:");
-
-                    foreach (var proteinDb in currentProteinDbFilenameList)
+                    if (proteinDb.IsContaminant)
                     {
-                        if (proteinDb.IsContaminant)
-                        {
-                            file.Write(string.Join(Environment.NewLine, '\t' + "Contaminants " + proteinDb.FilePath + " Downloaded on: " + File.GetCreationTime(proteinDb.FilePath).ToString()));
-                        }
-                        else
-                        {
-                            file.Write(string.Join(Environment.NewLine, '\t' + proteinDb.FilePath + " Downloaded on: " + File.GetCreationTime(proteinDb.FilePath).ToString()));
-                        }
+                        file.Write(string.Join(Environment.NewLine, '\t' + "Contaminants " + proteinDb.FilePath + " Downloaded on: " + File.GetCreationTime(proteinDb.FilePath).ToString()));
+                    }
+                    else
+                    {
+                        file.Write(string.Join(Environment.NewLine, '\t' + proteinDb.FilePath + " Downloaded on: " + File.GetCreationTime(proteinDb.FilePath).ToString()));
                     }
                 }
-                FinishedWritingFile(proseFilePath, new List<string> { displayName });
             }
-
+            FinishedWritingFile(proseFilePath, new List<string> { displayName });
             MetaMorpheusEngine.FinishedSingleEngineHandler -= SingleEngineHandlerInTask;
             return MyTaskResults;
         }
@@ -670,6 +720,46 @@ namespace TaskLayer
             {
                 Warn("Warning: " + emptyProteinEntries + " empty protein entries ignored");
             }
+
+            
+
+            if (!proteinList.Any(p => p.IsDecoy))
+            {
+                Status("Done loading proteins", new List<string> { taskId });
+                return proteinList;
+            }
+
+            // Sanitize the decoys
+            // TODO: Fix this so that it accounts for multi-protease searches. Currently, we only consider the first protease
+            // when looking for target/decoy collisions
+
+            HashSet<string> targetPeptideSequences = new();
+            foreach(var protein in proteinList.Where(p => !p.IsDecoy))
+            {
+                // When thinking about decoy collisions, we can ignore modifications
+                foreach(var peptide in protein.Digest(commonParameters.DigestionParams, new List<Modification>(), new List<Modification>()))
+                {
+                    targetPeptideSequences.Add(peptide.BaseSequence);
+                }
+            }
+            // Now, we iterate through the decoys and scramble the sequences that correspond to target peptides
+            for(int i = 0; i < proteinList.Count; i++)
+            {
+                if(proteinList[i].IsDecoy)
+                {
+                    var peptidesToReplace = proteinList[i]
+                        .Digest(commonParameters.DigestionParams, new List<Modification>(), new List<Modification>())
+                        .Select(p => p.BaseSequence)
+                        .Where(targetPeptideSequences.Contains)
+                        .ToList();
+                    if(peptidesToReplace.Any())
+                    {
+                        proteinList[i] = DecoySequenceValidator.ScrambleDecoyBioPolymer(proteinList[i], commonParameters.DigestionParams, forbiddenSequences: targetPeptideSequences, peptidesToReplace);
+                    }
+                }
+            }
+
+            Status("Done loading proteins", new List<string> { taskId });
             return proteinList;
         }
 
@@ -832,7 +922,7 @@ namespace TaskLayer
         {
             return value.Split(new string[] { "\t\t" }, StringSplitOptions.RemoveEmptyEntries).Select(b => (b.Split('\t').First(), b.Split('\t').Last())).ToList();
         }
-        
+
         private void SingleEngineHandlerInTask(object sender, SingleEngineFinishedEventArgs e)
         {
             MyTaskResults.AddResultText(e.ToString());
@@ -1144,18 +1234,16 @@ namespace TaskLayer
 
             // TODO: note that this will not function well if the user is using file-specific settings, but it's assumed
             // that bottom-up and top-down data is not being searched in the same task
+            if (commonParameters == null || commonParameters.DigestionParams == null)
+                return;
 
-            if (commonParameters != null
-                && commonParameters.DigestionParams != null
-                && commonParameters.DigestionParams.Protease != null
-                && commonParameters.DigestionParams.Protease.Name == "top-down")
+            GlobalVariables.AnalyteType = commonParameters.DigestionParams switch
             {
-                GlobalVariables.AnalyteType = "Proteoform";
-            }
-            else
-            {
-                GlobalVariables.AnalyteType = "Peptide";
-            }
+                RnaDigestionParams => AnalyteType.Oligo,
+                DigestionParams { Protease: not null } when commonParameters.DigestionParams.DigestionAgent.Name == "top-down" 
+                    => AnalyteType.Proteoform,
+                _ => AnalyteType.Peptide
+            };
         }
 
         /// <summary>
@@ -1173,7 +1261,7 @@ namespace TaskLayer
             {
                 if (accessionGroup.Count() != 1) //if multiple proteins with the same accession
                 {
-                    List<Protein> proteinsWithThisAccession = accessionGroup.OrderBy(p => p.OneBasedPossibleLocalizedModifications.Count).ThenBy(p => p.ProteolysisProducts.Count()).ToList();
+                    List<Protein> proteinsWithThisAccession = accessionGroup.OrderBy(p => p.OneBasedPossibleLocalizedModifications.Count).ThenBy(p => p.TruncationProducts.Count()).ToList();
                     List<Protein> proteinsToRemove = new List<Protein>();
                     if (tcAmbiguity == TargetContaminantAmbiguity.RenameProtein)
                     {
@@ -1184,7 +1272,7 @@ namespace TaskLayer
                             //accession is private and there's no clone method, so we need to make a whole new protein... TODO: put this in mzlib
                             //use PROTEIN_D1 instead of PROTEIN_1 so it doesn't look like an isoform (D for Duplicate)
                             var renamedProtein = new Protein(originalProtein.BaseSequence, originalProtein + "_D" + proteinNumber.ToString(), originalProtein.Organism,
-                                originalProtein.GeneNames.ToList(), originalProtein.OneBasedPossibleLocalizedModifications, originalProtein.ProteolysisProducts.ToList(), originalProtein.Name, originalProtein.FullName,
+                                originalProtein.GeneNames.ToList(), originalProtein.OneBasedPossibleLocalizedModifications, originalProtein.TruncationProducts.ToList(), originalProtein.Name, originalProtein.FullName,
                                 originalProtein.IsDecoy, originalProtein.IsContaminant, originalProtein.DatabaseReferences.ToList(), originalProtein.SequenceVariations.ToList(), originalProtein.AppliedSequenceVariations,
                                 originalProtein.SampleNameForVariants, originalProtein.DisulfideBonds.ToList(), originalProtein.SpliceSites.ToList(), originalProtein.DatabaseFilePath);
                             proteins.Add(renamedProtein);

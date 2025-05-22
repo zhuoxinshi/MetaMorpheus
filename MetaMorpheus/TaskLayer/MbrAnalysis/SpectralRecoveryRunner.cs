@@ -46,12 +46,14 @@ namespace TaskLayer.MbrAnalysis
             int maxThreadsPerFile = commonParameters.MaxThreadsToUsePerFile;
             int[] threads = Enumerable.Range(0, maxThreadsPerFile).ToArray();
 
-            ConcurrentDictionary<ChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches = new();
+            ConcurrentDictionary<MbrChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches = new();
 
             foreach (SpectraFileInfo spectraFile in spectraFiles)
             {
-                List<ChromatographicPeak> fileSpecificMbrPeaks =
-                    parameters.FlashLfqResults.Peaks[spectraFile].Where(p => p.IsMbrPeak).ToList();
+                List<MbrChromatographicPeak> fileSpecificMbrPeaks = parameters.FlashLfqResults.Peaks[spectraFile]
+                    .Where(p => p.DetectionType == DetectionType.MBR)
+                    .Cast<MbrChromatographicPeak>()
+                    .Where(p => !p.RandomRt && !p.DecoyPeptide).ToList();
                 if (fileSpecificMbrPeaks == null || (!fileSpecificMbrPeaks.Any())) break;
 
                 MyFileManager myFileManager = new(true);
@@ -87,14 +89,14 @@ namespace TaskLayer.MbrAnalysis
 
                     for (; i < fileSpecificMbrPeaks.Count; i += maxThreadsPerFile)
                     {
-                        ChromatographicPeak mbrPeak = fileSpecificMbrPeaks[i];
+                        MbrChromatographicPeak mbrPeak = fileSpecificMbrPeaks[i];
                         SpectralMatch bestDonorPsm = allPeptides.Where(p =>
                             p.FullSequence == mbrPeak.Identifications.First().ModifiedSequence).FirstOrDefault();
                         if (bestDonorPsm == null)
                         {
                             break;
                         }
-                        IBioPolymerWithSetMods bestDonorPwsm = bestDonorPsm.BestMatchingBioPolymersWithSetMods.First().Peptide;
+                        IBioPolymerWithSetMods bestDonorPwsm = bestDonorPsm.BestMatchingBioPolymersWithSetMods.First().SpecificBioPolymer;
 
                         IEnumerable<SpectralMatch> peptideSpectralMatches =
                             mcse.SearchAroundPeak(bestDonorPwsm, mbrPeak.Apex.IndexedPeak.RetentionTime);
@@ -119,9 +121,8 @@ namespace TaskLayer.MbrAnalysis
                 List<SpectralMatch> allPsms = parameters.AllPsms.
                     OrderByDescending(p => p).ToList();
 
-                AssignEstimatedPsmQvalue(bestMbrMatches, allPsms);
                 FDRAnalysisOfMbrPsms(bestMbrMatches, allPsms, parameters, fileSpecificParameters);
-                AssignEstimatedPsmPepQValue(bestMbrMatches, allPsms);
+
                 foreach (SpectralRecoveryPSM match in bestMbrMatches.Values) match.FindOriginalPsm(allPsms);
             }
 
@@ -201,80 +202,20 @@ namespace TaskLayer.MbrAnalysis
                 }
             }
         }
-        private static void FDRAnalysisOfMbrPsms(ConcurrentDictionary<ChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches, List<SpectralMatch> allPsms,
+        private static void FDRAnalysisOfMbrPsms(ConcurrentDictionary<MbrChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches, List<SpectralMatch> allPsms,
             PostSearchAnalysisParameters parameters, List<(string, CommonParameters)> fileSpecificParameters)
         {
             List<SpectralMatch> psms = bestMbrMatches.
                 Select(p => p.Value.spectralLibraryMatch).
                 Where(v => v != null).
                 ToList();
-            List<int>[] psmGroupIndices = PEP_Analysis_Cross_Validation.Get_PSM_Group_Indices(psms, 1);
-            MLContext mlContext = new MLContext();
-            IEnumerable<PsmData>[] PSMDataGroups = new IEnumerable<PsmData>[1];
 
-            string searchType = "standard";
-            if (psms[0].DigestionParams.Protease.Name == "top-down")
-            {
-                searchType = "top-down";
-            }
+            new FdrAnalysisEngine(psms, parameters.NumNotches, fileSpecificParameters.First().Item2, fileSpecificParameters,
+                new List<string> { parameters.SearchTaskId }, analysisType: "PSM", doPEP: true, outputFolder: parameters.OutputFolder).Run();
 
-            int chargeStateMode = PEP_Analysis_Cross_Validation.GetChargeStateMode(allPsms);
-
-            Dictionary<string, Dictionary<int, Tuple<double, double>>> fileSpecificTimeDependantHydrophobicityAverageAndDeviation_unmodified = PEP_Analysis_Cross_Validation.ComputeHydrophobicityValues(allPsms, fileSpecificParameters, false);
-            Dictionary<string, Dictionary<int, Tuple<double, double>>> fileSpecificTimeDependantHydrophobicityAverageAndDeviation_modified = PEP_Analysis_Cross_Validation.ComputeHydrophobicityValues(allPsms, fileSpecificParameters, true);
-            PEP_Analysis_Cross_Validation.ComputeMobilityValues(allPsms, fileSpecificParameters);
-
-            Dictionary<string, float> fileSpecificMedianFragmentMassErrors = PEP_Analysis_Cross_Validation.GetFileSpecificMedianFragmentMassError(allPsms);
-
-            PSMDataGroups[0] = PEP_Analysis_Cross_Validation.CreatePsmData(searchType, fileSpecificParameters, psms, psmGroupIndices[0], fileSpecificTimeDependantHydrophobicityAverageAndDeviation_unmodified, fileSpecificTimeDependantHydrophobicityAverageAndDeviation_modified, fileSpecificMedianFragmentMassErrors, chargeStateMode);
-
-            string[] trainingVariables = PsmData.trainingInfos[searchType];
-
-            TransformerChain<BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<Microsoft.ML.Trainers.FastTree.FastTreeBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>>>[] trainedModels = new TransformerChain<BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<Microsoft.ML.Trainers.FastTree.FastTreeBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>>>[1];
-
-            var trainer = mlContext.BinaryClassification.Trainers.FastTree(labelColumnName: "Label", featureColumnName: "Features", numberOfTrees: 400);
-            var pipeline = mlContext.Transforms.Concatenate("Features", trainingVariables).Append(trainer);
-
-            IDataView dataView = mlContext.Data.LoadFromEnumerable(PSMDataGroups[0]);
-
-            string outputFolder = parameters.OutputFolder;
-
-            trainedModels[0] = pipeline.Fit(dataView);
-
-            PEP_Analysis_Cross_Validation.Compute_PSM_PEP(psms, psmGroupIndices[0], mlContext, trainedModels[0], searchType, fileSpecificParameters, fileSpecificMedianFragmentMassErrors, chargeStateMode, outputFolder);
         }
 
-        private static void AssignEstimatedPsmPepQValue(ConcurrentDictionary<ChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches, List<SpectralMatch> allPsms)
-        {
-            List<double> pepValues = bestMbrMatches. 
-                Select(p => p.Value.spectralLibraryMatch).
-                Where(p => p != null).
-                OrderBy(p => p.FdrInfo.PEP).
-                Select(p => p.FdrInfo.PEP).
-                ToList();
-
-            foreach (SpectralRecoveryPSM match in bestMbrMatches.Values)
-            {
-                if (match.spectralLibraryMatch == null) continue;
-
-                int myIndex = 0;
-                while (myIndex < (pepValues.Count - 1) && pepValues[myIndex] <= match.spectralLibraryMatch.FdrInfo.PEP)
-                {
-                    myIndex++;
-                }
-                if (myIndex == pepValues.Count - 1)
-                {
-                    match.spectralLibraryMatch.FdrInfo.PEP_QValue = pepValues.Last();
-                }
-                else
-                {
-                    double estimatedQ = (pepValues[myIndex - 1] + pepValues[myIndex]) / 2;
-                    match.spectralLibraryMatch.FdrInfo.PEP_QValue = estimatedQ;
-                }
-            }
-        }
-
-        private static void WriteSpectralRecoveryPsmResults(ConcurrentDictionary<ChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches, PostSearchAnalysisParameters parameters)
+        private static void WriteSpectralRecoveryPsmResults(ConcurrentDictionary<MbrChromatographicPeak, SpectralRecoveryPSM> bestMbrMatches, PostSearchAnalysisParameters parameters)
         {
             string mbrOutputPath = Path.Combine(Path.Join(parameters.OutputFolder, spectralRecoveryFolder), @"RecoveredSpectra.psmtsv");
             using (var output = new StreamWriter(mbrOutputPath))

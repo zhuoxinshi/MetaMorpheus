@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Media;
+using Readers;
 
 namespace GuiFunctions
 {
@@ -15,12 +16,12 @@ namespace GuiFunctions
     {
         #region Constants 
 
-        public static char[] SubScriptNumbers = {
+        public static readonly char[] SubScriptNumbers = {
             '\u2080', '\u2081', '\u2082', '\u2083', '\u2084',
             '\u2085', '\u2086', '\u2087', '\u2088', '\u2089'
         };
 
-        public static char[] SuperScriptNumbers = {
+        public static readonly char[] SuperScriptNumbers = {
             '\u2070', '\u00b9', '\u00b2', '\u00b3', '\u2074',
             '\u2075', '\u2076', '\u2077', '\u2078', '\u2079'
         }; 
@@ -37,6 +38,7 @@ namespace GuiFunctions
         public static bool AnnotationBold { get; set; } = false;
         public static bool DisplayInternalIons { get; set; } = true;
         public static bool DisplayInternalIonAnnotations { get; set; }= true;
+        public static OxyColor FallbackColor { get; } = OxyColors.Aqua;
         public static Dictionary<OxyColor, string> PossibleColors { get; set; }
         public static Dictionary<ProductType, OxyColor> ProductTypeToColor { get; set; }
         public static Dictionary<ProductType, OxyColor> BetaProductTypeToColor { get; set; }
@@ -114,15 +116,15 @@ namespace GuiFunctions
             InitializeDictionaries();
         }
 
-        public static bool FilterAcceptsPsm(PsmFromTsv psm)
+        public static bool FilterAcceptsPsm(SpectrumMatchFromTsv sm)
         {
-            if (psm.QValue <= QValueFilter
-                 && (psm.QValueNotch == null || psm.QValueNotch <= QValueFilter)
-                 && (psm.DecoyContamTarget == "T" || (psm.DecoyContamTarget == "D" && ShowDecoys) || (psm.DecoyContamTarget == "C" && ShowContaminants))
-                 && (psm.GlycanLocalizationLevel == null || psm.GlycanLocalizationLevel >= LocalizationLevelStart && psm.GlycanLocalizationLevel <= LocalizationLevelEnd))
+            if (sm.QValue <= QValueFilter
+                 && (sm.QValueNotch == null || sm.QValueNotch <= QValueFilter)
+                 && (sm.DecoyContamTarget == "T" || (sm.DecoyContamTarget == "D" && ShowDecoys) || (sm.DecoyContamTarget == "C" && ShowContaminants))
+                 && (!sm.IsCrossLinkedPeptide() || (sm is PsmFromTsv { BetaPeptideBaseSequence: not null } psm && (!psm.GlycanLocalizationLevel.HasValue || psm.GlycanLocalizationLevel.Value >= LocalizationLevelStart && psm.GlycanLocalizationLevel.Value <= LocalizationLevelEnd))))
             {
                 // Ambiguity filtering conditionals, should only be hit if Ambiguity Filtering is selected
-                if (AmbiguityFilter == "No Filter" || psm.AmbiguityLevel == AmbiguityFilter)
+                if (AmbiguityFilter == "No Filter" || sm.AmbiguityLevel == AmbiguityFilter)
                 {
                     return true;
                 }
@@ -318,6 +320,15 @@ namespace GuiFunctions
             ProductTypeToColor[ProductType.zDot] = OxyColors.Orange;
             ProductTypeToColor[ProductType.D] = OxyColors.DodgerBlue;
             ProductTypeToColor[ProductType.M] = OxyColors.Firebrick;
+
+            // default color of each fragment to annotate
+            BetaProductTypeToColor = ((ProductType[])Enum.GetValues(typeof(ProductType))).ToDictionary(p => p, p => OxyColors.Aqua);
+            BetaProductTypeToColor[ProductType.b] = OxyColors.LightBlue;
+            BetaProductTypeToColor[ProductType.y] = OxyColors.OrangeRed;
+            BetaProductTypeToColor[ProductType.zDot] = OxyColors.LightGoldenrodYellow;
+            BetaProductTypeToColor[ProductType.c] = OxyColors.Orange;
+            BetaProductTypeToColor[ProductType.D] = OxyColors.AliceBlue;
+            BetaProductTypeToColor[ProductType.M] = OxyColors.LightCoral;
         }
 
         /// <summary>
@@ -452,8 +463,9 @@ namespace GuiFunctions
         /// <summary>
         /// Loads in settings based upon SettingsSnapshot parameter
         /// </summary>
-        public static void LoadSettings(MetaDrawSettingsSnapshot settings)
+        public static void LoadSettings(MetaDrawSettingsSnapshot settings, out bool flaggedErrorOnRead)
         {
+            flaggedErrorOnRead = false;
             DisplayIonAnnotations = settings.DisplayIonAnnotations;
             AnnotateMzValues = settings.AnnotateMzValues;
             AnnotateCharges = settings.AnnotateCharges;
@@ -504,11 +516,15 @@ namespace GuiFunctions
 
                         break;
                     }
+                    default:
+                        throw new MetaMorpheusException("Cannot parse Product Ion Color values");
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Debugger.Break();
+                SetDefaultProductTypeColors();
+                flaggedErrorOnRead = true;
             }
 
             try // Beta Product Type Colors
@@ -537,11 +553,15 @@ namespace GuiFunctions
 
                         break;
                     }
+                    default:
+                        throw new MetaMorpheusException("Cannot parse Beta Product Ion Color values");
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Debugger.Break();
+                SetDefaultBetaProductTypeColors();
+                flaggedErrorOnRead = true;
             }
 
             try // Modification Type Colors
@@ -569,11 +589,15 @@ namespace GuiFunctions
 
                         break;
                     }
+                    default:
+                        throw new MetaMorpheusException("Cannot parse Modification Color values");
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Debugger.Break();
+                SetDefaultModificationColors();
+                flaggedErrorOnRead = true;
             }
 
             try // Coverage Type Colors
@@ -598,18 +622,25 @@ namespace GuiFunctions
                             if (CoverageTypeToColor.ContainsKey(key))
                                 CoverageTypeToColor[key] = DrawnSequence.ParseOxyColorFromName(savedProductType.Split(',')[1]);
                         }
-
                         break;
                     }
+                    default:
+                        throw new MetaMorpheusException("Cannot parse Sequence Coverage color values");
+
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                Debugger.Break();
+                Debugger.Break(); 
+                SetDefaultCoverageTypeColors();
+                flaggedErrorOnRead = true;
             }
 
             try // Spectrum Descriptors
             {
+                if (settings.SpectrumDescriptionValues.Count == 0)
+                    throw new MetaMorpheusException("Cannot parse Spectrum Descriptor values");
+
                 var firstSplit = settings.SpectrumDescriptionValues.First().Split(',');
                 switch (firstSplit.Length)
                 {
@@ -633,11 +664,15 @@ namespace GuiFunctions
 
                         break;
                     }
+                    default:
+                        throw new MetaMorpheusException("Cannot parse Spectrum Descriptor values");
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 Debugger.Break();
+                SetDefaultProductTypeColors();
+                flaggedErrorOnRead = true;
             }
         }
 
