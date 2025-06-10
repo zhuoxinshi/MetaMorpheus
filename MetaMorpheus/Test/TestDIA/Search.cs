@@ -16,6 +16,8 @@ using Nett;
 using System.IO.Compression;
 using static Plotly.NET.StyleParam.Range;
 using System.Windows;
+using FlashLFQ;
+using static iText.StyledXmlParser.Jsoup.Select.Evaluator;
 
 namespace Test.TestDIA
 {
@@ -214,9 +216,10 @@ namespace Test.TestDIA
             var filePath46 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_gradient5_ISD60-80-100_400-1100_300mz-overlap100_RF_labelCorrected-calib-averaged.mzML";
             var filePath47 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_400-1100_300mz-overlap100_RF_labelCorrected-calib-averaged.mzML";
             var filePath48 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
+            var filePath49 = @"E:\ISD Project\ISD_240812\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100.mzML";
 
-            var fileList = new List<string> { filePath48};//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\0501YC\cali-avged-preFilter_Umpire_GPTMD_ClassicDecon_20ppm_apex0.15_corr0.75_overlap0_maxRT0.5_preSN0.01_num2";
+            var fileList = new List<string> { filePath21 };//filePath21, filePath22, filePath23,
+            var outputFolder = @"E:\ISD Project\TestSearch\random\B_rep1_ML";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -228,12 +231,13 @@ namespace Test.TestDIA
             string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             string tomlFile_noMods = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
 
-            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(50);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.15,
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance: 0.3,
                 fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
-                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 5000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
         ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
                 ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold:2, combineFragments: false,
@@ -250,13 +254,13 @@ namespace Test.TestDIA
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var GPTMD_max2 = @"E:\ISD Project\ISD_250428\GPTMD_max2\Task Settings\Task1-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
-            gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+            gptmdTask.CommonParameters = searchTask.CommonParameters;
 
             var cali_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task1-CalibrateTaskconfig.toml";
             var cali_task = Toml.ReadFile<CalibrationTask>(cali_toml, MetaMorpheusTask.tomlConfig);
             cali_task.CommonParameters = searchTask.CommonParameters.Clone();
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+            var taskList = new List<(string, MetaMorpheusTask)> {  ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
 
             string YC_gptmd = @"E:\CE\250318_CE\YC_cali-avged_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
@@ -313,25 +317,25 @@ namespace Test.TestDIA
         [Test]
         public static void DDAQuant()
         {
-            var psmFile1 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS4_60min_DDA_Proteoforms.psmtsv";
-            var psmFile4 = @"E:\ISD Project\ISD_250428\Mix4-6_DDA\Task1-SearchTask\Individual File Results\05-03-25_MixS7_60min_DDA_PSMs.psmtsv";
-            var psmFile2 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS5_60min_DDA_Proteoforms.psmtsv";
-            var psmFile3 = @"E:\ISD Project\ISD_250428\2025-05-15-17-09-43\Task1-SearchTask\Individual File Results\05-03-25_MixS6_60min_DDA_Proteoforms.psmtsv";
+            var psmFile2 = @"E:\ISD Project\ISD_250428\0501YC_DDA_cali-avg-gptmd-xml_1.0.8\Task4-SearchTask\AllProteoforms.psmtsv";
+            var psmFile1 = @"E:\ISD Project\ISD_250428\0429YB_DDA_cali-avg-gptmd-xml_1.0.8\Task4-SearchTask\AllProteoforms.psmtsv";
+            var psmFile3 = @"E:\ISD Project\ISD_250428\0429YD_DDA_cali-avg-gptmd-xml_1.0.8\Task4-SearchTask\AllProteoforms.psmtsv";
+            var psmFile4 = @"E:\ISD Project\ISD_250428\0429YE_DDA_cali-avg-gptmd-xml_1.0.8\Task4-SearchTask\AllProteoforms.psmtsv";
             var psmFile5 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task2-SearchTask\Individual File Results\05-04-25_PEPPI-YB_81min_DDA_rep1_Proteoforms.psmtsv";
             var psmFile6 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task2-SearchTask\Individual File Results\05-04-25_PEPPI-YB_81min_DDA_rep2_Proteoforms.psmtsv";
             var psmFile7 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task2-SearchTask\Individual File Results\05-04-25_PEPPI-YB_81min_DDA_rep3_Proteoforms.psmtsv";
 
-            var filePath1 = @"E:\ISD Project\ISD_250428\05-03-25_MixS4_60min_DDA.raw";
-            var filePath2 = @"E:\ISD Project\ISD_250428\05-03-25_MixS5_60min_DDA.raw";
-            var filePath3 = @"E:\ISD Project\ISD_250428\05-03-25_MixS6_60min_DDA.raw";  
-            var filePath4 = @"E:\ISD Project\ISD_250428\05-03-25_MixS7_60min_DDA.raw";
+            var filePath2 = @"E:\ISD Project\ISD_250428\0501YC_DDA_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_DDA-calib-averaged.mzML";
+            var filePath1 = @"E:\ISD Project\ISD_250428\0429YB_DDA_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YB_105min_DDA-calib-averaged.mzML";
+            var filePath3 = @"E:\ISD Project\ISD_250428\0429YD_DDA_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_DDA-calib-averaged.mzML";
+            var filePath4 = @"E:\ISD Project\ISD_250428\0429YE_DDA_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YE_105min_gradient5_DDA-calib-averaged.mzML";
             var filePath5 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep1.raw";
             var filePath6 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep2.raw";
             var filePath7 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep3.raw";
 
-            var psmFileList = new List<string> {  psmFile5, psmFile6, psmFile7 };
-            var fileList = new List<string> { filePath5, filePath6, filePath7 };
-            var outputFolder = @"E:\ISD Project\TestSearch\0504YB_rep_preFilter\DDAQuant_gptmd-xml_2"; 
+            var psmFileList = new List<string> {  psmFile1, psmFile3, psmFile4 };
+            var fileList = new List<string> { filePath1, filePath3, filePath4 };
+            var outputFolder = @"E:\ISD Project\TestSearch\ASMS\DDAQuant"; 
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -359,7 +363,7 @@ namespace Test.TestDIA
             //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
 
             var combinedResults = new List<DIAProteoformQuant>();
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < fileList.Count; i++)
             {
                 var myFileManager = new MyFileManager(true);
                 var dataFile = myFileManager.LoadFile(fileList[i], task.CommonParameters);
@@ -436,6 +440,303 @@ namespace Test.TestDIA
             //task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(YC_gptmd, false) }, fileList, "test");
 
             var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
+            engine.Run();
+        }
+
+        [Test]
+        public static void SearchLoop()
+        {
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_searchOnly = @"E:\ISD Project\CE_241118\1122_DDA&ISD-rep123\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_neutralLossSearch = @"E:\CE\250318_CE\YB_seq400-1100_300mz_100overlap_neutralLossSearch\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            string tomlFile_noMods = @"E:\ISD Project\ISD_240606\sample1-to-12_DDA&ISD_xml\Task Settings\Task1-SearchTaskconfig.toml";
+
+            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
+            var GPTMD_max2 = @"E:\ISD Project\ISD_250428\GPTMD_max2\Task Settings\Task1-GPTMDTaskconfig.toml";
+
+            string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
+            string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";
+            string YB_gptmd = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
+            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+            string ecoli_fasta = @"E:\DIA\FW-DIA data\uniprotkb_taxonomy_id_469008_2025_04_24.fasta";
+            string YB_rep_DDA_prunedDb = @"E:\ISD Project\ISD_250428\0504YB_rep_DDA_cali-avg-gptmd-xml_1.0.8_library-prunedDb\Task4-SearchTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMDpruned.xml";
+
+            var filePath1 = @"E:\ISD Project\ISD_250428\0504YB_ISD_rep_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected-calib-averaged.mzML";
+            var filePath2 = @"E:\ISD Project\ISD_250428\0504YB_ISD_rep_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep2_labelCorrected-calib-averaged.mzML";
+            var filePath3 = @"E:\ISD Project\ISD_250428\0504YB_ISD_rep_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep3_labelCorrected-calib-averaged.mzML";
+            var filePath4 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_400-1100_300mz-overlap100_RF_labelCorrected-calib-averaged.mzML";
+            var filePath5 = @"E:\ISD Project\ISD_250428\0501YC_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
+            
+            var outPath1 = @"E:\ISD Project\TestSearch\0501YC\cali-avged-seq_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10";
+            var outPath2 = @"E:\ISD Project\TestSearch\0501YC\cali-avged-preFilter_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10";
+            var outPath3 = @"E:\ISD Project\TestSearch\0501YC\cali-avged-rep3_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10";
+            var outPath4 = @"E:\ISD Project\TestSearch\0501YC\cali-avged-seq_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_combineFrags";
+            var outPath5 = @"E:\ISD Project\TestSearch\0501YC\cali-avged-preFilter_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_combineFrags";
+            
+            var fileList = new List<string> {  };
+            var outFolderList = new List<string> { outPath4, outPath5};
+
+            for(int i = 0; i < fileList.Count; i++)
+            {
+                var searchFileList = new List<string> { fileList[i] };
+                if (!Directory.Exists(outFolderList[i]))
+                {
+                    Directory.CreateDirectory(outFolderList[i]);
+                }
+                SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+                searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                    maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.5,
+                    fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                    precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                    apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+            ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+                    pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                    ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: true,
+                    rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
+
+                //match all charge fragment ions
+                searchTask.SearchParameters.WriteSpectralLibrary = true;
+
+                //Use IsoDec
+                //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+                //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+                //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
+
+                var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+                gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+
+                var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+
+                //task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(YC_gptmd, false) }, fileList, "test");
+
+                var engine = new EverythingRunnerEngine(taskList, searchFileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outFolderList[i]);
+                engine.Run();
+
+            }
+
+            var filePath6 = @"E:\ISD Project\ISD_250428\0429YD_ISD_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_ISD60-80-100_400-1200_300mz-overlap50_RF_labelCorrected-calib-averaged.mzML";
+            var filePath7 = @"E:\ISD Project\ISD_250428\04-29-25_PEPPI-YD_105min_ISD60-80-100_400-1200_300mz-overlap50_RF_labelCorrected.mzML";
+            var filePath8 = @"E:\ISD Project\ISD_250428\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_400-1200_300mz-overlap50_RF_labelCorrected.mzML";
+            var filePath9 = @"E:\ISD Project\ISD_250428\allYE_cali-avg-gptmd-xml\Task2-AveragingTask\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+            var filePath10 = @"E:\ISD Project\ISD_250428\allYE_cali-avg-gptmd-xml\Task2-AveragingTask\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_400-1200_300mz-overlap50_RF_labelCorrected-calib-averaged.mzML";
+            var filePath11 = @"E:\ISD Project\ISD_250428\0429YD_ISD_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+
+            var outPath6 = @"E:\ISD Project\TestSearch\0429_YD_seq\cali-avged_GPTMD_Umpire_20ppm_apex0.3_corr0.5_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_new";
+            var outPath7 = @"E:\ISD Project\TestSearch\0429_YD_seq\GPTMD_Umpire_20ppm_apex0.3_corr0.5_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_new_combineFrags";
+            var outPath8 = @"E:\ISD Project\TestSearch\0429YE\seq_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_new";
+            var outPath9 = @"E:\ISD Project\TestSearch\0429YE\cali-avged-preFilter_GPTMD_Umpire_20ppm_apex0.3_corr0.75_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_new";
+            var outPath10 = @"E:\ISD Project\TestSearch\0429YE\cali-avged-seq_GPTMD_sharedXIC0.25_apex0.3";
+            var outPath11 = @"E:\ISD Project\TestSearch\0429_YD_preFilter\cali-avged-GPTMD_sharedXIC0.25_apex0.3";
+
+            var fileList2 = new List<string> { filePath11, filePath10};
+            var outFolderList2 = new List<string> { outPath11, outPath10};
+            for (int i = 0; i < fileList2.Count; i++)
+            {
+                var searchFileList = new List<string> { fileList2[i] };
+                if (!Directory.Exists(outFolderList2[i]))
+                {
+                    Directory.CreateDirectory(outFolderList2[i]);
+                }
+                SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+                searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                    maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+                    fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                    precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                    apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 8000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+            ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+                    pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                    ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false,
+                    rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.25);
+
+                //match all charge fragment ions
+                searchTask.SearchParameters.WriteSpectralLibrary = true;
+
+                //Use IsoDec
+                //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+                //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+                //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
+
+                var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+                gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+
+                var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+
+                //task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(YC_gptmd, false) }, fileList, "test");
+
+                var engine = new EverythingRunnerEngine(taskList, searchFileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outFolderList2[i]);
+                engine.Run();
+            }
+
+            //var outPath10 = @"E:\ISD Project\TestSearch\0429_YD_preFilter\cali-avged_GPTMD_Umpire_20ppm_apex0.3_corr0.5_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_new";
+            //var outPath11 = @"E:\ISD Project\TestSearch\0429_YD_seq\cali-avged_GPTMD_Umpire_20ppm_apex0.3_corr0.5_overlap0_maxRT0.5_preIntensity0.01_num2_minCount10_new_combineFrags";
+            var outPath12 = @"E:\ISD Project\TestSearch\0429YE\cali-avged-seq_GPTMD_Umpire_20ppm_apex0.3_corr0.5_overlap0_maxRT0.5_preIntensity0.01_num2_minCount10_new_combineFrags";
+            var outPath13 = @"E:\ISD Project\TestSearch\0429YE\cali-avged-preFilter_GPTMD_Umpire_20ppm_apex0.3_corr0.5_overlap0.2_maxRT0.5_preIntensity0.01_num2_minCount10_new";
+
+            var outFolderList3 = new List<string> {  outPath11, outPath12 };
+            for (int i = 0; i < fileList2.Count; i++)
+            {
+                var searchFileList = new List<string> { fileList2[i] };
+                if (!Directory.Exists(outFolderList3[i]))
+                {
+                    Directory.CreateDirectory(outFolderList3[i]);
+                }
+                SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+                searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                    maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+                    fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                    precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                    apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 8000, minMS1Charge: 5, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+            ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+                    pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                    ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false,
+                    rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
+
+                //match all charge fragment ions
+                searchTask.SearchParameters.WriteSpectralLibrary = true;
+
+                //Use IsoDec
+                //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+                //task.CommonParameters.ProductDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
+                //task.CommonParameters.ProductDeconvolutionParameters.MaxAssumedChargeState = 20;
+
+                var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+                gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+
+                var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+
+                //task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(YC_gptmd, false) }, fileList, "test");
+
+                var engine = new EverythingRunnerEngine(taskList, searchFileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outFolderList3[i]);
+                engine.Run();
+            }
+        }
+
+        [Test]
+        public static void ASMS_individual()
+        {
+            var filePathB = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YB_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected.mzML";
+            var filePathC = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected.mzML";
+            var filePathD = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
+            var filePathE = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
+
+            var fileB_cali_avg = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YB_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
+            var fileC_cali_avg = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
+            var fileD_cali_avg = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+            var fileE_cali_avg = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+
+            var rep1 = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected.mzML";
+            var rep2 = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep2_labelCorrected.mzML";
+            var rep3 = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep3_labelCorrected.mzML";
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_searchOnly = @"E:\ISD Project\CE_241118\1122_DDA&ISD-rep123\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+
+            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+
+            var fileList = new List<string> { fileB_cali_avg, fileC_cali_avg, fileD_cali_avg, fileE_cali_avg };
+            var outFolder = @"E:\ISD Project\TestSearch\ASMS\Individual_cali";
+            if (!Directory.Exists(outFolder))
+            {
+                Directory.CreateDirectory(outFolder);
+            }
+
+            string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";
+            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+
+            var fileList2 = new List<string> { filePathB, filePathC, filePathD, filePathE };
+            var outFolder2 = @"E:\ISD Project\TestSearch\ASMS\ind_nocali";
+            if (!Directory.Exists(outFolder))
+            {
+                Directory.CreateDirectory(outFolder);
+            }
+            var corrList = new List<double> { 0.25, 0.5, 0.75 };
+            var apexList = new List<double> { 0.15, 0.3, 0.5 };
+
+            foreach(double corr in corrList)
+            {
+                foreach(double apex in apexList)
+                {
+                    foreach (var file in fileList2)
+                    {
+                        var searchList = new List<string> { file };
+                        SearchTask searchTask1 = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+                        var resultFolder = Path.Combine(outFolder2, Path.GetFileNameWithoutExtension(file), $"{corr}, {apex}");
+                        searchTask1.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                       maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: corr, apexRtTolerance: apex,
+                       fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                       precursorIntensityCutOff: 0.01, splineTimeInterval: 0.005f, type: "DIA", scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+                       ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+                       pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                       ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false,
+                       rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
+                        if (!Directory.Exists(resultFolder))
+                        {
+                            Directory.CreateDirectory(resultFolder);
+                        }
+                        gptmdTask.CommonParameters = searchTask1.CommonParameters;
+                        var taskList = new List<(string, MetaMorpheusTask)> {  ("search", searchTask1) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+                        var engine = new EverythingRunnerEngine(taskList, searchList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, resultFolder);
+                        engine.Run();
+                    }
+                }
+            }
+            
+        }
+
+        [Test]
+        public static void ASMS_all()
+        {
+            var filePathB = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YB_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected.mzML";
+            var filePathC = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected.mzML";
+            var filePathD = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
+            var filePathE = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
+
+            var fileC_cali_avg = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected-calib-averaged.mzML";
+            var fileD_cali_avg = @"E:\ISD Project\ISD_250428\YD_ISD_cali-avg_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+            var fileE_cali_avg = @"E:\ISD Project\Presentations\ASMS 2025 Data\04-29-25_PEPPI-YE_105min_gradient5_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+
+            var rep1 = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected.mzML";
+            var rep2 = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep2_labelCorrected.mzML";
+            var rep3 = @"E:\ISD Project\Presentations\ASMS 2025 Data\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep3_labelCorrected.mzML";
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_searchOnly = @"E:\ISD Project\CE_241118\1122_DDA&ISD-rep123\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+
+            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            gptmdTask.CommonParameters = searchTask.CommonParameters.Clone();
+
+            var fileList = new List<string> { filePathB, filePathC, filePathD, filePathE };
+            var outFolder = @"E:\ISD Project\TestSearch\ASMS\all_nocali\0.75,0.15";
+            if (!Directory.Exists(outFolder))
+            {
+                Directory.CreateDirectory(outFolder);
+            }
+
+            string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";
+            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+               maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.75, apexRtTolerance: 0.15,
+               fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+               precursorIntensityCutOff: 0.01, splineTimeInterval: 0.005f, type: "DIA", scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+               ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+               pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+               ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false,
+               rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
+
+            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outFolder);
             engine.Run();
         }
     }

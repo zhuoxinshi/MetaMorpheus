@@ -74,11 +74,11 @@ namespace Test.TestDIA
             return 0;
         }
 
-        public static IEnumerable<FragmentMetric> FromPsmFile(string path, string identifer = "")
-        {
-            var psms = PsmTsvReader.ReadTsv(path, out _).Where(psm => psm.PassesConfidenceFilter());
-            return psms.SelectMany(p => FromPsm(p, identifer));
-        }
+        //public static IEnumerable<FragmentMetric> FromPsmFile(string path, string identifer = "")
+        //{
+        //    var psms = PsmTsvReader.ReadTsv(path, out _).Where(psm => psm.PassesConfidenceFilter());
+        //    return psms.SelectMany(p => FromPsm(p, identifer));
+        //}
 
         public FragmentMetric() { }
     }
@@ -175,29 +175,29 @@ namespace Test.TestDIA
         }
         public SearchResultsMetricsFile() : base () { }
 
-        public static SearchResultsMetricsFile GetFromPsmFilePath(string psmFromTsvPath)
-        {
-            List<SearchResultMetric> results = new List<SearchResultMetric>();
-            if (File.Exists(psmFromTsvPath))
-            {
-                var psms = PsmTsvReader.ReadTsv(psmFromTsvPath, out _).Where(psm => psm.PassesConfidenceFilter()).ToArray();
+        //public static SearchResultsMetricsFile GetFromPsmFilePath(string psmFromTsvPath)
+        //{
+        //    List<SearchResultMetric> results = new List<SearchResultMetric>();
+        //    if (File.Exists(psmFromTsvPath))
+        //    {
+        //        var psms = PsmTsvReader.ReadTsv(psmFromTsvPath, out _).Where(psm => psm.PassesConfidenceFilter()).ToArray();
 
-                foreach (var psm in psms)
-                {
-                    results.Add(new SearchResultMetric(psm));
-                }
-            }
-            else
-            {
-                throw new FileNotFoundException("File not found", psmFromTsvPath);
-            }
+        //        foreach (var psm in psms)
+        //        {
+        //            results.Add(new SearchResultMetric(psm));
+        //        }
+        //    }
+        //    else
+        //    {
+        //        throw new FileNotFoundException("File not found", psmFromTsvPath);
+        //    }
 
-            var searchResultsMetricsFile = new SearchResultsMetricsFile()
-            {
-                Results = results,
-            };
-            return searchResultsMetricsFile;
-        }
+        //    var searchResultsMetricsFile = new SearchResultsMetricsFile()
+        //    {
+        //        Results = results,
+        //    };
+        //    return searchResultsMetricsFile;
+        //}
 
         public override void LoadResults()
         {
@@ -221,26 +221,26 @@ namespace Test.TestDIA
         public override Software Software { get; set; }
     }
 
-    public class Tests
-    {
-        [Test]
-        public static void WriteResults()
-        {
-            var psmPath = @"E:\DIA\Data\250313_DIA\0317_5pro_ISD\Task1-SearchTask\Individual File Results\03-17-25_CE_5pro_90min_ISD60-80-100_overlap-equal_labelCorrected_PSMs.psmtsv";
-            var frags = FragmentMetric.FromPsmFile(psmPath, "overlap");
+    //public class Tests
+    //{
+    //    [Test]
+    //    public static void WriteResults()
+    //    {
+    //        var psmPath = @"E:\DIA\Data\250313_DIA\0317_5pro_ISD\Task1-SearchTask\Individual File Results\03-17-25_CE_5pro_90min_ISD60-80-100_overlap-equal_labelCorrected_PSMs.psmtsv";
+    //        var frags = FragmentMetric.FromPsmFile(psmPath, "overlap");
 
-            //var largePath = @"E:\DIA\Data\250313_DIA\0318_5pro\Task1-SearchTask\Individual File Results\03-18-25_CE_5pro_90min_ISD60-80-100_equal_labelCorrected_PSMs.psmtsv";
-            //var largeFrags = FragmentMetric.FromPsmFile(largePath, "equal");
+    //        //var largePath = @"E:\DIA\Data\250313_DIA\0318_5pro\Task1-SearchTask\Individual File Results\03-18-25_CE_5pro_90min_ISD60-80-100_equal_labelCorrected_PSMs.psmtsv";
+    //        //var largeFrags = FragmentMetric.FromPsmFile(largePath, "equal");
 
-            //var allFrags = frags.Concat(largeFrags).ToList();
-            var outPath = @"E:\ISD Project\TestIsdDataAnalysis\overlap_FragmentsMetrics.tsv";
-            var fragFile = new FragmentMetricFile(outPath, frags);
-            fragFile.WriteResults(outPath);
+    //        //var allFrags = frags.Concat(largeFrags).ToList();
+    //        var outPath = @"E:\ISD Project\TestIsdDataAnalysis\overlap_FragmentsMetrics.tsv";
+    //        var fragFile = new FragmentMetricFile(outPath, frags);
+    //        fragFile.WriteResults(outPath);
 
-            //var searchResults = SearchResultsMetricsFile.GetFromPsmFilePath(psmPath);
-            //var outPath = @"E:\ISD Project\TestIsdDataAnalysis\SearchResultsMetricsFile_03-17-25_CE_5pro_90min_ISD60-80-100_overlap-equal_labelCorrected_PSMs.tsv";
-            //searchResults.WriteResults(outPath);
-        }
-    }
+    //        //var searchResults = SearchResultsMetricsFile.GetFromPsmFilePath(psmPath);
+    //        //var outPath = @"E:\ISD Project\TestIsdDataAnalysis\SearchResultsMetricsFile_03-17-25_CE_5pro_90min_ISD60-80-100_overlap-equal_labelCorrected_PSMs.tsv";
+    //        //searchResults.WriteResults(outPath);
+    //    }
+    //}
 
 }

@@ -1626,122 +1626,122 @@ namespace Test.MetaDraw
         //    searchTask.RunTask(folderPath, new List<DbForTask> { db }, new List<string> { myFile }, "metadraw");
         //    string psmFile = Directory.GetFiles(folderPath).First(f => f.Contains("AllPSMs.psmtsv"));
 
-            List<SpectrumMatchFromTsv> parsedPsms = SpectrumMatchTsvReader.ReadTsv(psmFile, out var warnings);
-            ObservableCollection<SpectrumMatchFromTsv> psms = new(parsedPsms);
+        //    List<SpectrumMatchFromTsv> parsedPsms = SpectrumMatchTsvReader.ReadTsv(psmFile, out var warnings);
+        //    ObservableCollection<SpectrumMatchFromTsv> psms = new(parsedPsms);
 
-            var psmDict = parsedPsms.GroupBy(p => p.FileNameWithoutExtension)
-                .ToDictionary(p => p.Key, p => new ObservableCollection<SpectrumMatchFromTsv>(p));
+        //    var psmDict = parsedPsms.GroupBy(p => p.FileNameWithoutExtension)
+        //        .ToDictionary(p => p.Key, p => new ObservableCollection<SpectrumMatchFromTsv>(p));
 
-            // check that fragment mass error was read in correctly
-            Assert.That(Math.Round(-0.27631606125063707, 5), Is.EqualTo(Math.Round(psms[1].MatchedIons[1].MassErrorPpm, 5)));
+        //    //check that fragment mass error was read in correctly
+        //Assert.That(Math.Round(-0.27631606125063707, 5), Is.EqualTo(Math.Round(psms[1].MatchedIons[1].MassErrorPpm, 5)));
 
-            // check aspects of each histogram type:
-            var plot = new PlotModelStat("Histogram of Precursor Masses", psms, psmDict);
-            // Ensure axes are labeled correctly, and intervals are correct
-            Assert.That(plot.Model.Axes.Count, Is.EqualTo(2));
-            Assert.That(plot.Model.Axes[1].Title, Is.EqualTo("Count"));
-            Assert.That(plot.Model.Axes[1].AbsoluteMinimum, Is.EqualTo(0));
-            Assert.That(plot.Model.Axes[0].IntervalLength, Is.EqualTo(60));
+        //    //check aspects of each histogram type:
+        //    var plot = new PlotModelStat("Histogram of Precursor Masses", psms, psmDict);
+        //    //Ensure axes are labeled correctly, and intervals are correct
+        //Assert.That(plot.Model.Axes.Count, Is.EqualTo(2));
+        //    Assert.That(plot.Model.Axes[1].Title, Is.EqualTo("Count"));
+        //    Assert.That(plot.Model.Axes[1].AbsoluteMinimum, Is.EqualTo(0));
+        //    Assert.That(plot.Model.Axes[0].IntervalLength, Is.EqualTo(60));
 
-            var plot2 = new PlotModelStat("Histogram of Precursor Charges", psms, psmDict);
-            var series2 = plot2.Model.Series.ToList()[0];
-            var items2 = (List<OxyPlot.Series.ColumnItem>)series2.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series2);
-            Assert.That(items2[0].Value, Is.EqualTo(9));
-            Assert.That(items2[1].Value, Is.EqualTo(1));
+        //    var plot2 = new PlotModelStat("Histogram of Precursor Charges", psms, psmDict);
+        //    var series2 = plot2.Model.Series.ToList()[0];
+        //    var items2 = (List<OxyPlot.Series.ColumnItem>)series2.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series2);
+        //    Assert.That(items2[0].Value, Is.EqualTo(9));
+        //    Assert.That(items2[1].Value, Is.EqualTo(1));
 
-            var plot3 = new PlotModelStat("Histogram of Precursor PPM Errors (around 0 Da mass-difference notch only)",
-                psms, psmDict);
-            var series3 = plot3.Model.Series.ToList()[0];
-            var items3 = (List<OxyPlot.Series.ColumnItem>)series3.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series3);
-            Assert.That(items3[7].Value, Is.EqualTo(2));
+        //    var plot3 = new PlotModelStat("Histogram of Precursor PPM Errors (around 0 Da mass-difference notch only)",
+        //        psms, psmDict);
+        //    var series3 = plot3.Model.Series.ToList()[0];
+        //    var items3 = (List<OxyPlot.Series.ColumnItem>)series3.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series3);
+        //    Assert.That(items3[7].Value, Is.EqualTo(2));
 
-            var plot4 = new PlotModelStat("Histogram of Fragment Charges",
-                psms, psmDict);
-            var series4 = plot4.Model.Series.ToList()[0];
-            var items4 = (List<OxyPlot.Series.ColumnItem>)series4.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series4);
-            Assert.That(items4[0].Value, Is.EqualTo(101));
+        //    var plot4 = new PlotModelStat("Histogram of Fragment Charges",
+        //        psms, psmDict);
+        //    var series4 = plot4.Model.Series.ToList()[0];
+        //    var items4 = (List<OxyPlot.Series.ColumnItem>)series4.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series4);
+        //    Assert.That(items4[0].Value, Is.EqualTo(101));
 
-            var plot5 = new PlotModelStat("Histogram of Precursor m/z",
-                psms, psmDict);
-            var series5 = plot5.Model.Series.ToList()[0];
-            var items5 = (List<OxyPlot.Series.ColumnItem>)series5.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series5);
-            Assert.That(items5.Count, Is.EqualTo(5));
-            Assert.That(items5[0].Value, Is.EqualTo(5));
+        //    var plot5 = new PlotModelStat("Histogram of Precursor m/z",
+        //        psms, psmDict);
+        //    var series5 = plot5.Model.Series.ToList()[0];
+        //    var items5 = (List<OxyPlot.Series.ColumnItem>)series5.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series5);
+        //    Assert.That(items5.Count, Is.EqualTo(5));
+        //    Assert.That(items5[0].Value, Is.EqualTo(5));
 
-            var plot6 = new PlotModelStat("Histogram of PTM Spectral Counts",
-                psms, psmDict);
-            var series6 = plot6.Model.Series.ToList()[0];
-            var items6 = (List<OxyPlot.Series.ColumnItem>)series6.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series6);
-            Assert.That(items6.Count, Is.EqualTo(1));
-            Assert.That(items6[0].Value, Is.EqualTo(2));
+        //    var plot6 = new PlotModelStat("Histogram of PTM Spectral Counts",
+        //        psms, psmDict);
+        //    var series6 = plot6.Model.Series.ToList()[0];
+        //    var items6 = (List<OxyPlot.Series.ColumnItem>)series6.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series6);
+        //    Assert.That(items6.Count, Is.EqualTo(1));
+        //    Assert.That(items6[0].Value, Is.EqualTo(2));
 
-            var plot7 = new PlotModelStat("Precursor PPM Error vs. RT",
-                psms, psmDict);
-            var series7 = plot7.Model.Series.ToList()[0];
-            var points7 = (List<OxyPlot.Series.ScatterPoint>)series7.GetType()
-                .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(series7);
-            Assert.That(points7.Count, Is.EqualTo(9));
-            Assert.That(points7[1].X, Is.EqualTo(42.07841));
-            Assert.That(points7[1].Y, Is.EqualTo(-1.48));
-            Assert.That(points7[1].Tag, Is.EqualTo("LSRIDTPK"));
+        //    var plot7 = new PlotModelStat("Precursor PPM Error vs. RT",
+        //        psms, psmDict);
+        //    var series7 = plot7.Model.Series.ToList()[0];
+        //    var points7 = (List<OxyPlot.Series.ScatterPoint>)series7.GetType()
+        //        .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(series7);
+        //    Assert.That(points7.Count, Is.EqualTo(9));
+        //    Assert.That(points7[1].X, Is.EqualTo(42.07841));
+        //    Assert.That(points7[1].Y, Is.EqualTo(-1.48));
+        //    Assert.That(points7[1].Tag, Is.EqualTo("LSRIDTPK"));
 
-            var plot8 = new PlotModelStat("Predicted RT vs. Observed RT",
-                psms, psmDict);
-            var series8 = plot8.Model.Series.ToList()[0];
-            var points8 = (List<OxyPlot.Series.ScatterPoint>)series8.GetType()
-                .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(series8);
-            Assert.That(points8.Count, Is.EqualTo(10));
-            Assert.That(points8[7].X, Is.EqualTo(42.06171));
-            Assert.That(points8[7].Y, Is.EqualTo(19.00616880619646));
-            Assert.That(points8[7].Tag, Is.EqualTo("AFISYHDEAQK"));
+        //    var plot8 = new PlotModelStat("Predicted RT vs. Observed RT",
+        //        psms, psmDict);
+        //    var series8 = plot8.Model.Series.ToList()[0];
+        //    var points8 = (List<OxyPlot.Series.ScatterPoint>)series8.GetType()
+        //        .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(series8);
+        //    Assert.That(points8.Count, Is.EqualTo(10));
+        //    Assert.That(points8[7].X, Is.EqualTo(42.06171));
+        //    Assert.That(points8[7].Y, Is.EqualTo(19.00616880619646));
+        //    Assert.That(points8[7].Tag, Is.EqualTo("AFISYHDEAQK"));
 
-            var plot9 = new PlotModelStat("Histogram of Fragment PPM Errors",
-                psms, psmDict);
-            var series9 = plot9.Model.Series.ToList()[0];
-            var items9 = (List<OxyPlot.Series.ColumnItem>)series9.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series9);
-            Assert.That(items9[11].Value, Is.EqualTo(18));
+        //    var plot9 = new PlotModelStat("Histogram of Fragment PPM Errors",
+        //        psms, psmDict);
+        //    var series9 = plot9.Model.Series.ToList()[0];
+        //    var items9 = (List<OxyPlot.Series.ColumnItem>)series9.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series9);
+        //    Assert.That(items9[11].Value, Is.EqualTo(18));
 
-            var plot10 = new PlotModelStat("Histogram of Hydrophobicity scores",
-                psms, psmDict);
-            var series10 = plot10.Model.Series.ToList()[0];
-            var items10 = (List<OxyPlot.Series.ColumnItem>)series10.GetType()
-                .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series10);
-            Assert.That(items10.Count, Is.EqualTo(5));
-            Assert.That(items10[1].Value, Is.EqualTo(3));
+        //    var plot10 = new PlotModelStat("Histogram of Hydrophobicity scores",
+        //        psms, psmDict);
+        //    var series10 = plot10.Model.Series.ToList()[0];
+        //    var items10 = (List<OxyPlot.Series.ColumnItem>)series10.GetType()
+        //        .GetProperty("Items", BindingFlags.Public | BindingFlags.Instance).GetValue(series10);
+        //    Assert.That(items10.Count, Is.EqualTo(5));
+        //    Assert.That(items10[1].Value, Is.EqualTo(3));
 
-            //test variant plotting
-            string variantFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\VariantCrossTest.psmtsv");
-            List<string> warningsVariants = new List<string>();
-            List<PsmFromTsv> parsedPsmsWithVariants;
-            parsedPsmsWithVariants = SpectrumMatchTsvReader.ReadPsmTsv(variantFile, out warningsVariants);
-            ObservableCollection<SpectrumMatchFromTsv> psmsWithVariants = new(parsedPsmsWithVariants);
+        //    test variant plotting
+        //    string variantFile = Path.Combine(TestContext.CurrentContext.TestDirectory, @"TestData\VariantCrossTest.psmtsv");
+        //    List<string> warningsVariants = new List<string>();
+        //    List<PsmFromTsv> parsedPsmsWithVariants;
+        //    parsedPsmsWithVariants = SpectrumMatchTsvReader.ReadPsmTsv(variantFile, out warningsVariants);
+        //    ObservableCollection<SpectrumMatchFromTsv> psmsWithVariants = new(parsedPsmsWithVariants);
 
-            var psmVariantDict = psmsWithVariants.GroupBy(p => p.FileNameWithoutExtension)
-                .ToDictionary(p => p.Key, p => new ObservableCollection<SpectrumMatchFromTsv>(p));
+        //    var psmVariantDict = psmsWithVariants.GroupBy(p => p.FileNameWithoutExtension)
+        //        .ToDictionary(p => p.Key, p => new ObservableCollection<SpectrumMatchFromTsv>(p));
 
-            var variantPlot1 = new PlotModelStat("Precursor PPM Error vs. RT", psmsWithVariants, psmVariantDict);
-            var variantSeries1 = variantPlot1.Model.Series.ToList()[0];
-            var variantPoints1 = (List<OxyPlot.Series.ScatterPoint>)variantSeries1.GetType()
-                .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(variantSeries1);
-            Assert.That(variantPoints1.Count, Is.EqualTo(1));
-            Assert.That(variantPoints1[0].X, Is.EqualTo(97.8357));
-            Assert.That(variantPoints1[0].Y, Is.EqualTo(0.35));
-            Assert.That(variantPoints1[0].Tag, Is.EqualTo("MQVDQEEPHVEEQQQQTPAENKAESEEMETSQAGSK"));
+        //    var variantPlot1 = new PlotModelStat("Precursor PPM Error vs. RT", psmsWithVariants, psmVariantDict);
+        //    var variantSeries1 = variantPlot1.Model.Series.ToList()[0];
+        //    var variantPoints1 = (List<OxyPlot.Series.ScatterPoint>)variantSeries1.GetType()
+        //        .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(variantSeries1);
+        //    Assert.That(variantPoints1.Count, Is.EqualTo(1));
+        //    Assert.That(variantPoints1[0].X, Is.EqualTo(97.8357));
+        //    Assert.That(variantPoints1[0].Y, Is.EqualTo(0.35));
+        //    Assert.That(variantPoints1[0].Tag, Is.EqualTo("MQVDQEEPHVEEQQQQTPAENKAESEEMETSQAGSK"));
 
-            var variantPlot2 = new PlotModelStat("Predicted RT vs. Observed RT", psmsWithVariants, psmVariantDict);
-            var variantSeries2 = variantPlot2.Model.Series.ToList()[0];
-            var variantPoints2 = (List<OxyPlot.Series.ScatterPoint>)variantSeries2.GetType()
-                .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(variantSeries2);
-            Assert.That(variantPoints2.Count, Is.EqualTo(1));
-            Assert.That(variantPoints2[0].X, Is.EqualTo(97.8357));
-            Assert.That(variantPoints2[0].Y, Is.EqualTo(16.363848874371111));
-            Assert.That(variantPoints2[0].Tag, Is.EqualTo("MQVDQEEPHVEEQQQQTPAENKAESEEMETSQAGSK"));
+        //    var variantPlot2 = new PlotModelStat("Predicted RT vs. Observed RT", psmsWithVariants, psmVariantDict);
+        //    var variantSeries2 = variantPlot2.Model.Series.ToList()[0];
+        //    var variantPoints2 = (List<OxyPlot.Series.ScatterPoint>)variantSeries2.GetType()
+        //        .GetProperty("Points", BindingFlags.Public | BindingFlags.Instance).GetValue(variantSeries2);
+        //    Assert.That(variantPoints2.Count, Is.EqualTo(1));
+        //    Assert.That(variantPoints2[0].X, Is.EqualTo(97.8357));
+        //    Assert.That(variantPoints2[0].Y, Is.EqualTo(16.363848874371111));
+        //    Assert.That(variantPoints2[0].Tag, Is.EqualTo("MQVDQEEPHVEEQQQQTPAENKAESEEMETSQAGSK"));
 
         //    Directory.Delete(folderPath, true);
         //}

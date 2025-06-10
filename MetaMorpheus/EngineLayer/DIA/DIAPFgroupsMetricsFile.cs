@@ -45,8 +45,9 @@ namespace EngineLayer.DIA
         public int Ms2Group { get; set; }
         public double PsmScore { get; set; }
         public int Ms2ScanNumber { get; set; }
+        public double FragmentFractionalIntensity { get; set; } 
 
-        public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup)
+        public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup, PsmFromTsv psmFromTsv = null)
         {
             Correlation = pfPair.Correlation;
             Overlap = pfPair.Overlap;
@@ -58,6 +59,25 @@ namespace EngineLayer.DIA
             PrecursorApexRt = pfGroup.PrecursorPeakCurve.ApexRT;
             FragmentIonMz = pfPair.FragmentPeakCurve.MonoisotopicMass.ToMz(pfPair.FragmentPeakCurve.Charge);
             Ms2ScanNumber = pfPair.FragmentPeakCurve.Peaks.First().ScanNumber;
+            FragmentFractionalIntensity = pfPair.FragmentPeakCurve.ApexIntensity/ pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.ApexIntensity);
+
+            if (psmFromTsv != null)
+            {
+                if (psmFromTsv.DecoyContamTarget == "T")
+                {
+                    TagetDecoy = psmFromTsv.DecoyContamTarget;
+                }
+                else if (psmFromTsv.DecoyContamTarget == "D")
+                {
+                    TagetDecoy = psmFromTsv.DecoyContamTarget;
+                }
+                else
+                {
+                    TagetDecoy = "NA";
+                }
+
+                PsmScore = psmFromTsv.Score;
+            }
         }
 
         public void SetMs2Group(int ms2Group)
@@ -171,8 +191,9 @@ namespace EngineLayer.DIA
         public string FullSequence { get; set; }
         public double PsmScore { get; set; }
         public double PsmQValue { get; set; }
+        public int Ms2Group { get; set; }
 
-        public PFgroupMetrics(PrecursorFragmentsGroup pfGroup)
+        public PFgroupMetrics(PrecursorFragmentsGroup pfGroup, PsmFromTsv psmTsv = null)
         {
             PrecursorMass = pfGroup.PrecursorPeakCurve.MonoisotopicMass;
             PrecursorCharge = pfGroup.PrecursorPeakCurve.Charge;
@@ -195,6 +216,14 @@ namespace EngineLayer.DIA
             MedianApexRtDelta = pfGroup.PFpairs.Select(pf => Math.Abs(pf.FragmentPeakCurve.ApexRT - pf.PrecursorPeakCurve.ApexRT)).Median();
             MedianOverlap = pfGroup.PFpairs.Select(pf => pf.Overlap).Median();
             PFgroupIndex = pfGroup.PFgroupIndex;
+            Ms2Group = pfGroup.PFpairs.First().FragmentPeakCurve.Peaks.First().ScanNumber % 4;
+            if (psmTsv != null)
+            {
+                TargetDecoy = psmTsv.DecoyContamTarget;
+                PsmScore = psmTsv.Score;
+                PsmQValue = psmTsv.QValue;
+                FullSequence = psmTsv.FullSequence;
+            }
         }
 
         public void SetTargetDecoy(SpectralMatch psm)

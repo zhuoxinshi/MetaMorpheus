@@ -16,6 +16,7 @@ using System.IO.Compression;
 using Nett;
 using OxyPlot;
 using FlashLFQ.PEP;
+using Easy.Common.Extensions;
 
 namespace Test.TestDIA
 {
@@ -122,48 +123,48 @@ namespace Test.TestDIA
             }
         }
 
-        [Test]
-        public void TestUnrelated()
-        {
-            var fd_dda_path = @"E:\ISD Project\ISD_240812\08-12-24_PEPPI_FractionD_orbiMS1_DDA.raw";
-            MyFileManager myFileManager = new MyFileManager(true);
-            var commonParameters = new CommonParameters();
-            var fd_DDA = myFileManager.LoadFile(fd_dda_path, commonParameters);
-            var fd_DDA_ms2 = fd_DDA.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
-            var isolationWindows = fd_DDA_ms2.Select(s => s.IsolationRange).ToList();
+        //[Test]
+        //public void TestUnrelated()
+        //{
+        //    var fd_dda_path = @"E:\ISD Project\ISD_240812\08-12-24_PEPPI_FractionD_orbiMS1_DDA.raw";
+        //    MyFileManager myFileManager = new MyFileManager(true);
+        //    var commonParameters = new CommonParameters();
+        //    var fd_DDA = myFileManager.LoadFile(fd_dda_path, commonParameters);
+        //    var fd_DDA_ms2 = fd_DDA.GetAllScansList().Where(s => s.MsnOrder == 2).ToList();
+        //    var isolationWindows = fd_DDA_ms2.Select(s => s.IsolationRange).ToList();
 
-            var proteoforms_dda_path = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task4-SearchTask\Individual File Results\08-12-24_PEPPI_FractionD_orbiMS1_DDA-calib-averaged_Proteoforms.psmtsv";
-            var proteoforms_DDA = PsmTsvReader.ReadTsv(proteoforms_dda_path, out List<string> errors).Where(p => p.QValue < 0.01 && p.QValueNotch < 0.01 && p.DecoyContamTarget == "T").ToList();
-            var proteoforms_isd_path = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task4-SearchTask\Individual File Results\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100-calib-averaged_Proteoforms.psmtsv";
-            var proteoforms_ISD = PsmTsvReader.ReadTsv(proteoforms_isd_path, out errors).Where(p => p.QValue < 0.01 && p.QValueNotch < 0.01 && p.DecoyContamTarget == "T"). ToList();
-            var uniqueISD = new List<PsmFromTsv>();
-            var allseqInDDA = proteoforms_DDA.Select(p => p.FullSequence).ToList();
-            foreach(var proteoform in proteoforms_ISD)
-            {
-                if (!allseqInDDA.Contains(proteoform.FullSequence))
-                {
-                    uniqueISD.Add(proteoform);
-                }
-            }
+        //    var proteoforms_dda_path = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task4-SearchTask\Individual File Results\08-12-24_PEPPI_FractionD_orbiMS1_DDA-calib-averaged_Proteoforms.psmtsv";
+        //    var proteoforms_DDA = PsmTsvReader.ReadTsv(proteoforms_dda_path, out List<string> errors).Where(p => p.QValue < 0.01 && p.QValueNotch < 0.01 && p.DecoyContamTarget == "T").ToList();
+        //    var proteoforms_isd_path = @"E:\ISD Project\ISD_240812\FB-FD_lessGPTMD\Task4-SearchTask\Individual File Results\08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100-calib-averaged_Proteoforms.psmtsv";
+        //    var proteoforms_ISD = PsmTsvReader.ReadTsv(proteoforms_isd_path, out errors).Where(p => p.QValue < 0.01 && p.QValueNotch < 0.01 && p.DecoyContamTarget == "T"). ToList();
+        //    var uniqueISD = new List<PsmFromTsv>();
+        //    var allseqInDDA = proteoforms_DDA.Select(p => p.FullSequence).ToList();
+        //    foreach(var proteoform in proteoforms_ISD)
+        //    {
+        //        if (!allseqInDDA.Contains(proteoform.FullSequence))
+        //        {
+        //            uniqueISD.Add(proteoform);
+        //        }
+        //    }
 
-            var unselected = new List<PsmFromTsv>();
-            var selected = new List<PsmFromTsv>();
-            foreach(var id in uniqueISD)
-            {
-                var rtRange_start = id.RetentionTime - 0.5;
-                var rtRange_end = id.RetentionTime + 0.5;
-                var ddaScansInRange = fd_DDA_ms2.Where(s => s.RetentionTime >= rtRange_start && s.RetentionTime <= rtRange_end).ToList();
-                foreach(var scan in ddaScansInRange)
-                {
-                    if (id.PrecursorMz >= scan.IsolationRange.Minimum && id.PrecursorMz <= scan.IsolationRange.Maximum)
-                    {
-                        selected.Add(id);
-                        break;
-                    }
-                }
-            }
-            var uniqueISDpreMz = uniqueISD.Select(p => p.PrecursorMz).ToList();
-        }
+        //    var unselected = new List<PsmFromTsv>();
+        //    var selected = new List<PsmFromTsv>();
+        //    foreach(var id in uniqueISD)
+        //    {
+        //        var rtRange_start = id.RetentionTime - 0.5;
+        //        var rtRange_end = id.RetentionTime + 0.5;
+        //        var ddaScansInRange = fd_DDA_ms2.Where(s => s.RetentionTime >= rtRange_start && s.RetentionTime <= rtRange_end).ToList();
+        //        foreach(var scan in ddaScansInRange)
+        //        {
+        //            if (id.PrecursorMz >= scan.IsolationRange.Minimum && id.PrecursorMz <= scan.IsolationRange.Maximum)
+        //            {
+        //                selected.Add(id);
+        //                break;
+        //            }
+        //        }
+        //    }
+        //    var uniqueISDpreMz = uniqueISD.Select(p => p.PrecursorMz).ToList();
+        //}
 
         [Test]
         public static void TestXICplot()

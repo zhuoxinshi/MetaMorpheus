@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using Accord;
 using Easy.Common;
 using MathNet.Numerics;
 using MathNet.Numerics.Distributions;
@@ -33,12 +32,13 @@ namespace EngineLayer.DIA
             PrecursorPeakCurve = pre;
             FragmentPeakCurve = frag;
         }
-        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag, double overlap, double corr)
+        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag, double overlap, double corr, string label = null)
         {
             PrecursorPeakCurve = pre;
             FragmentPeakCurve = frag;
             Overlap = overlap;
             Correlation = corr;
+            Label = label;
         }
         public PeakCurve PrecursorPeakCurve { get; set; }
         public PeakCurve FragmentPeakCurve { get; set; }    
@@ -46,13 +46,14 @@ namespace EngineLayer.DIA
         public int FragmentRank { get; set; }
         public int PrecursorRank { get; set; }
         public double Overlap { get; set; }
+        public string Label { get; set; } 
 
         public static double CalculateCorrelation((double, double)[] xy1, (double, double)[] xy2)
         {
-            //if (xy1.Length < 5 || xy2.Length < 5)
-            //{
-            //    return 0;
-            //}
+            if (xy1 == null || xy2 == null)
+            {
+                return 0;
+            }
 
             double start = Math.Max(xy1[0].Item1, xy2[0].Item1);
             double end = Math.Min(xy1[xy1.Length - 1].Item1, xy2[xy2.Length - 1].Item1);
@@ -60,6 +61,10 @@ namespace EngineLayer.DIA
             var validxy1 = xy1.Where(p => p.Item1 >= start && p.Item1 <= end).ToArray();
             var validxy2 = xy2.Where(p => p.Item1 >= start && p.Item1 <= end).ToArray();
             int numPoints = Math.Min(validxy1.Length, validxy2.Length);
+            if (numPoints < 3)
+            {
+                return 0;
+            }
             var xy = validxy1.Take(numPoints).Zip(validxy2.Take(numPoints), (a, b) => (a.Item2, b.Item2)).ToArray();
             var y1 = xy.Select(p => p.Item1).ToArray();
             var y2 = xy.Select(p => p.Item2).ToArray();

@@ -186,6 +186,10 @@ namespace EngineLayer.DIA
                 case XICType.MassCurve:
                     peakCurves = MassCurve.GetAllMassCurves(scans, commonParameters, diaParam, peakFindingTolerance, maxRTRange, minMass, minCharge, out allPeaksByScan, cutPeak, isolationWindow);
                     break;
+                case XICType.ChargeStateEnvelopeCurve:
+                    peakCurves = ChargeStateEnvelopeCurve.GetAllEnvelopeCurvesWithNotch(scans, commonParameters, diaParam, peakFindingTolerance, maxRTRange, minMass, minCharge, out allPeaksByScan, cutPeak, isolationWindow);
+                    //peakCurves = ChargeStateEnvelopeCurve.GetAllEnvelopeCurvesWithNotch(scans, commonParameters, diaParam, );
+                    break;
                 default: throw new MzLibException("XICType");
             }
             peakCurves = peakCurves.Where(pc => pc.Peaks.Count > numPeakThreshold).ToList();
@@ -200,7 +204,7 @@ namespace EngineLayer.DIA
 
         public static void PeakCurveSpline(List<PeakCurve> allPeakCurves, SplineType splineType, DIAparameters diaParam, MsDataScan[] ms1Scans, MsDataScan[] ms2Scans)
         {
-            var rtIndexMap = GetRtIndexMap(ms1Scans);
+            var rtIndexMap = allPeakCurves.First().Peaks.First().MsLevel == 1 ? GetRtIndexMap(ms1Scans) : GetRtIndexMap(ms2Scans);
             var rtMap = GetRtMap(ms1Scans, ms2Scans);
 
             switch (splineType)
@@ -211,7 +215,7 @@ namespace EngineLayer.DIA
                     break;
                 case SplineType.CubicSpline:
                     foreach (var pc in allPeakCurves)
-                        pc.GetCubicSplineXYData(diaParam.SplineRtInterval);
+                        pc.GetCubicSplineXYData(diaParam.SplineRtInterval, rtIndexMap);
                     break;
                 case SplineType.BSpline:
                     foreach (var pc in allPeakCurves)
@@ -280,6 +284,10 @@ namespace EngineLayer.DIA
                 case SplineType.NormalizedLinearSpline:
                     foreach (var pc in allPeakCurves)
                         pc.GetNormalizedLinearSplinePeaks();
+                    break;
+                case SplineType.ExtendedCubicSpline:
+                    foreach (var pc in allPeakCurves)
+                        pc.GetExtendedCubicSplineXYData(diaParam.SplineRtInterval, rtIndexMap);
                     break;
             }
         }
@@ -511,6 +519,8 @@ namespace EngineLayer.DIA
                     return GetPseudoMs2Scan_neutralMass(pfGroup, commonParameters, dataFilePath);
                 case PseudoMs2ConstructionType.massCurve:
                     return GetPseudoMs2Scan_massCurve(pfGroup, commonParameters, dataFilePath);
+                case PseudoMs2ConstructionType.chargeStateEnvelope:
+                    return GetPseudoMs2Scan_chargeStateEnvelope(pfGroup, commonParameters, dataFilePath);
 
                 default: return null;
             }
@@ -558,6 +568,22 @@ namespace EngineLayer.DIA
             var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => new IsotopicEnvelope(
                             new List<(double mz, double intensity)> { (1, 1) }, pf.FragmentPeakCurve.AveragedMass, pf.FragmentPeakCurve.Charge, 1, 0)).OrderBy(e => e.MonoisotopicMass).ToArray();
             var charge = pfGroup.PrecursorPeakCurve.Charge;
+            var monoMz = pfGroup.PrecursorPeakCurve.AveragedMass.ToMz(charge);
+            Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge, dataFilePath, commonParameters, neutralExperimentalFragments);
+
+            return scanWithprecursor;
+        }
+
+        public static Ms2ScanWithSpecificMass GetPseudoMs2Scan_chargeStateEnvelope(PrecursorFragmentsGroup pfGroup, CommonParameters commonParameters, string dataFilePath)
+        {
+            var mzs = new double[] { 1 };
+            var intensities = new double[] { Double.MaxValue };
+            var spectrum = new MzSpectrum(mzs, intensities, false);
+            var newMs2Scan = new MsDataScan(spectrum, pfGroup.PFgroupIndex, 2, true, Polarity.Positive, pfGroup.PrecursorPeakCurve.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null,
+                        MZAnalyzerType.Orbitrap, intensities.Sum(), null, null, null);
+            var neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => new IsotopicEnvelope(
+                            new List<(double mz, double intensity)> { (1, 1) }, pf.FragmentPeakCurve.MonoisotopicMass, pf.FragmentPeakCurve.Charge, 1, 0)).OrderBy(e => e.MonoisotopicMass).ToArray();
+            var charge = 1;
             var monoMz = pfGroup.PrecursorPeakCurve.AveragedMass.ToMz(charge);
             Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge, dataFilePath, commonParameters, neutralExperimentalFragments);
 

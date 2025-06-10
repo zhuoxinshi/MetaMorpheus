@@ -10,6 +10,7 @@ namespace EngineLayer.DIA
     {
         mzPeak,
         neutralMass,
-        massCurve
+        massCurve,
+        chargeStateEnvelope,
     }
 }

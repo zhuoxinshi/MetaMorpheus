@@ -8,6 +8,7 @@ using static Python.Runtime.TypeSpec;
 using ThermoFisher.CommonCore.Data.Business;
 using MassSpectrometry;
 using MzLibUtil;
+using Chemistry;
 
 namespace EngineLayer.DIA
 {
@@ -50,7 +51,7 @@ namespace EngineLayer.DIA
             {
                 if (j < massTable.Length && massTable[j] != null)
                 {
-                    List<DeconvolutedMass> bin = massTable[j];
+                    List<DeconvolutedMass> bin = massTable[j];//Where(m => m.Charge == targetMass.Charge).ToList()
                     int index = BinarySearchForIndexedMass(bin, zeroBasedScanIndex);
 
                     for (int i = index; i < bin.Count; i++)
@@ -62,7 +63,7 @@ namespace EngineLayer.DIA
                             break;
                         }
 
-                        if (tolerance.Within(mass.MonoisotopicMass, targetMass.MonoisotopicMass) && mass.ZeroBasedScanIndex == zeroBasedScanIndex && mass.Charge == targetMass.Charge
+                        if (ToleranceWithinNotch(targetMass.MonoisotopicMass, mass.MonoisotopicMass, tolerance) && mass.ZeroBasedScanIndex == zeroBasedScanIndex && mass.Charge == targetMass.Charge
                             && (bestMass == null || Math.Abs(mass.MonoisotopicMass - targetMass.MonoisotopicMass) < Math.Abs(bestMass.MonoisotopicMass - targetMass.MonoisotopicMass)))
                         {
                             bestMass = mass;
@@ -83,7 +84,8 @@ namespace EngineLayer.DIA
             {
                 if (j < massTable.Length && massTable[j] != null)
                 {
-                    List<DeconvolutedMass> bin = massTable[j];
+                    List<DeconvolutedMass> bin = massTable[j];//.Where(m => m.Charge == charge).ToList()
+                    if (bin.Count == 0) continue;
                     int index = BinarySearchForIndexedMass(bin, zeroBasedScanIndex);
 
                     for (int i = index; i < bin.Count; i++)
@@ -145,6 +147,26 @@ namespace EngineLayer.DIA
             }
 
             return m;
+        }
+
+        public static bool ToleranceWithinNotch(double mass1, double mass2, Tolerance tolerance, int numNotches = 0)
+        {
+            if (tolerance.Within(mass1, mass2))
+            {
+                return true;
+            }
+            else if (numNotches > 0)
+            {
+                for (int notch = 1; notch <= numNotches; notch++)
+                {
+                    double notchStep = notch * Constants.C13MinusC12;
+                    if (tolerance.Within(mass1, mass2 + notchStep) || tolerance.Within(mass1, mass2 - notchStep))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         public static MassCurve FindMassCurve(Peak targetMass, List<DeconvolutedMass>[] massTable, MsDataScan[] scans, MzRange isolationWindow, int maxMissedScans
@@ -252,6 +274,39 @@ namespace EngineLayer.DIA
                 }
             }
             return allMassCurves;
+        }
+
+        public static DeconvolutedMass GetMassFromScan(DeconvolutedMass targetMass, List<DeconvolutedMass>[,] massTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
+        {
+            DeconvolutedMass bestMass = null;
+            int ceilingMz = (int)Math.Ceiling(tolerance.GetMaximumValue(targetMass.MonoisotopicMass) * binSize);
+            int floorMz = (int)Math.Floor(tolerance.GetMinimumValue(targetMass.MonoisotopicMass) * binSize);
+
+            for (int j = floorMz; j <= ceilingMz; j++)
+            {
+                if (j < massTable.Length && massTable[targetMass.Charge,j] != null)
+                {
+                    List<DeconvolutedMass> bin = massTable[targetMass.Charge, j];
+                    int index = BinarySearchForIndexedMass(bin, zeroBasedScanIndex);
+
+                    for (int i = index; i < bin.Count; i++)
+                    {
+                        DeconvolutedMass mass = bin[i];
+
+                        if (mass.ZeroBasedScanIndex > zeroBasedScanIndex)
+                        {
+                            break;
+                        }
+
+                        if (tolerance.Within(mass.MonoisotopicMass, targetMass.MonoisotopicMass) && mass.ZeroBasedScanIndex == zeroBasedScanIndex && mass.Charge == targetMass.Charge
+                            && (bestMass == null || Math.Abs(mass.MonoisotopicMass - targetMass.MonoisotopicMass) < Math.Abs(bestMass.MonoisotopicMass - targetMass.MonoisotopicMass)))
+                        {
+                            bestMass = mass;
+                        }
+                    }
+                }
+            }
+            return bestMass;
         }
     }
 }

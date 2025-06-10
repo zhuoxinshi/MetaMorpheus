@@ -17,8 +17,8 @@ namespace TaskLayer
 {
     public static class MzIdentMLWriter
     {
-        public static void WriteMzIdentMl(IEnumerable<SpectralMatch> psms, List<EngineLayer.ProteinGroup> groups, List<Modification> variableMods, 
-            List<Modification> fixedMods, List<SilacLabel> silacLabels, List<DigestionAgent> proteases, Tolerance productTolerance, 
+        public static void WriteMzIdentMl(IEnumerable<SpectralMatch> psms, List<EngineLayer.ProteinGroup> groups, List<Modification> variableMods,
+            List<Modification> fixedMods, List<SilacLabel> silacLabels, List<DigestionAgent> proteases, Tolerance productTolerance,
             Tolerance parentTolerance, int missedCleavages, string outputPath, bool appendMotifToModNames)
         {
 
@@ -228,7 +228,7 @@ namespace TaskLayer
                 }
             };
             int database_index = 0;
-            foreach (string database in databases.Where(p=>p!=null))
+            foreach (string database in databases.Where(p => p != null))
             {
                 _mzid.DataCollection.Inputs.SearchDatabase[database_index] = new mzIdentML110.Generated.SearchDatabaseType()
                 {
@@ -253,7 +253,7 @@ namespace TaskLayer
             }
 
             int protein_index = 0;
-            foreach (Protein protein in proteins.Where(p=>p.DatabaseFilePath!=null))
+            foreach (Protein protein in proteins.Where(p => p.DatabaseFilePath != null))
             {
                 _mzid.SequenceCollection.DBSequence[protein_index] = new mzIdentML110.Generated.DBSequenceType
                 {
@@ -439,12 +439,7 @@ namespace TaskLayer
                             value = psm.FdrInfo.QValue.ToString()
                         }
                     }
-                    };
-                } catch
-                {
-
-                }
-                
+                };
                 if (psm.BioPolymerWithSetModsMonoisotopicMass.HasValue)
                 {
                     _mzid.DataCollection.AnalysisData.SpectrumIdentificationList[0].SpectrumIdentificationResult[scan_result_scan_item.Item1].SpectrumIdentificationItem[scan_result_scan_item.Item2].calculatedMassToCharge = Math.Round(psm.BioPolymerWithSetModsMonoisotopicMass.Value.ToMz(psm.ScanPrecursorCharge), 5);
@@ -769,7 +764,7 @@ namespace TaskLayer
                     cvRef = "PSI-MS",
                 };
             }
-            
+
             return new mzIdentML110.Generated.CVParamType()
             {
                 accession = "MS:1001460",

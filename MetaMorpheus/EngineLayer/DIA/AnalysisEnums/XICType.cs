@@ -13,6 +13,7 @@ namespace EngineLayer.DIA
         isoEnvelopeTotal,
         isoEnvelopeHighestPeak,
         Peak_cutPeak,
-        MassCurve
+        MassCurve,
+        ChargeStateEnvelopeCurve,
     }
 }

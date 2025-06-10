@@ -26,6 +26,7 @@ using Accord.Math.Optimization.Losses;
 using Microsoft.VisualStudio.TestPlatform.Utilities;
 using static Microsoft.FSharp.Core.ByRefKinds;
 using Accord.Statistics.Models.Regression.Linear;
+using Accord.Statistics.Models.Regression;
 using Omics;
 using Proteomics.ProteolyticDigestion;
 using Omics.Modifications;
@@ -34,6 +35,10 @@ using OxyPlot;
 using Org.BouncyCastle.Asn1.Mozilla;
 using NWaves.Filters;
 using NWaves.Signals;
+using Accord.Statistics;
+using Accord.Statistics.Analysis;
+using HarfBuzzSharp;
+using Microsoft.ML;
 
 namespace Test.TestDIA
 {
@@ -1295,6 +1300,75 @@ namespace Test.TestDIA
             var allScans = dataFile.GetAllScansList().ToArray();
             var scan = allScans.Where(s => s.OneBasedScanNumber == 3334).First();
             var envelopes = Deconvoluter.Deconvolute(scan, task.CommonParameters.PrecursorDeconvolutionParameters).Select(e => ( e.MonoisotopicMass.ToMz(e.Charge), e.Charge)).OrderBy(e => e.Item1).ToList();
+
+        }
+
+
+        [Test]
+        public static void TestClustering()
+        {
+            var dataFilePath = @"E:\ISD Project\ISD_250428\0429YD_ISD_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
+            var myDataFileManager = new MyFileManager(true);
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            var diaParam = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.25, apexRtTolerance: 0.2,
+                fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 3000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2);
+            task.CommonParameters.DIAparameters = diaParam;
+
+            var dataFile = myDataFileManager.LoadFile(dataFilePath, task.CommonParameters);
+            var ms1scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 1).ToArray();
+            var scan = ms1scans.Where(s => s.OneBasedScanNumber == 2733).FirstOrDefault();
+            var envelopes = Deconvoluter.Deconvolute(scan, task.CommonParameters.PrecursorDeconvolutionParameters).Where(e => e.Charge > 4);
+            var clusters = ChargeStateEnvelope.Cluster(envelopes.ToList(), new PpmTolerance(10), 3, 5);
+        }
+
+        [Test]
+        public static void TestEnvelopeCurve()
+        {
+            var filePath1 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected.mzML";
+            var filePath2 = @"E:\ISD Project\ISD_250428\0504YB_ISD_rep_cali-avg-gptmd-xml_1.0.8\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected-calib-averaged.mzML";
+            var tomlFile = @"E:\ISD Project\ISD_240606\2024-10-24-15-44-25\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            task.CommonParameters.PrecursorMassTolerance = new PpmTolerance(50);
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(50), new PpmTolerance(50),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+                fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 2, maxRTrangeMS2: 2, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 3000, minMS1Charge: 3, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+                ms1XICType: XICType.ChargeStateEnvelopeCurve, ms2XICType: XICType.ChargeStateEnvelopeCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.massCurve, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 5, ms1NumPeaksThreshold: 4);
+
+            MassDiffAcceptor massDiffAcceptor = SearchTask.GetMassDiffAcceptor(task.CommonParameters.PrecursorMassTolerance, task.SearchParameters.MassDiffAcceptorType, task.SearchParameters.CustomMdac);
+            var myFileManager = new MyFileManager(true);
+            var myMsDataFile = myFileManager.LoadFile(filePath2, task.CommonParameters);
+            var allScans = myMsDataFile.GetAllScansList().ToArray();
+            var allMs1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
+            var allMs2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            var allMs1MassCurves = ISDEngine_static.GetAllPeakCurves(allMs1Scans, task.CommonParameters, task.CommonParameters.DIAparameters,
+                               XICType.ChargeStateEnvelopeCurve, new PpmTolerance(100), 1, out List<Peak>[] peaksByScan1, false).Where(pc => pc.Peaks.Count > 2).ToList();
+            //var allPC2 = ChargeStateEnvelopeCurve.GetAllEnvelopeCurvesWithNotch(allMs1Scans, task.CommonParameters, task.CommonParameters.DIAparameters, massDiffAcceptor, 1, 3000, 3,
+            //    out List<Peak>[] peaksByScan2).Where(pc => pc.Peaks.Count > 2).ToList();
+            //var targetMass = peaksByScan2[2205].Where(p => Math.Round(p.HighestPeakMz, 2) == 925.47).First();
+            //var pc3 = ChargeStateEnvelopeCurve.FindEnvelopeCurveNoTable(targetMass, peaksByScan2, allMs1Scans.Length, massDiffAcceptor, null, 2, 1);
+            //targetMass.PeakCurve.VisualizeGeneral("rt").Show();
+            var allPeaksByScan = ChargeStateEnvelope.GetAllChargeEnvelopeByScan(allMs1Scans, task.CommonParameters.PrecursorDeconvolutionParameters);
+            var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
+            var table = ChargeStateEnvelope.GetEnvelopeTable(allPeaks, 1);
+            var masses = allPeaksByScan[1501];
+            int stop = 0;
+            //var masses2 = peaksByScan2[1501];
+            //var pc1 = ChargeStateEnvelopeCurve.FindEnvelopeCurveNoTable(targetMass1, allPeaksByScan, allPeaksByScan.Length, massDiffAcceptor, null, 2, 1);
+            ////var pc = ChargeStateEnvelopeCurve.FindEnvelopeCurve(targetMass, table, allMs1Scans, null, 2, new PpmTolerance(50), 1, 2);
+            //pc1.VisualizeGeneral("rt").Show();
 
         }
     }

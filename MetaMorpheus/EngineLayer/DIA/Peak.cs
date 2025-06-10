@@ -26,7 +26,7 @@ namespace EngineLayer
         }
 
         public double Mz { get; set; }
-        public double Intensity { get; set; }
+        public virtual double Intensity { get; set; }
         public double RetentionTime { get; set; }
         public int ScanNumber { get; set; }
         public int ZeroBasedScanIndex {  get; set; }
@@ -34,12 +34,13 @@ namespace EngineLayer
         public int MsLevel { get; set; }
         public PeakCurve PeakCurve { get; set; }
         public PeakEnvelope PeakEnvelope { get; set; }
-        public double MonoisotopicMass { get; set; }
+        public virtual double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
         public virtual double HighestPeakMz { get { return Mz; } }
         public virtual double TotalIntensity { get { return Intensity; } }
         public virtual double HighestPeakIntensity { get { return Intensity; } }
         public double SN { get; set; }
+        public virtual double AveragedMass { get; set; } 
 
         public static List<Peak> GetAllPeaks(MsDataScan[] scans, int binsPerDalton)
         {

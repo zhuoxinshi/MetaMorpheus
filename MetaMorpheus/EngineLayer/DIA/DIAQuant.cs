@@ -12,7 +12,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using LinqStatistics;
 using System.Windows.Markup;
 using Omics.SpectrumMatch;
 using Easy.Common.Extensions;
@@ -20,7 +19,6 @@ using System.Security.Cryptography.X509Certificates;
 using Chemistry;
 using MassSpectrometry;
 using static Plotly.NET.StyleParam.Range;
-using Accord;
 using TopDownProteomics.MassSpectrometry;
 
 namespace EngineLayer.DIA
@@ -183,6 +181,7 @@ namespace EngineLayer.DIA
         public double IntegratedHighestIsoPeakIntensityAllCharges { get; set; }
         public double IntegratedHighestIsoPeakIntensityHighestThreeCharges { get; set; }
         public double IntegratedHighestIsoPeakIntensityHighestCharge { get; set; }
+        public double ApexIntensity { get; set; }
 
         public DIAProteoformQuant(string fileName, List<DIAQuantResult> quantResults)
         {
@@ -202,6 +201,7 @@ namespace EngineLayer.DIA
             IntegratedHighestIsoPeakIntensityAllCharges = quantResults.Sum(q => q.IntegratedHighestIsoPeakIntensity);
             IntegratedHighestIsoPeakIntensityHighestThreeCharges = quantResults.OrderByDescending(q => q.IntegratedHighestIsoPeakIntensity).Take(3).Sum(q => q.IntegratedHighestIsoPeakIntensity);
             IntegratedHighestIsoPeakIntensityHighestCharge = quantResults.Max(q => q.IntegratedMs1TotalIntensity);
+            ApexIntensity = quantResults.Max(q => q.PrecursorApexIntensity);
         }
 
         public DIAProteoformQuant() { }

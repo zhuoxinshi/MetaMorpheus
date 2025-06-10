@@ -23,6 +23,7 @@ using SpectralAveraging;
 using UsefulProteomicsDatabases;
 using Transcriptomics.Digestion;
 using Proteomics.AminoAcidPolymer;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -367,6 +368,19 @@ namespace TaskLayer
         {
             if (commonParameters.DIAparameters != null)
             {
+                if (commonParameters.DIAparameters.PFgroupsDictionary != null)
+                {
+                    int pfGroupIndex = 1;
+                    var pseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
+                    foreach (var pfGroup in commonParameters.DIAparameters.PFgroupsDictionary[myMSDataFile.FilePath])
+                    {
+                        pfGroup.PFgroupIndex = pfGroupIndex;
+                        pfGroupIndex++;
+                        var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, commonParameters.DIAparameters.PseudoMs2ConstructionType, myMSDataFile.FilePath);
+                        pseudoMs2Scans.Add(newScans);
+                    }
+                    return pseudoMs2Scans;
+                }
                 switch (commonParameters.DIAparameters.AnalysisType)
                 {
                     case AnalysisType.DIAEngine:

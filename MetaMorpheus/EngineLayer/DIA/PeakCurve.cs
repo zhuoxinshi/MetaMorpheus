@@ -18,8 +18,6 @@ using NWaves.Filters;
 using Numerics.NET.Statistics;
 using System.Xml.Linq;
 using EngineLayer.DIA.CWT;
-using Accord.Statistics.Kernels;
-using Accord.Statistics.Distributions.DensityKernels;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -216,14 +214,40 @@ namespace EngineLayer.DIA
             XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, LinearSpline);
         }
 
-        public void GetCubicSplineXYData(double splineRtInterval)
+        public void GetCubicSplineXYData(double splineRtInterval, Dictionary<int, double> rtIndexMap = null)
         {
+            if (Peaks.Count < 5)
+            {
+                GetExtendedCubicSplineXYData(splineRtInterval, rtIndexMap);
+                return;
+            }
             if (CubicSpline == null)
             {
                 GetCubicSpline();
             }
-            int numPoints = (int)Math.Floor((EndRT - StartRT) / splineRtInterval) + 1;
             XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, CubicSpline);
+        }
+
+        public void GetExtendedCubicSplineXYData(double splineRtInterval, Dictionary<int, double> rtIndexMap)
+        {
+            var rtArray = Peaks.Select(p => p.RetentionTime).ToList();
+            var intensityArray = Peaks.Select(p => p.Intensity).ToList();
+            if (Peaks.First().ZeroBasedScanIndex != 0)
+            {
+                rtArray.Insert(0, rtIndexMap[Peaks.First().ZeroBasedScanIndex - 1]);
+                intensityArray.Insert(0, 0);
+            }
+            if (Peaks.Last().ZeroBasedScanIndex != rtIndexMap.Count - 1)
+            {
+                rtArray.Add(rtIndexMap[Peaks.Last().ZeroBasedScanIndex + 1]);
+                intensityArray.Add(0);
+            }
+            if (rtArray.Count < 5)
+            {
+                return;
+            }
+            var extendedCubicSpline = CubicSpline.InterpolateAkima(rtArray.ToArray(), intensityArray.ToArray());
+            XYData = CalculateSpline(rtArray.First(), rtArray.Last(), splineRtInterval, extendedCubicSpline);
         }
 
         public void GetBSplineXYData(double splineRtInterval, int smoothDegree)
