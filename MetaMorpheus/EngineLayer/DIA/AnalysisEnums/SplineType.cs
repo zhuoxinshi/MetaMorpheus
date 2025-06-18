@@ -28,5 +28,7 @@ namespace EngineLayer.DIA
         SimpleGaussianSpline,
         NormalizedLinearSpline,
         ExtendedCubicSpline,
+        ExtendedCycleSpline,
+        ExtendedCycleSplineSavgolSmoothed,
     }
 }

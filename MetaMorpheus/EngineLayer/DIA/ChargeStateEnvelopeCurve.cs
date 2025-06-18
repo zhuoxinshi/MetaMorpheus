@@ -14,6 +14,7 @@ namespace EngineLayer.DIA
         {
             Peaks = chargeEnvelopes;
             MonoisotopicMass = Peaks.First().MonoisotopicMass;
+            Charge = 1;
         }
 
         public static List<PeakCurve> GetAllEnvelopeCurves(MsDataScan[] scans, CommonParameters commonParameters, DIAparameters diaParam,

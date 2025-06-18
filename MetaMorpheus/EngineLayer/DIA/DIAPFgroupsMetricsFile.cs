@@ -47,19 +47,17 @@ namespace EngineLayer.DIA
         public int Ms2ScanNumber { get; set; }
         public double FragmentFractionalIntensity { get; set; } 
 
-        public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup, PsmFromTsv psmFromTsv = null)
+        public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup = null, PsmFromTsv psmFromTsv = null)
         {
             Correlation = pfPair.Correlation;
             Overlap = pfPair.Overlap;
             FragmentIntensity = pfPair.FragmentPeakCurve.TotalIntensity;
             ApexRtDelta = Math.Abs(pfPair.FragmentPeakCurve.ApexRT - pfPair.PrecursorPeakCurve.ApexRT);
-            PFgroupIndex = pfGroup.PFgroupIndex;
-            PrecursorMass = pfGroup.PrecursorPeakCurve.MonoisotopicMass;
-            PrecursorCharge = pfGroup.PrecursorPeakCurve.Charge;
-            PrecursorApexRt = pfGroup.PrecursorPeakCurve.ApexRT;
+            PrecursorMass = pfPair.PrecursorPeakCurve.MonoisotopicMass;
+            PrecursorCharge = pfPair.PrecursorPeakCurve.Charge;
+            PrecursorApexRt = pfPair.PrecursorPeakCurve.ApexRT;
             FragmentIonMz = pfPair.FragmentPeakCurve.MonoisotopicMass.ToMz(pfPair.FragmentPeakCurve.Charge);
             Ms2ScanNumber = pfPair.FragmentPeakCurve.Peaks.First().ScanNumber;
-            FragmentFractionalIntensity = pfPair.FragmentPeakCurve.ApexIntensity/ pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.ApexIntensity);
 
             if (psmFromTsv != null)
             {
@@ -77,6 +75,11 @@ namespace EngineLayer.DIA
                 }
 
                 PsmScore = psmFromTsv.Score;
+            }
+            if (pfGroup != null)
+            {
+                PFgroupIndex = pfGroup.PFgroupIndex;
+                FragmentFractionalIntensity = pfPair.FragmentPeakCurve.ApexIntensity / pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.ApexIntensity);
             }
         }
 
@@ -130,7 +133,7 @@ namespace EngineLayer.DIA
             Results = csv.GetRecords<PFpairMetrics>().ToList();
         }
 
-        public static PFpairMetricFile GetPFpairsFromPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms)
+        public static PFpairMetricFile GetPFpairsFromPfGroupAndPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms)
         {
             List<PFpairMetrics> results = new List<PFpairMetrics>();
             var sortedScanNumberArray = sortedPsms.Select(psm => psm.ScanNumber).ToArray();

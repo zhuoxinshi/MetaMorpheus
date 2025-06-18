@@ -445,47 +445,5 @@ namespace EngineLayer.DIA
             }
         }
 
-        public static PrecursorFragmentsGroup FindPfGroupBasedOnPsm(PsmFromTsv psmTsv, List<DeconvolutedMass>[] ms1PeakTable, Dictionary<double, List<DeconvolutedMass>[]> allMs2MassTables,
-            DIAparameters diaParam)
-        {
-            var cycle = (psmTsv.Ms2ScanNumber - 1) % 4;
-            List<DeconvolutedMass>[] ms2PeakTable = null;
-            switch (cycle)
-            {
-                case 1:
-                    ms2PeakTable = allMs2MassTables[60];
-                    break;
-                case 2:
-                    ms2PeakTable = allMs2MassTables[80];
-                    break;
-                case 3:
-                    ms2PeakTable = allMs2MassTables[100];
-                    break;
-            }
-            var precursorMass = MassCurve.GetMassFromScan(psmTsv.PrecursorMass, psmTsv.PrecursorCharge, ms1PeakTable, (psmTsv.PrecursorScanNum - 1) / 4,
-                diaParam.Ms1PeakFindingTolerance, diaParam.PeakSearchBinSize);
-            if (precursorMass == null || precursorMass.PeakCurve == null)
-            {
-                return null;
-            }
-            var pfGroup = new PrecursorFragmentsGroup(precursorMass.PeakCurve);
-            precursorMass.PeakCurve.GetRawXYData();
-
-            foreach (var matchedIon in psmTsv.MatchedIons)
-            {
-                var fragmentMass = MassCurve.GetMassFromScan(matchedIon.Mz.ToMass(matchedIon.Charge), matchedIon.Charge, ms2PeakTable, (psmTsv.Ms2ScanNumber - 1) / 4,
-                                       diaParam.Ms2PeakFindingTolerance, diaParam.PeakSearchBinSize);
-                if ( fragmentMass.PeakCurve != null)//fragmentMass == null ||
-                {
-                    double overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursorMass.PeakCurve, fragmentMass.PeakCurve);
-                    fragmentMass.PeakCurve.GetRawXYData();
-                    double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorMass.PeakCurve, fragmentMass.PeakCurve);
-                    var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, fragmentMass.PeakCurve, overlap, corr, psmTsv.DecoyContamTarget);
-                    pfGroup.PFpairs.Add(pfPair);
-                }
-            }
-            return pfGroup;
-        }
-
     }
 }

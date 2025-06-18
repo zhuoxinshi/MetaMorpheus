@@ -1035,7 +1035,7 @@ namespace TaskLayer
                     var pfPairsToWrite = new List<PFpairMetrics>();
                     var psmsOfThisFile = DIApsmsGroupedByFile.Where(g => g.Key == file.Key).First().OrderBy(psm => psm.ScanNumber).ToArray();
 
-                    var pfPairMetricsFile = PFpairMetricFile.GetPFpairsFromPsms(file.Value, psmsOfThisFile);
+                    var pfPairMetricsFile = PFpairMetricFile.GetPFpairsFromPfGroupAndPsms(file.Value, psmsOfThisFile);
                     string name = Path.GetFileNameWithoutExtension(file.Key);
                     string pfPairMetricsFilePath = Path.Combine(folderPath, name + "_PFpairMetrics.tsv");
                     pfPairMetricsFile.WriteResults(pfPairMetricsFilePath);

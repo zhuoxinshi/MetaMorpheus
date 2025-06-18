@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Plotly.NET;
+using EngineLayer.DIA;
 
 namespace Test.TestDIA
 {
@@ -24,14 +25,14 @@ namespace Test.TestDIA
         [Test]
         public static void TestML1()
         {
-            var psmFilePath = @"E:\ISD Project\ISD_250428\0429YD_ISD&DDA_SearchVariableO\Task1-SearchTask\Individual File Results\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected_PSMs.psmtsv";
+            var psmFilePath = @"E:\ISD Project\ISD_250428\0504YB_ForML\Task1-SearchTask\AllPSMs.psmtsv";
             var dataFilePath = @"E:\ISD Project\ISD_250428\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
             var myDataFileManager = new MyFileManager(true);
 
             string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
-            var diaParam = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+            var diaParam = new DIAparameters(new PpmToleranceWithNotch(20, 2), new PpmToleranceWithNotch(20, 2),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.25, apexRtTolerance: 0.2,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
@@ -68,11 +69,9 @@ namespace Test.TestDIA
 
             var pfGroupMetricsList = new List<PFgroupMetrics>();
             var pfPairsList = new List<PFpairMetrics>();
-            var groupMetricsFilePath = @"E:\ISD Project\TestIsdDataAnalysis\TestML_pfGroupMetrics_YD_proteoform.tsv";
-            var pairMetricsFilePath = @"E:\ISD Project\TestIsdDataAnalysis\TestML_pfPairMetrics_YD_proteoform.tsv";
             foreach (var psm in psms)
             {
-                var pfGroup = PrecursorFragmentsGroup.FindPfGroupBasedOnPsm(psm, ms1MassTable, ms2MassTables, task.CommonParameters.DIAparameters);
+                var pfGroup = TrainModel.FindPfGroupBasedOnPsm(psm, ms1MassTable, ms2MassTables, task.CommonParameters.DIAparameters);
                 if (pfGroup != null)
                 {
                     var pfGroupMetrics = new PFgroupMetrics(pfGroup, psm);
@@ -191,9 +190,74 @@ namespace Test.TestDIA
             var metricsFilePath = @"E:\ISD Project\TestSearch\random\B_rep1_ML\search\PFgrouping\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected_PFpairMetrics.tsv";
             var metricsFile = new PFpairMetricFile { FilePath = metricsFilePath };
             metricsFile.LoadResults();
-            var results = metricsFile.Results.Where(pf => pf.TagetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 8).ToList();
-            var pfPairs = TrainModel.GetPFPairsFromPFMetricsFile(metricsFile);
+            var results = metricsFile.Results.Where(pf => pf.TagetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 10).ToList();
+            var pfPairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(metricsFile.Results);
             TrainModel.Train(pfPairs);
+        }
+
+        [Test]
+        public static void TestML2()
+        {
+            var psmFilePath = @"E:\ISD Project\ISD_250428\0504YB_ForML\Task1-SearchTask\AllPSMs.psmtsv";
+            var dataFilePath = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_averaged_labelCorrected.mzML";
+            var myDataFileManager = new MyFileManager(true);
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask task = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            var diaParam = new DIAparameters(new PpmToleranceWithNotch(20, 2), new PpmToleranceWithNotch(20, 2),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.25, apexRtTolerance: 0.2,
+                fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 3000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2);
+            task.CommonParameters.DIAparameters = diaParam;
+
+            var dataFile = myDataFileManager.LoadFile(dataFilePath, task.CommonParameters);
+            var ms1scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 1).ToArray();
+            var ms2scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+            var allMs1MassCurves = ISDEngine_static.GetAllPeakCurves(ms1scans, task.CommonParameters, task.CommonParameters.DIAparameters, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1, out List<Peak>[] ms1PeaksByScan, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
+            var isdScanVoltageMap = ISDEngine_static.ConstructMs2Groups(ms2scans);
+            var allMs2PeakCurves = new Dictionary<double, List<PeakCurve>>();
+            var allMs2PeaksByScan = new Dictionary<double, List<Peak>[]>();
+            foreach (var ms2Group in isdScanVoltageMap)
+            {
+                allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), task.CommonParameters, task.CommonParameters.DIAparameters,
+                    diaParam.Ms2XICType, diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null,
+                    diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
+                allMs2PeaksByScan[ms2Group.Key] = peaksByScan2;
+            }
+
+            var psms = PsmTsvReader.ReadTsv(psmFilePath, out List<string> warnings).Where(psm => psm.Score >= 8 && psm.DecoyContamTarget == "T").ToList();
+            var AllPFPairMetrics = new List<PFpairMetrics>();
+            foreach (var psm in psms)
+            {
+                var cycle = (psm.Ms2ScanNumber - 1) % 4;
+                List<Peak>[] ms2PeaksByScan = null;
+                switch (cycle)
+                {
+                    case 1:
+                        ms2PeaksByScan = allMs2PeaksByScan[60];
+                        break;
+                    case 2:
+                        ms2PeaksByScan = allMs2PeaksByScan[80];
+                        break;
+                    case 3:
+                        ms2PeaksByScan = allMs2PeaksByScan[100];
+                        break;
+                }
+                var metrics = TrainModel.GetPFPairMetricsFromPsm(psm, ms1PeaksByScan, ms2PeaksByScan, task.CommonParameters.DIAparameters);
+                if (metrics == null || metrics.Count == 0) continue;
+                AllPFPairMetrics.AddRange(metrics);
+            }
+
+            var allPFPairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(AllPFPairMetrics);
+            var num = allPFPairs.Where(p => p.Label == true).Count();
+            TrainModel.Train(allPFPairs, true);
+            var pfFilePath = @"E:\ISD Project\TestIsdDataAnalysis\TestML_pfPairMetrics_YB_PSM.tsv";
+            var pfPairMetricFile = new PFpairMetricFile { FilePath = pfFilePath, Results = AllPFPairMetrics };
+            pfPairMetricFile.WriteResults(pfFilePath);
         }
     }
 }

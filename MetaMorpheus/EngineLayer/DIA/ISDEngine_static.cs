@@ -30,8 +30,8 @@ namespace EngineLayer.DIA
             //Get ms1 XICs
             var allMs1PeakCurves = GetAllPeakCurves(ms1Scans, commonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1,
                 out List<Peak>[] peaksByScan, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
-            PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
-            PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
+            PeakCurveSpline(allMs1PeakCurves, diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
+            //PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
 
             //Get ms2 XICs
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
@@ -40,8 +40,8 @@ namespace EngineLayer.DIA
             {
                 allMs2PeakCurves[ms2Group.Key] = GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
-                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
-                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
+                PeakCurveSpline(allMs2PeakCurves[ms2Group.Key], diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
+                //PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
             }
 
             //Group precursors
@@ -134,7 +134,7 @@ namespace EngineLayer.DIA
             }
 
             //debug
-            var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();
+            //var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();
 
             return pseudoMs2Scans;
         }
@@ -231,7 +231,7 @@ namespace EngineLayer.DIA
                     break;
                 case SplineType.ScanCycleCubicSpline:
                     foreach (var pc in allPeakCurves)
-                        pc.GetScanCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
+                        pc.ScanCycleSpline(diaParam.ScanCycleSplineTimeInterval);
                     break;
                 case SplineType.SavgolSmoothed:
                     foreach(var pc in allPeakCurves)
@@ -288,6 +288,14 @@ namespace EngineLayer.DIA
                 case SplineType.ExtendedCubicSpline:
                     foreach (var pc in allPeakCurves)
                         pc.GetExtendedCubicSplineXYData(diaParam.SplineRtInterval, rtIndexMap);
+                    break;
+                case SplineType.ExtendedCycleSpline:
+                    foreach (var pc in allPeakCurves)
+                        pc.GetExtendedCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
+                    break;
+                case SplineType.ExtendedCycleSplineSavgolSmoothed:
+                    foreach (var pc in allPeakCurves)
+                        pc.GetExtendedCycleCubicSplineSavgolSmoothedXYData(diaParam.ScanCycleSplineTimeInterval, diaParam.SGfilterWindowSize);
                     break;
             }
         }

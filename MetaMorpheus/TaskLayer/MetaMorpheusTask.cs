@@ -368,7 +368,7 @@ namespace TaskLayer
         {
             if (commonParameters.DIAparameters != null)
             {
-                if (commonParameters.DIAparameters.PFgroupsDictionary != null)
+                if (commonParameters.DIAparameters.PFgroupsDictionary != null && commonParameters.DIAparameters.PFgroupsDictionary.Keys.Contains(myMSDataFile.FilePath))
                 {
                     int pfGroupIndex = 1;
                     var pseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();

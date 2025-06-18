@@ -53,7 +53,7 @@ namespace EngineLayer.DIA
             {
                 chargeEnvelopesByScan[scans[i].OneBasedScanNumber] = new List<Peak>();
                 var envelopes = Deconvoluter.Deconvolute(scans[i].MassSpectrum, deconParameters, mzRange).Where(e => e.MonoisotopicMass >= minMass && e.Charge >= minCharge).ToList();
-                var chargeEnvelopes = Cluster(envelopes, new PpmTolerance(50), 3, 4);
+                var chargeEnvelopes = Cluster(envelopes, new PpmToleranceWithNotch(20, 3), 1);
                 foreach(var chargeEnvelope in chargeEnvelopes)
                 {
                     chargeEnvelope.RetentionTime = scans[i].RetentionTime;
@@ -84,7 +84,7 @@ namespace EngineLayer.DIA
             return table;
         }
 
-        public static List<ChargeStateEnvelope> Cluster(List<IsotopicEnvelope> envelopes, PpmTolerance massTolerance, int numNotches, int minNumberInCluster)
+        public static List<ChargeStateEnvelope> Cluster(List<IsotopicEnvelope> envelopes, PpmTolerance massTolerance, int minNumberInCluster)
         {
             var orderedEnvelopes = envelopes.OrderByDescending(e => e.TotalIntensity).ToArray();
             var clusters = new List<ChargeStateEnvelope>();
@@ -100,7 +100,7 @@ namespace EngineLayer.DIA
                 {
                     if (visited.Contains(j))
                         continue;
-                    if (cluster.AddEnvelope(orderedEnvelopes[j], massTolerance, numNotches))
+                    if (cluster.AddEnvelope(orderedEnvelopes[j], massTolerance))
                     {
                         visited.Add(j);
                     }
@@ -114,33 +114,13 @@ namespace EngineLayer.DIA
             return clusters;
         }
 
-        private static bool isNeighbor(double mass1, double mass2, PpmTolerance massTolerance, int numNotches)
-        {
-            if (massTolerance.Within(mass1, mass2))
-            {
-                return true;
-            }
-            else
-            {
-                for (int notch = 1; notch <= numNotches; notch++)
-                {
-                    double notchStep = notch * Constants.C13MinusC12;
-                    if (massTolerance.Within(mass1, mass2 + notchStep) || massTolerance.Within(mass1, mass2 - notchStep))
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        public bool AddEnvelope(IsotopicEnvelope envelope, PpmTolerance massTolerance, int numNotches)
+        public bool AddEnvelope(IsotopicEnvelope envelope, PpmTolerance massTolerance)
         {
             if (Envelopes.Select(e => e.Charge).Contains(envelope.Charge))
             {
                 return false;
             }
-            if (isNeighbor(AveragedMass, envelope.MonoisotopicMass, massTolerance, numNotches))
+            if (massTolerance.Within(AveragedMass, envelope.MonoisotopicMass))
             {
                 Envelopes.Add(envelope);
                 return true;

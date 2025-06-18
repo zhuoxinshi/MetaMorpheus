@@ -23,6 +23,7 @@ namespace EngineLayer.DIA
             MonoisotopicMass = masses.First().MonoisotopicMass;
         }
 
+        public override double AveragedMz => AverageMz();
 
         //public GenericChart VisualizeTotalIntensity()
         //{
@@ -40,6 +41,17 @@ namespace EngineLayer.DIA
         //    return plot;
         //}
 
+        public override double AverageMz()
+        {
+            double sumIntensity = Peaks.Sum(p => p.Intensity);
+            double averagedMz = 0;
+            foreach (var peak in Peaks)
+            {
+                double weight = peak.Intensity / sumIntensity;
+                averagedMz += weight * peak.HighestPeakMz;
+            }
+            return averagedMz;
+        }
 
         public static DeconvolutedMass GetMassFromScan(DeconvolutedMass targetMass, List<DeconvolutedMass>[] massTable, int zeroBasedScanIndex, Tolerance tolerance, int binSize)
         {

@@ -21,6 +21,7 @@ using EngineLayer.DIA.CWT;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using static Python.Runtime.TypeSpec;
 
 namespace EngineLayer.DIA
 {
@@ -69,7 +70,7 @@ namespace EngineLayer.DIA
         public double ApexSN => Peaks.OrderByDescending(p => p.Intensity).First().SN;
         public double ApexIntensity => Peaks.Max(p => p.Intensity);
         public double TotalIntensity => Peaks.Sum(p => p.Intensity);
-        public double AveragedMz => AverageMz();
+        public virtual double AveragedMz => AverageMz();
         public double AveragedIntensity => AverageIntensity();
         public LinearSpline LinearSpline { get; set; }
         public CubicSpline CubicSpline { get; set; }    
@@ -94,7 +95,7 @@ namespace EngineLayer.DIA
 
         public double AveragedMass => AverageMass();
 
-        public double AverageMz()
+        public virtual double AverageMz()
         {
             double sumIntensity = Peaks.Sum(p => p.Intensity);
             double averagedMz = 0;
@@ -226,6 +227,28 @@ namespace EngineLayer.DIA
                 GetCubicSpline();
             }
             XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, CubicSpline);
+        }
+
+        public void GetExtendedCycleCubicSplineXYData(double splineRtInterval)
+        {
+            var indexArray = Peaks.Select(p => (double)p.ZeroBasedScanIndex).ToList();
+            var intensityArray = Peaks.Select(p => p.Intensity).ToList();
+            indexArray.Insert(0, (double)(StartCycle - 1));
+            intensityArray.Insert(0, 0);
+            indexArray.Add((double)(EndCycle + 1));
+            intensityArray.Add(0);
+            var extendedCubicSpline = CubicSpline.InterpolateAkima(indexArray.ToArray(), intensityArray.ToArray());
+            XYData = CalculateSpline(indexArray.First(), indexArray.Last(), splineRtInterval, extendedCubicSpline);
+        }
+
+        public void GetExtendedCycleCubicSplineSavgolSmoothedXYData(double splineRtInterval, int windowSize)
+        {
+            GetExtendedCycleCubicSplineXYData(splineRtInterval);
+            var y = CalculateSavgolSmoothedData(XYData.Select(xy => xy.Item2).ToArray(), windowSize);
+            for (int i = 0; i < XYData.Length; i++)
+            {
+                XYData[i] = (XYData[i].Item1, y[i]);
+            }
         }
 
         public void GetExtendedCubicSplineXYData(double splineRtInterval, Dictionary<int, double> rtIndexMap)
@@ -488,6 +511,20 @@ namespace EngineLayer.DIA
 
             return (result.MinimizingPoint[0], result.MinimizingPoint[1], result.MinimizingPoint[2]);
         }
+
+        //Test
+        public void ScanCycleSpline(double interval)
+        {
+            var sortedIndex = Peaks.Select(p => (double)p.ZeroBasedScanIndex).OrderBy(t => t).ToArray();
+            var sortedIntensity = Peaks.Select(p => p.Intensity).ToArray();
+            var spline = CubicSpline.InterpolateAkima(sortedIndex, sortedIntensity);
+            XYData = CalculateSpline(StartCycle, EndCycle, interval, spline);
+            if (XYData.Select(xy => xy.Item2).Contains(double.NaN))
+            {
+                int stop = 0;
+            }
+        }
+
 
         private double CalculateAverageInterval()
         {
@@ -902,6 +939,39 @@ namespace EngineLayer.DIA
                         y: XYData.Select(xy => xy.Item2)).WithTraceInfo("XYData").WithMarkerStyle(Color: Color.fromString("blue"));
             var combinedPlot = Chart.Combine(new[] { plot, plot2 });
             return combinedPlot;
+        }
+
+        public GenericChart VisualizeUmpireBSplineData()
+        {
+            var plot1 = Chart2D.Chart.Line<double, double, string>(
+                        x: Peaks.Select(p => p.RetentionTime),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+            var plot2 = Chart2D.Chart.Line<double, double, string>(
+                       x: UmpireBsplineData.Select(p => p.Item1),
+                       y: UmpireBsplineData.Select(p => p.Item2)).WithTraceInfo("Umpire BSpline").WithMarkerStyle(Color: Color.fromString("blue"));
+            var combinedPlot = Chart.Combine(new[] { plot1, plot2 });
+            return combinedPlot;
+        }
+
+        public double IntegrateAreaUnderCurve(string type = "TotalIntensity")
+        {
+            var data = new List<(double, double)>();
+            if (type == "TotalIntensity")
+            {
+                foreach (var peak in Peaks)
+                {
+                    data.Add((peak.RetentionTime, peak.TotalIntensity));
+                }
+            }
+            if (type == "HighestPeakIntensity")
+            {
+                foreach (var peak in Peaks)
+                {
+                    data.Add((peak.RetentionTime, peak.HighestPeakIntensity));
+                }
+            }
+            var area = PrecursorFragmentPair.CalculateArea(data);
+            return area;
         }
 
         //public GenericChart VisualizeCubicSpline(float timeInterval)

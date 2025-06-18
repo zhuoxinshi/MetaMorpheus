@@ -12,13 +12,12 @@ namespace EngineLayer.DIA
     public class DeconvolutedMass : Peak
     {
         //public double RetentionTime { get; set; }
-        public int MsLevel { get; set; }
         public override double HighestPeakMz => Envelope.Peaks.OrderByDescending(p => p.intensity).First().mz;   
         public override double HighestPeakIntensity => Envelope.Peaks.Max(p => p.intensity); 
 
         public IsotopicEnvelope Envelope { get; set; }
         public EnvelopeCurve EnvelopeCurve { get; set; }
-        public override double TotalIntensity => Envelope.Peaks.Sum(p => p.intensity);
+        public override double TotalIntensity => Envelope.TotalIntensity;
         public List<Peak> Isotopes { get; set; }
         public double AdjustedTotalIntensity { get; set; }
         public MassCurve MassCurve { get; set; }
@@ -44,7 +43,7 @@ namespace EngineLayer.DIA
             for (int i = 0; i < scans.Length; i++)
             {
                 massesByScan[scans[i].OneBasedScanNumber] = new List<Peak>();
-                var envelopes = Deconvoluter.Deconvolute(scans[i].MassSpectrum, deconParameters, mzRange);
+                var envelopes = Deconvoluter.Deconvolute(scans[i].MassSpectrum, deconParameters, mzRange).OrderBy(e => e.MonoisotopicMass);
                 foreach(var envelope in envelopes)
                 {
                     if (envelope.MonoisotopicMass < minMass || envelope.Charge < minCharge)
@@ -98,7 +97,11 @@ namespace EngineLayer.DIA
             return table;
         }
 
-        
+        public static Peak MassLookUp(List<Peak>[] allMassesByScan, int scanNumber, double highestPeakMz)
+        {
+            var mass = allMassesByScan[scanNumber].FirstOrDefault(p => Math.Round(p.HighestPeakMz, 2) == highestPeakMz);
+            return mass;
+        }
     }
 }
 

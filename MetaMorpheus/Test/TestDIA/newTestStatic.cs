@@ -1327,7 +1327,7 @@ namespace Test.TestDIA
             var ms1scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 1).ToArray();
             var scan = ms1scans.Where(s => s.OneBasedScanNumber == 2733).FirstOrDefault();
             var envelopes = Deconvoluter.Deconvolute(scan, task.CommonParameters.PrecursorDeconvolutionParameters).Where(e => e.Charge > 4);
-            var clusters = ChargeStateEnvelope.Cluster(envelopes.ToList(), new PpmTolerance(10), 3, 5);
+            var clusters = ChargeStateEnvelope.Cluster(envelopes.ToList(), new PpmTolerance(10), 5);
         }
 
         [Test]
@@ -1343,7 +1343,7 @@ namespace Test.TestDIA
                 fragmentRankCutOff: 2000, precursorRankCutOff: 10, maxRTrangeMS1: 2, maxRTrangeMS2: 2, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 3000, minMS1Charge: 3, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-                ms1XICType: XICType.ChargeStateEnvelopeCurve, ms2XICType: XICType.ChargeStateEnvelopeCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.massCurve, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
                 ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 5, ms1NumPeaksThreshold: 4);
 
@@ -1354,22 +1354,41 @@ namespace Test.TestDIA
             var allMs1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
             var allMs2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
             var allMs1MassCurves = ISDEngine_static.GetAllPeakCurves(allMs1Scans, task.CommonParameters, task.CommonParameters.DIAparameters,
-                               XICType.ChargeStateEnvelopeCurve, new PpmTolerance(100), 1, out List<Peak>[] peaksByScan1, false).Where(pc => pc.Peaks.Count > 2).ToList();
+                               XICType.MassCurve, new PpmToleranceWithNotch(20, 2), 0.5, out List<Peak>[] peaksByScan1, false).Where(pc => pc.Peaks.Count > 2).ToList();
             //var allPC2 = ChargeStateEnvelopeCurve.GetAllEnvelopeCurvesWithNotch(allMs1Scans, task.CommonParameters, task.CommonParameters.DIAparameters, massDiffAcceptor, 1, 3000, 3,
             //    out List<Peak>[] peaksByScan2).Where(pc => pc.Peaks.Count > 2).ToList();
             //var targetMass = peaksByScan2[2205].Where(p => Math.Round(p.HighestPeakMz, 2) == 925.47).First();
             //var pc3 = ChargeStateEnvelopeCurve.FindEnvelopeCurveNoTable(targetMass, peaksByScan2, allMs1Scans.Length, massDiffAcceptor, null, 2, 1);
             //targetMass.PeakCurve.VisualizeGeneral("rt").Show();
-            var allPeaksByScan = ChargeStateEnvelope.GetAllChargeEnvelopeByScan(allMs1Scans, task.CommonParameters.PrecursorDeconvolutionParameters);
-            var allPeaks = allPeaksByScan.Where(v => v != null).SelectMany(p => p).ToList();
-            var table = ChargeStateEnvelope.GetEnvelopeTable(allPeaks, 1);
-            var masses = allPeaksByScan[1501];
-            int stop = 0;
-            //var masses2 = peaksByScan2[1501];
-            //var pc1 = ChargeStateEnvelopeCurve.FindEnvelopeCurveNoTable(targetMass1, allPeaksByScan, allPeaksByScan.Length, massDiffAcceptor, null, 2, 1);
-            ////var pc = ChargeStateEnvelopeCurve.FindEnvelopeCurve(targetMass, table, allMs1Scans, null, 2, new PpmTolerance(50), 1, 2);
-            //pc1.VisualizeGeneral("rt").Show();
+            var peak = DeconvolutedMass.MassLookUp(peaksByScan1, 2201, 841.34);
+            //peak.PeakCurve.GetUmpireBSplineData(150, 2);
+            //peak.PeakCurve.VisualizeUmpireBSplineData().Show();
+            //peak.PeakCurve.GetUmpireBSplineData(150, 3);
+            //peak.PeakCurve.VisualizeUmpireBSplineData().Show();
+            //peak.PeakCurve.GetCubicSplineXYData(0.005);
+            //peak.PeakCurve.VisualizeGeneral("rt").Show();
+            //peak.PeakCurve.GetScanCycleCubicSplineXYData(0.05);
+            //peak.PeakCurve.VisualizeGeneral("cycle").Show();
+            //peak.PeakCurve.ScanCycleSpline(0.05);
+            //peak.PeakCurve.VisualizeGeneral("cycle").Show();
+            //peak.PeakCurve.GetExtendedCycleCubicSplineXYData(0.05);
+            //peak.PeakCurve.VisualizeGeneral("cycle").Show();
+            var testPCs = allMs1MassCurves.Where(p => p.Peaks.Count == 3).ToList();
+            int stop7 = 7;
 
+            var PCs3Peaks = allMs1MassCurves.Where(p => p.Peaks.Count >= 3).ToList();
+            var PCs5Peaks = allMs1MassCurves.Where(p => p.Peaks.Count >= 5).ToList();
+
+            foreach (var pc in testPCs)
+            {
+                pc.VisualizeGeneral("rt").Show();
+            }
+            
+            var peaks2353 = peaksByScan1[2353].Where(p => p.Charge == 7).ToList();
+            var peaks2349 = peaksByScan1[2349].Where(p => p.Charge == 7).ToList();
+            var peaks2345 = peaksByScan1[2345].Where(p => p.Charge == 7).ToList();
+
+            int stop8 = 8;
         }
     }
 }

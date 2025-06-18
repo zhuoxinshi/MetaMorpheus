@@ -62,8 +62,8 @@ namespace EngineLayer.DIA
             EndRT = precursorPeakCurve.EndRT;
             PrecursorHighestIsotopeIntensities = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.HighestPeakIntensity).ToList());
             PrecursorEnvelopeTotalIntensities = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.TotalIntensity).ToList());
-            IntegratedMs1TotalIntensity = precursorPeakCurve.Peaks.Sum(p => p.TotalIntensity);
-            IntegratedHighestIsoPeakIntensity = precursorPeakCurve.Peaks.Sum(p => p.HighestPeakIntensity);
+            IntegratedMs1TotalIntensity = precursorPeakCurve.IntegrateAreaUnderCurve();
+            IntegratedHighestIsoPeakIntensity = precursorPeakCurve.IntegrateAreaUnderCurve("HighestPeakIntensity");
         }
 
         public DIAQuantResult(PsmFromTsv psmFromTsv, PeakCurve precursorPeakCurve)
@@ -82,10 +82,11 @@ namespace EngineLayer.DIA
             PrecursorRTs = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.RetentionTime).ToList());
             PrecursorHighestIsotopeIntensities = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.HighestPeakIntensity).ToList());
             PrecursorEnvelopeTotalIntensities = string.Join(", ", precursorPeakCurve.Peaks.Select(p => p.TotalIntensity).ToList());
-            IntegratedMs1TotalIntensity = precursorPeakCurve.Peaks.Sum(p => p.TotalIntensity);
-            IntegratedHighestIsoPeakIntensity = precursorPeakCurve.Peaks.Sum(p => p.HighestPeakIntensity);
+            IntegratedMs1TotalIntensity = precursorPeakCurve.IntegrateAreaUnderCurve();
+            IntegratedHighestIsoPeakIntensity = precursorPeakCurve.IntegrateAreaUnderCurve("HighestPeakIntensity");
         }
         public DIAQuantResult() { }
+
     }
 
     public class DIAQuantFile : ResultFile<DIAQuantResult>, IResultFile
@@ -200,8 +201,13 @@ namespace EngineLayer.DIA
             IntegratedMs1TotalIntensityHighestCharge = quantResults.Max(q => q.IntegratedMs1TotalIntensity);
             IntegratedHighestIsoPeakIntensityAllCharges = quantResults.Sum(q => q.IntegratedHighestIsoPeakIntensity);
             IntegratedHighestIsoPeakIntensityHighestThreeCharges = quantResults.OrderByDescending(q => q.IntegratedHighestIsoPeakIntensity).Take(3).Sum(q => q.IntegratedHighestIsoPeakIntensity);
-            IntegratedHighestIsoPeakIntensityHighestCharge = quantResults.Max(q => q.IntegratedMs1TotalIntensity);
+            IntegratedHighestIsoPeakIntensityHighestCharge = quantResults.Max(q => q.IntegratedHighestIsoPeakIntensity);
             ApexIntensity = quantResults.Max(q => q.PrecursorApexIntensity);
+        }
+
+        public static DIAProteoformQuant ProteoformQuantHighestThreeCharges(string fileName, List<DIAQuantResult> quantResults)
+        {
+            return new DIAProteoformQuant(fileName, quantResults);
         }
 
         public DIAProteoformQuant() { }
