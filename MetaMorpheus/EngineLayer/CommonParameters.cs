@@ -197,7 +197,6 @@ namespace EngineLayer
 
         public DIAparameters DIAparameters { get; set; }
         public List<DIAPFgroupsMetricsFile> DIAPFgroupsMetricsFiles { get; set; }
-
         public CommonParameters Clone()
         {
             CommonParameters c = new CommonParameters();

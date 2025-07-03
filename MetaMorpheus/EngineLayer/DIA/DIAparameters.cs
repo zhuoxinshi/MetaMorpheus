@@ -65,6 +65,7 @@ namespace EngineLayer.DIA
         public double SharedXICCutOff { get; set; }  
         public Dictionary<string, List<PrecursorFragmentsGroup>> PFgroupsDictionary { get; set; }
         public Dictionary<string, List<PeakCurve>> PeakCurveDictionary { get; set; }
+        public bool NeutralLossSearch { get; set; }
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan = 2, int binSize = 100, 
             double overlapRatioCutOff = 0.3, double correlationCutOff = 0.5, double apexRtTolerance = 0.1, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
@@ -75,7 +76,7 @@ namespace EngineLayer.DIA
             AnalysisType analysisType = AnalysisType.DIAEngine, bool combineFragments = false, CorrelationType correlationType = CorrelationType.CubicSpline_scanCycle,
             bool cutMs1Peaks = false, bool cutMs2Peaks = false, int sgFilterWindowSize = 5, SplineType ms1SplineType = SplineType.NoSpline, SplineType ms2SplineType = SplineType.NoSpline, 
             float splineTimeInterval = 0.05f, int numScanPerCycle = 0, bool trimMs2Peaks = false, double trimMs2MinSNR = 0.01, int noPointsPerMin = 150, int ms1NumPeaksThreshold = 4, int ms2NumPeaksThreshold = 2, 
-            bool rankFilter = false, int minPFpairCount = 0, double sharedXICCutOff = 0.8)
+            bool rankFilter = false, int minPFpairCount = 0, double sharedXICCutOff = 0.8, bool neutralLossSearch= false)
         {
             Ms1PeakFindingTolerance = ms1PeakFindingTolerance;
             Ms2PeakFindingTolerance = ms2PeakFindingTolerance;
@@ -126,6 +127,7 @@ namespace EngineLayer.DIA
             RankFilter = rankFilter;
             MinPFpairCount = minPFpairCount;
             SharedXICCutOff = sharedXICCutOff;
+            NeutralLossSearch = neutralLossSearch;
         }
 
         public StringBuilder WriteDIASettings()

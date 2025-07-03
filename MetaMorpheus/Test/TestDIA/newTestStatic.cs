@@ -39,6 +39,7 @@ using Accord.Statistics;
 using Accord.Statistics.Analysis;
 using HarfBuzzSharp;
 using Microsoft.ML;
+using Readers.Generated;
 
 namespace Test.TestDIA
 {
@@ -1389,6 +1390,193 @@ namespace Test.TestDIA
             var peaks2345 = peaksByScan1[2345].Where(p => p.Charge == 7).ToList();
 
             int stop8 = 8;
+        }
+
+        [Test]
+        public static void CheckGrouping()
+        {
+            var dataFilePath = @"E:\ISD Project\ISD_250428\05-01-25_PEPPI-YC_105min_ISD60-80-100_preFilter700-900-1100_RF_labelCorrected.mzML";
+            var myDataFileManager = new MyFileManager(true);
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmToleranceWithNotch(20, 2), new PpmToleranceWithNotch(20, 2),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+                fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                ms1SplineType: SplineType.ExtendedCycleSpline, ms2SplineType: SplineType.ExtendedCycleSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: true, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
+
+            var myFileManager = new MyFileManager(true);
+            var myMsDataFile = myFileManager.LoadFile(dataFilePath, searchTask.CommonParameters);
+            var allScans = myMsDataFile.GetAllScansList().ToArray();
+            var allMs1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
+            var allMs2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            var diaParam = searchTask.CommonParameters.DIAparameters;
+            var allMs1PeakCurves = ISDEngine_static.GetAllPeakCurves(allMs1Scans, searchTask.CommonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1, out List<Peak>[] peaksByScan1, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
+            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves, diaParam.Ms1SplineType, searchTask.CommonParameters.DIAparameters, allMs1Scans, allMs2Scans);
+            var isdScanVoltageMap = ISDEngine_static.ConstructMs2Groups(allMs2Scans);
+            var allMs2PeakCurves = new Dictionary<double, List<PeakCurve>>();
+            var ms2PeaksByScan = new Dictionary<double, List<Peak>[]>();
+            foreach (var ms2Group in isdScanVoltageMap)
+            {
+                allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), searchTask.CommonParameters, diaParam, diaParam.Ms2XICType,
+                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
+                ISDEngine_static.PeakCurveSpline(allMs2PeakCurves[ms2Group.Key], diaParam.Ms2SplineType, diaParam, allMs1Scans, allMs2Scans);
+                ms2PeaksByScan[ms2Group.Key] = peaksByScan2;
+            }
+
+            var targetMass = peaksByScan1[3093].Where(p => Math.Round(p.HighestPeakMz, 2) == 980.89 && p.Charge == 13).First();
+            var fragments = allMs2PeakCurves[80];
+            var allFragments = allMs2PeakCurves.Values.SelectMany(v => v).ToList();
+            var pfGroup = ISDEngine_static.PFgrouping(targetMass.PeakCurve, fragments, searchTask.CommonParameters.DIAparameters);
+            var fragPC1 = fragments.Where(p => Math.Abs(p.AveragedMz - 706.4) < 0.1 && p.Charge == 4 && Math.Round(p.ApexRT, 1) == 40.7).FirstOrDefault();
+            var fragPC2 = fragments.Where(p => Math.Abs(p.AveragedMz - 749.7) < 0.1 && p.Charge == 3 && Math.Round(p.ApexRT, 1) == 40.7).FirstOrDefault();
+            var fragPC3 = fragments.Where(p => Math.Abs(p.AveragedMz - 890.82) < 0.1 && p.Charge == 3 && Math.Round(p.ApexRT, 1) == 40.4).FirstOrDefault();
+            var fragPC4 = fragments.Where(p => Math.Abs(p.AveragedMz - 782.74) < 0.1 && p.Charge == 3 && Math.Round(p.ApexRT, 1) == 40.7).FirstOrDefault();
+
+            var targetMass2 = peaksByScan1[3113].Where(p => Math.Round(p.HighestPeakMz, 2) == 929.73 && p.Charge == 12).First();
+
+            //find fragments from DDA run
+            var psmFilePath = @"E:\ISD Project\ISD_250428\0501YC_DDA_noMod\Task1-SearchTask\AllProteoforms_dda.psmtsv";
+            var allPsmTsv =  PsmTsvReader.ReadTsv(psmFilePath, out List<string> warnings).ToList();
+            var targetPsm = allPsmTsv.Where(p => Math.Round(p.PrecursorMz, 2) == 796.72).FirstOrDefault();
+            var matchedIons = targetPsm.MatchedIons.Where(i => i.IsInternalFragment == false).OrderByDescending(i => i.Intensity).ToList();
+            var fragmentPCs = new List<PeakCurve>();
+            var massTolerance = new PpmToleranceWithNotch(50, 2);
+            foreach(var ion in matchedIons)
+            {
+                var fragmentPC = allFragments.Where(p => massTolerance.Within(p.MonoisotopicMass, ion.NeutralTheoreticalProduct.MonoisotopicMass) && p.Charge == ion.Charge && Math.Abs(p.ApexRT - 40.5) < 0.5).FirstOrDefault();
+                if (fragmentPC != null)
+                {
+                    fragmentPCs.Add(fragmentPC);
+                }
+            }
+
+            //Case2
+            var targetMass3 = peaksByScan1[3129].Where(p => Math.Abs(p.HighestPeakMz - 799.2) < 0.1 && p.Charge == 16).First();
+            var pfGroup3 = ISDEngine_static.PFgrouping(targetMass.PeakCurve, fragments, searchTask.CommonParameters.DIAparameters);
+            int stop1 = 1;
+            targetMass3.PeakCurve.VisualizeGeneral("rt").Show();
+            int stop2 = 2;
+
+            var targetMass4 = peaksByScan1[1681].Where(p => Math.Round(p.HighestPeakMz, 2) == 650.14 && p.Charge == 17).First();
+            var pfGroup4 = ISDEngine_static.PFgrouping(targetMass4.PeakCurve, allMs2PeakCurves[80], searchTask.CommonParameters.DIAparameters);
+            int stop3 = 3;
+            var frag4_1 = ms2PeaksByScan[80][1699].Where(p => Math.Round(p.HighestPeakMz, 2) == 739.94 && p.Charge == 4).FirstOrDefault();
+            var frag4_2 = ms2PeaksByScan[80][1699].Where(p => Math.Round(p.HighestPeakMz, 2) == 519.3 && p.Charge == 2).FirstOrDefault();
+            var frag4_3 = ms2PeaksByScan[80][1699].Where(p => Math.Round(p.HighestPeakMz, 2) == 576.32 && p.Charge == 2).FirstOrDefault();
+            var frag4_4 = ms2PeaksByScan[80][1699].Where(p => Math.Round(p.HighestPeakMz, 2) == 641.84 && p.Charge == 2).FirstOrDefault();
+            var frag4_5 = ms2PeaksByScan[80][1699].Where(p => Math.Round(p.HighestPeakMz, 2) == 462.28 && p.Charge == 2).FirstOrDefault();
+            var list4 = new List<PeakCurve> { targetMass4.PeakCurve, frag4_1.PeakCurve, frag4_2.PeakCurve, frag4_3.PeakCurve, frag4_4.PeakCurve, frag4_5.PeakCurve };
+            PeakCurve.VisualizeCombined(list4, "cycle").Show();
+            int stop4 = 4;
+            PeakCurve.VisualizeCombined(list4, "rt").Show();
+            int stop5 = 5;
+            PeakCurve.VisualizeCombined(list4, "rt", true).Show();
+            int stop6 = 6;
+            var fragList4 = new List<PeakCurve> { frag4_1.PeakCurve, frag4_2.PeakCurve, frag4_3.PeakCurve, frag4_4.PeakCurve, frag4_5.PeakCurve };
+            PeakCurve.VisualizeCombined(fragList4, "rt").Show();
+            int stop7 = 7;
+            var targetMass5 = peaksByScan1[1681].Where(p => Math.Round(p.HighestPeakMz, 2) == 649.26 && p.Charge == 17).FirstOrDefault();
+            targetMass5.PeakCurve.VisualizeGeneral("cycle").Show();
+            var list5_1 = new List<PeakCurve> { targetMass5.PeakCurve, frag4_1.PeakCurve };
+            PeakCurve.VisualizeCombined(list5_1, "cycle").Show();
+            int stop8 = 8;
+
+        }
+
+        [Test]
+        public static void CheckGrouping_D()
+        {
+            var dataFilePath = @"E:\ISD Project\ISD_250428\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected.mzML";
+            var myDataFileManager = new MyFileManager(true);
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmToleranceWithNotch(20, 2), new PpmToleranceWithNotch(20, 2),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+                fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
+                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+                pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
+                ms1SplineType: SplineType.ExtendedCycleSpline, ms2SplineType: SplineType.ExtendedCycleSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: true, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
+
+            var myFileManager = new MyFileManager(true);
+            var myMsDataFile = myFileManager.LoadFile(dataFilePath, searchTask.CommonParameters);
+            var allScans = myMsDataFile.GetAllScansList().ToArray();
+            var allMs1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
+            var allMs2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            var diaParam = searchTask.CommonParameters.DIAparameters;
+            var allMs1PeakCurves = ISDEngine_static.GetAllPeakCurves(allMs1Scans, searchTask.CommonParameters, diaParam, diaParam.Ms1XICType, diaParam.Ms1PeakFindingTolerance, diaParam.MaxRTRangeMS1, out List<Peak>[] peaksByScan1, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
+            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves, diaParam.Ms1SplineType, searchTask.CommonParameters.DIAparameters, allMs1Scans, allMs2Scans);
+            var isdScanVoltageMap = ISDEngine_static.ConstructMs2Groups(allMs2Scans);
+            var allMs2PeakCurves = new Dictionary<double, List<PeakCurve>>();
+            var ms2PeaksByScan = new Dictionary<double, List<Peak>[]>();
+            foreach (var ms2Group in isdScanVoltageMap)
+            {
+                allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), searchTask.CommonParameters, diaParam, diaParam.Ms2XICType,
+                    diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
+                ISDEngine_static.PeakCurveSpline(allMs2PeakCurves[ms2Group.Key], diaParam.Ms2SplineType, diaParam, allMs1Scans, allMs2Scans);
+                ms2PeaksByScan[ms2Group.Key] = peaksByScan2;
+            }
+
+            var targetMass1 = peaksByScan1[3085].Where(p => Math.Round(p.HighestPeakMz, 2) == 917.62 && p.Charge == 19).First();
+            var frag1_1 = ms2PeaksByScan[100][2516].Where(p => Math.Round(p.HighestPeakMz, 2) == 1128.9 && p.Charge == 3).FirstOrDefault();
+            var pfGroup1 = ISDEngine_static.PFgrouping(targetMass1.PeakCurve, allMs2PeakCurves[100], searchTask.CommonParameters.DIAparameters);
+            var frag1_2 = ms2PeaksByScan[60][3094].Where(p => Math.Round(p.HighestPeakMz, 2) == 794.69 && p.Charge == 4).FirstOrDefault();
+            frag1_2.PeakCurve.VisualizeGeneral("rt").Show();
+            //var frag1_3 = ms2PeaksByScan[100][2516].Where(p => Math.Round(p.HighestPeakMz, 2) == 1161.59 && p.Charge == 3).FirstOrDefault();
+            //var frag1_4 = ms2PeaksByScan[100][2492].Where(p => Math.Round(p.HighestPeakMz, 2) == 1169.58 && p.Charge == 1).FirstOrDefault();
+            //var frag1_5 = ms2PeaksByScan[100][2492].Where(p => Math.Round(p.HighestPeakMz, 2) == 1018.85 && p.Charge == 3).FirstOrDefault();
+            //var list1 = new List<PeakCurve> { targetMass1.PeakCurve, frag1_1.PeakCurve, frag1_2.PeakCurve, frag1_3.PeakCurve, frag1_4.PeakCurve, frag1_5.PeakCurve };
+            //var fragList1 = new List<PeakCurve> { frag1_1.PeakCurve, frag1_2.PeakCurve, frag1_3.PeakCurve, frag1_4.PeakCurve, frag1_5.PeakCurve };
+            //int stop1 = 1;
+            //PeakCurve.VisualizeCombinedNormalizedRaw(list1, "rt").Show();
+            //int stop2 = 2;
+            //PeakCurve.VisualizeCombined(list1, "cycle").Show();
+            //var frag1_6 = ms2PeaksByScan[100][2520].Where(p => Math.Round(p.HighestPeakMz, 2) == 1085.55 && p.Charge == 3).FirstOrDefault();
+            var fragList1_1 = new List<PeakCurve> { frag1_1.PeakCurve, frag1_2.PeakCurve};
+            foreach(var fragPC in fragList1_1)
+            {
+                var corr0 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetMass1.PeakCurve, fragPC);
+                targetMass1.PeakCurve.GetRawXYData();
+                fragPC.GetRawXYData();
+                var corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetMass1.PeakCurve, fragPC);
+                fragPC.GetSavgolSmoothedXYData(5);
+                targetMass1.PeakCurve.GetSavgolSmoothedXYData(5);
+                var corr2 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetMass1.PeakCurve, fragPC);
+                fragPC.GetSavgolSmoothedCubicSplineXYData(5, 0.05);
+                targetMass1.PeakCurve.GetSavgolSmoothedCubicSplineXYData(5, 0.05);
+                var corr3 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetMass1.PeakCurve, fragPC);
+                targetMass1.PeakCurve.GetUmpireBSplineData(150, 2);
+                fragPC.GetUmpireBSplineData(150, 2);
+                var corr4 = PrecursorFragmentPair.CalculatePeakCurveCorrXYData_Umpire(targetMass1.PeakCurve, fragPC, 150);
+            }
+            targetMass1.PeakCurve.GetExtendedCycleCubicSplineXYData(0.05);
+            frag1_2.PeakCurve.GetExtendedCycleCubicSplineXYData(0.05);
+            var corrr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(targetMass1.PeakCurve, frag1_2.PeakCurve);
+            int stop3 = 3;
+            var pfGroup1_2 = ISDEngine_static.PFgrouping(targetMass1.PeakCurve, allMs2PeakCurves[80], searchTask.CommonParameters.DIAparameters);
+            //find fragments from DDA run
+            //var psmFilePath = @"E:\Temp\AllProteoforms_dda.psmtsv";
+            //var allPsmTsv = PsmTsvReader.ReadTsv(psmFilePath, out List<string> warnings).ToList();
+            //var targetPsm = allPsmTsv.Where(p => Math.Round(p.PrecursorMz, 2) == 796.72).FirstOrDefault();
+            //var matchedIons = targetPsm.MatchedIons.Where(i => i.IsInternalFragment == false).OrderByDescending(i => i.Intensity).ToList();
+            //var fragmentPCs = new List<PeakCurve>();
+            //var massTolerance = new PpmToleranceWithNotch(50, 2);
+            int stop4 = 3;
+            var pfGroup1_3 = ISDEngine_static.PFgrouping(targetMass1.PeakCurve, allMs2PeakCurves[60], searchTask.CommonParameters.DIAparameters);
+            int stop5 = 5;
         }
     }
 }

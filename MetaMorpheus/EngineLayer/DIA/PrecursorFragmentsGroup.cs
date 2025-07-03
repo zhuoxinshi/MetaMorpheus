@@ -111,6 +111,35 @@ namespace EngineLayer.DIA
             }
         }
 
+        public static PrecursorFragmentsGroup JustPair(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in ms2curves)
+            {
+                var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                if (overlap > 0)
+                {
+                    double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                    double sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursor, ms2curve);
+                    var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr, sharedXIC);
+                    preFragGroup.PFpairs.Add(PFpair);
+                }
+            }
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderByDescending(pair => pair.FragmentPeakCurve.ApexIntensity).ToList();
+                for (int i = 0; i < preFragGroup.PFpairs.Count; i++)
+                {
+                    preFragGroup.PFpairs[i].NormalizedIntensityRank = i + 1;
+                }
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
         public static PrecursorFragmentsGroup UmpireGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
         {
             //if (Math.Abs(precursor.MonoisotopicMass - 9461) < 1 && precursor.Charge == 12)

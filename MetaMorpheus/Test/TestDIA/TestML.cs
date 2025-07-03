@@ -103,7 +103,7 @@ namespace Test.TestDIA
             int[] labels = new int[pfPairsList.Count];
             for (int i = 0; i < pfPairsList.Count; i++)
             {
-                labels[i] = pfPairsList[i].TagetDecoy == "T" ? 1 : 0; 
+                labels[i] = pfPairsList[i].TargetDecoy == "T" ? 1 : 0; 
             }
 
             //var teacher = new IterativeReweightedLeastSquares<LogisticRegression>();
@@ -140,16 +140,16 @@ namespace Test.TestDIA
             //double[] fpr = roc.FalsePositiveRates;
 
             //ML.Net
-            var dataList = new List<PFPair>();
+            var dataList = new List<PFPairFeature>();
             foreach(var pfPair in pfPairsList)
             {
-                var data = new PFPair
+                var data = new PFPairFeature
                 {
                     Correlation = (float)pfPair.Correlation,
                     ApexRtDelta = (float)pfPair.ApexRtDelta,
                     Overlap = (float)pfPair.Overlap,
                     FragmentIntensity = (float)pfPair.FragmentIntensity,
-                    Label = pfPair.TagetDecoy == "T" ? true : false
+                    Label = pfPair.TargetDecoy == "T" ? true : false
                 };
                 dataList.Add(data);
             }
@@ -190,7 +190,7 @@ namespace Test.TestDIA
             var metricsFilePath = @"E:\ISD Project\TestSearch\random\B_rep1_ML\search\PFgrouping\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected_PFpairMetrics.tsv";
             var metricsFile = new PFpairMetricFile { FilePath = metricsFilePath };
             metricsFile.LoadResults();
-            var results = metricsFile.Results.Where(pf => pf.TagetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 10).ToList();
+            var results = metricsFile.Results.Where(pf => pf.TargetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 10).ToList();
             var pfPairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(metricsFile.Results);
             TrainModel.Train(pfPairs);
         }
@@ -199,7 +199,7 @@ namespace Test.TestDIA
         public static void TestML2()
         {
             var psmFilePath = @"E:\ISD Project\ISD_250428\0504YB_ForML\Task1-SearchTask\AllPSMs.psmtsv";
-            var dataFilePath = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_averaged_labelCorrected.mzML";
+            var dataFilePath = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected.mzML";
             var myDataFileManager = new MyFileManager(true);
 
             string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
@@ -252,7 +252,10 @@ namespace Test.TestDIA
                 AllPFPairMetrics.AddRange(metrics);
             }
 
+            var featureFilePath = @"E:\ISD Project\TestDataForML\YB_rep1.tsv";
             var allPFPairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(AllPFPairMetrics);
+            var featureFile = new PFpairFeatureFile { Results = allPFPairs, FilePath = featureFilePath };
+            featureFile.WriteResults(featureFilePath);
             var num = allPFPairs.Where(p => p.Label == true).Count();
             TrainModel.Train(allPFPairs, true);
             var pfFilePath = @"E:\ISD Project\TestIsdDataAnalysis\TestML_pfPairMetrics_YB_PSM.tsv";

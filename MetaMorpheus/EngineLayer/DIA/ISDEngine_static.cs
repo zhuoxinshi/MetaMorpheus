@@ -32,6 +32,10 @@ namespace EngineLayer.DIA
                 out List<Peak>[] peaksByScan, diaParam.CutMs1Peaks, null, diaParam.MinMS1Mass, diaParam.MinMS1Charge, diaParam.Ms1NumPeaksThreshold);
             PeakCurveSpline(allMs1PeakCurves, diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
             //PeakCurveSpline(allMs1PeakCurves.Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
+            foreach(var pc in allMs1PeakCurves)
+            {
+                pc.GetNormalizedLinearSplinePeaks();
+            }
 
             //Get ms2 XICs
             var isdScanVoltageMap = ConstructMs2Groups(ms2Scans);
@@ -42,6 +46,10 @@ namespace EngineLayer.DIA
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
                 PeakCurveSpline(allMs2PeakCurves[ms2Group.Key], diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
                 //PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
+                foreach (var pc in allMs2PeakCurves[ms2Group.Key])
+                {
+                    pc.GetNormalizedLinearSplinePeaks();
+                }
             }
 
             //Group precursors
@@ -200,6 +208,55 @@ namespace EngineLayer.DIA
                 index++;
             }
             return peakCurves;
+        }
+
+        public static void PeakCurveSpline(PeakCurve pc, SplineType splineType, DIAparameters diaParam)
+        {
+            switch (splineType)
+            {
+                case SplineType.NoSpline:
+                        pc.GetRawXYData();
+                    break;
+                case SplineType.BSpline:
+                        pc.GetBSplineXYData(diaParam.SplineRtInterval, 2);
+                    break;
+                case SplineType.UmpireBSpline:
+                        pc.GetUmpireBSplineData(diaParam.NoPointsPerMin, 2);
+                    break;
+                case SplineType.ScanCycleCubicSpline:
+                        pc.ScanCycleSpline(diaParam.ScanCycleSplineTimeInterval);
+                    break;
+                case SplineType.SavgolSmoothed:
+                        pc.GetSavgolSmoothedXYData(diaParam.SGfilterWindowSize);
+                    break;
+                case SplineType.CubicSplineSavgolSmoothed:
+                        pc.GetCubicSplineSavgolSmoothedXYData(diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                    break;
+                case SplineType.ScanCycleCubicSplineSavgolSmoothed:
+                        pc.GetScanCycleCubicSplineSavgolSmoothedXYData(diaParam.SGfilterWindowSize, diaParam.ScanCycleSplineTimeInterval);
+                    break;
+                case SplineType.SavgolSmoothedCubicSpline:
+                        pc.GetSavgolSmoothedCubicSplineXYData(diaParam.SGfilterWindowSize, diaParam.SplineRtInterval);
+                    break;
+                case SplineType.GaussianFit:
+                        pc.GetGaussianFitXYData();
+                    break;
+                case SplineType.SimpleGaussian:
+                        pc.GetSimpleGaussianXYData();
+                    break;
+                case SplineType.SimpleGaussianSpline:
+                        pc.GetSimpleGaussianSplineXYData(diaParam.SplineRtInterval);
+                    break;
+                case SplineType.NormalizedLinearSpline:
+                        pc.GetNormalizedLinearSplinePeaks();
+                    break;
+                case SplineType.ExtendedCycleSpline:
+                        pc.GetExtendedCycleCubicSplineXYData(diaParam.ScanCycleSplineTimeInterval);
+                    break;
+                case SplineType.ExtendedCycleSplineSavgolSmoothed:
+                        pc.GetExtendedCycleCubicSplineSavgolSmoothedXYData(diaParam.ScanCycleSplineTimeInterval, diaParam.SGfilterWindowSize);
+                    break;
+            }
         }
 
         public static void PeakCurveSpline(List<PeakCurve> allPeakCurves, SplineType splineType, DIAparameters diaParam, MsDataScan[] ms1Scans, MsDataScan[] ms2Scans)
@@ -512,6 +569,8 @@ namespace EngineLayer.DIA
                     return PrecursorFragmentsGroup.UmpireGrouping(precursor, fragments, diaParam);
                 case PFGroupingType.SharedXIC:
                     return PrecursorFragmentsGroup.SharedXICGrouping(precursor, fragments, diaParam);
+                case PFGroupingType.JustPair:
+                    return PrecursorFragmentsGroup.JustPair(precursor, fragments, diaParam);
                 default: return null;
             }
         }

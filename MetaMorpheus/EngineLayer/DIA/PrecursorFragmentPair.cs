@@ -32,12 +32,13 @@ namespace EngineLayer.DIA
             PrecursorPeakCurve = pre;
             FragmentPeakCurve = frag;
         }
-        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag, double overlap, double corr, string label = null)
+        public PrecursorFragmentPair(PeakCurve pre, PeakCurve frag, double overlap, double corr, double sharedXIC = 0, string label = null)
         {
             PrecursorPeakCurve = pre;
             FragmentPeakCurve = frag;
             Overlap = overlap;
             Correlation = corr;
+            SharedXIC = sharedXIC;
             Label = label;
         }
         public PeakCurve PrecursorPeakCurve { get; set; }
@@ -46,7 +47,9 @@ namespace EngineLayer.DIA
         public int FragmentRank { get; set; }
         public int PrecursorRank { get; set; }
         public double Overlap { get; set; }
+        public double SharedXIC { get; set; } 
         public string Label { get; set; } 
+        public int NormalizedIntensityRank { get; set; }
 
         public static double CalculateCorrelation((double, double)[] xy1, (double, double)[] xy2)
         {
@@ -63,7 +66,7 @@ namespace EngineLayer.DIA
             int numPoints = Math.Min(validxy1.Length, validxy2.Length);
             if (numPoints < 3)
             {
-                return 0;
+                return double.NaN;
             }
             var xy = validxy1.Take(numPoints).Zip(validxy2.Take(numPoints), (a, b) => (a.Item2, b.Item2)).ToArray();
             var y1 = xy.Select(p => p.Item1).ToArray();
@@ -160,28 +163,41 @@ namespace EngineLayer.DIA
             return corr;
         }
 
+        //public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
+        //{
+        //    double overlap = 0;
+        //    var ms1rtrange = curve1.EndRT - curve1.StartRT;
+        //    var ms2rtrange = curve2.EndRT - curve2.StartRT;
+        //    if (curve1.StartRT >= curve2.StartRT && curve1.StartRT <= curve2.EndRT && curve1.EndRT >= curve2.EndRT)
+        //    {
+        //        overlap = (curve2.EndRT - curve1.StartRT) / ms1rtrange;
+        //    }
+        //    else if (curve1.EndRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT && curve1.StartRT <= curve2.StartRT)
+        //    {
+        //        overlap = (curve1.EndRT - curve2.StartRT) / ms1rtrange;
+        //    }
+        //    else if (curve1.StartRT <= curve2.StartRT && curve1.EndRT >= curve2.EndRT)
+        //    {
+        //        overlap = ms2rtrange / ms1rtrange;
+        //    }
+        //    else if (curve1.StartRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT)
+        //    {
+        //        overlap = 1;
+        //    }
+        //    return overlap;
+        //}
+
         public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
         {
-            double overlap = 0;
-            var ms1rtrange = curve1.EndRT - curve1.StartRT;
-            var ms2rtrange = curve2.EndRT - curve2.StartRT;
-            if (curve1.StartRT >= curve2.StartRT && curve1.StartRT <= curve2.EndRT && curve1.EndRT >= curve2.EndRT)
+            if (curve1.StartCycle <= curve2.StartCycle && curve1.EndCycle >= curve2.EndCycle)
             {
-                overlap = (curve2.EndRT - curve1.StartRT) / ms1rtrange;
+                return 1;
             }
-            else if (curve1.EndRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT && curve1.StartRT <= curve2.StartRT)
-            {
-                overlap = (curve1.EndRT - curve2.StartRT) / ms1rtrange;
-            }
-            else if (curve1.StartRT <= curve2.StartRT && curve1.EndRT >= curve2.EndRT)
-            {
-                overlap = ms2rtrange / ms1rtrange;
-            }
-            else if (curve1.StartRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT)
-            {
-                overlap = 1;
-            }
-            return overlap;
+            int maxStart = Math.Max(curve1.StartCycle, curve2.StartCycle);
+            int minEnd = Math.Min(curve1.EndCycle, curve2.EndCycle);
+            int minStart = Math.Min(curve1.StartCycle, curve2.StartCycle);
+            int maxEnd = Math.Max(curve1.EndCycle, curve2.EndCycle);
+            return (maxEnd - minStart) == 0 ? 0 : (minEnd - maxStart) / (double)(maxEnd - minStart);
         }
 
         public static double CalculateRTOverlapRatio_scanCycle(PeakCurve curve1, PeakCurve curve2)

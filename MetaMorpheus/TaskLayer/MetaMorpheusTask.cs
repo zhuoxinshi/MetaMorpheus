@@ -437,7 +437,7 @@ namespace TaskLayer
             {
                 Parallel.ForEach(Partitioner.Create(0, parentScans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                     (partitionRange, loopState) =>
-                    {
+                    {   
                         for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                         {
                             if (GlobalVariables.StopLoops) { break; }

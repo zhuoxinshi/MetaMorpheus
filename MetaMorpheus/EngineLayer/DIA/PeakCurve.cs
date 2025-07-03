@@ -88,7 +88,7 @@ namespace EngineLayer.DIA
         public List<(float, float)> BsplineSmoothedData { get; set; }
         public List<(double, double)> UmpireBsplineData { get; set; }
         public List<(double, double)> ScanCycleSmoothedData { get; set; }
-        public (int, double)[] NormalizedPeaks { get; set; }
+        public (double, double)[] NormalizedPeaks { get; set; }
         public double NL { get; set; }
         public (double, double)[] XYData { get; set; }
         public (int, double)[] NormalizedLinearSplinePeaks { get; set; }
@@ -137,13 +137,23 @@ namespace EngineLayer.DIA
         }
 
 
-        public void GetNormalizedPeaks()
+        public void GetNormalizedPeaks(string type = "rt")
         {
             double sumIntensity = Peaks.Sum(p => p.Intensity);
-            NormalizedPeaks = new (int, double)[Peaks.Count];
-            for (int i =0; i < Peaks.Count; i++)
+            NormalizedPeaks = new (double, double)[Peaks.Count];
+            if (type == "rt")
             {
-                NormalizedPeaks[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity / sumIntensity);
+                for (int i = 0; i < Peaks.Count; i++)
+                {
+                    NormalizedPeaks[i] = (Peaks[i].RetentionTime, Peaks[i].Intensity / sumIntensity * 100);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < Peaks.Count; i++)
+                {
+                    NormalizedPeaks[i] = ((double)Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity / sumIntensity * 100);
+                }
             }
         }
 
@@ -311,6 +321,19 @@ namespace EngineLayer.DIA
             for (int i = 0; i < Peaks.Count; i++)
             {
                 XYData[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity);
+            }
+        }
+
+        public void NormalizeXYData()
+        {
+            if (XYData == null || XYData.Length == 0)
+            {
+                GetRawXYData();
+            }
+            double sumIntensity = XYData.Sum(p => p.Item2);
+            for (int i = 0; i < XYData.Length; i++)
+            {
+                XYData[i] = (XYData[i].Item1, XYData[i].Item2 / sumIntensity * 100);
             }
         }
 
@@ -914,9 +937,26 @@ namespace EngineLayer.DIA
             return plot;
         }
 
-        public GenericChart VisualizeGeneral(string type)
+        public GenericChart VisualizeGeneral(string type, bool XYDataOnly = false)
         {
             GenericChart plot = null;
+            if (XYDataOnly)
+            {
+                if (type == "rt")
+                {
+                    plot = Chart2D.Chart.Line<double, double, string>(
+                            x: XYData.Select(p => p.Item1),
+                            y: XYData.Select(p => p.Item2)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+                    return plot;
+                }
+                if (type == "cycle")
+                {
+                    plot = Chart2D.Chart.Line<double, double, string>(
+                            x: XYData.Select(p => p.Item1),
+                            y: XYData.Select(p => p.Item2)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("red"));
+                    return plot;
+                }
+            }
             if (type == "rt")
             {
                 plot = Chart2D.Chart.Line<double, double, string>(
@@ -938,6 +978,67 @@ namespace EngineLayer.DIA
                         x: XYData.Select(xy => xy.Item1),
                         y: XYData.Select(xy => xy.Item2)).WithTraceInfo("XYData").WithMarkerStyle(Color: Color.fromString("blue"));
             var combinedPlot = Chart.Combine(new[] { plot, plot2 });
+            return combinedPlot;
+        }
+
+        public static GenericChart VisualizeCombined(List<PeakCurve> pcs, string type, bool xyDataOnly = false)
+        {
+            var allPlots = new List<GenericChart>();
+            foreach (var pc in pcs)
+            {
+                var plot = pc.VisualizeGeneral(type, xyDataOnly);
+                if (plot != null)
+                {
+                    allPlots.Add(plot);
+                }
+            }
+            var combinedPlot = Chart.Combine(allPlots);
+            return combinedPlot;
+        }
+
+        public static GenericChart VisualizeCombinedNormalizedRaw(List<PeakCurve> pcs, string type = "rt")
+        {
+            var allPlots = new List<GenericChart>();
+            foreach (var pc in pcs)
+            {
+                var plot = pc.VisualizeNormalizedRaw(type);
+                if (plot != null)
+                {
+                    allPlots.Add(plot);
+                }
+            }
+            var combinedPlot = Chart.Combine(allPlots);
+            return combinedPlot;
+        }
+
+        public GenericChart VisualizeNormalizedRaw(string type = "rt")
+        {
+            if (NormalizedPeaks == null)
+            {
+                GetNormalizedPeaks(type);
+            }
+            var plot = Chart2D.Chart.Line<double, double, string>(
+                        x: NormalizedPeaks.Select(p => p.Item1),
+                        y: NormalizedPeaks.Select(p => p.Item2)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("blue"));
+            return plot;
+        }
+
+        public GenericChart VisualizeRaw()
+        {
+            var plot = Chart2D.Chart.Line<double, double, string>(
+                        x: Peaks.Select(p => p.RetentionTime),
+                        y: Peaks.Select(p => p.Intensity)).WithTraceInfo($"{Math.Round(AveragedMz, 3)}", ShowLegend: true).WithMarkerStyle(Color: Color.fromString("blue"));
+            return plot;
+        }
+        public static GenericChart VisualizeCombinedRaw(List<PeakCurve> pcs)
+        {
+            var allPlots = new List<GenericChart>();
+            foreach (var pc in pcs)
+            {
+                var plot = pc.VisualizeRaw();
+                allPlots.Add(plot);
+            }
+            var combinedPlot = Chart.Combine(allPlots);
             return combinedPlot;
         }
 
@@ -1823,6 +1924,7 @@ namespace EngineLayer.DIA
             var peakCurve = FindPeakCurve(peak, peakTable, scans, null, maxMissedScans, tolerance, binSize, maxRTRange);
             return peakCurve;
         }
+
 
         public void Spline(SplineType splineType, DIAparameters diaParam, MsDataScan[] ms1Scans = null, MsDataScan[] ms2Scans = null)
         {

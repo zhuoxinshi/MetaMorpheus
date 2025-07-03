@@ -11,29 +11,65 @@ using MathNet.Numerics.Statistics;
 using MathNet.Numerics.Random;
 using MzLibUtil;
 using System.Linq.Expressions;
+using CsvHelper.Configuration;
+using CsvHelper;
+using Readers;
+using System.Globalization;
+using System.IO;
+using Omics.Fragmentation;
+using MassSpectrometry;
 
 namespace EngineLayer.DIA
 {
-    public class PFPair
+    public class PFPairFeature
     {
         public float Correlation { get; set; }   // e.g., XIC correlation
         public float ApexRtDelta { get; set; }   // e.g., RT diff
         public float Overlap { get; set; }      // e.g., XIC overlap
-        public float FragmentIntensity { get; set; } // e.g., fragment intensity ratio
-        public bool Label { get; set; }       // true = target, false = decoy
+        public float FragmentIntensity { get; set; } // e.g., fragment intensity
+        public float PsmScore { get; set; } 
+        public float SharedXIC { get; set; } 
+        public bool Label { get; set; }       
         public float Weight { get; set; }
+
+        public PFPairFeature() { }
     }
 
-    public class PredictionResult
+    public class PFpairFeatureFile : ResultFile<PFPairFeature>, IResultFile
     {
-        public bool PredictedLabel { get; set; }
-        public float Probability { get; set; }
-        public float Score { get; set; }
+        public static CsvConfiguration CsvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            Delimiter = "\t",
+        };
+
+        public PFpairFeatureFile() : base() { }
+        public PFpairFeatureFile(string filePath) : base(filePath, Software.Unspecified) { }
+
+        public override void LoadResults()
+        {
+            using var csv = new CsvReader(new StreamReader(FilePath), CsvConfiguration);
+            Results = csv.GetRecords<PFPairFeature>().ToList();
+        }
+
+        public override void WriteResults(string outputPath)
+        {
+            using var csv = new CsvWriter(new StreamWriter(File.Create(outputPath)), CsvConfiguration);
+
+            csv.WriteHeader<PFPairFeature>();
+            foreach (var result in Results)
+            {
+                csv.NextRecord();
+                csv.WriteRecord(result);
+            }
+        }
+
+        public override SupportedFileType FileType { get; }
+        public override Software Software { get; set; }
     }
 
     public class TrainModel
     {
-        public static void Train(IEnumerable<PFPair> yourDataList, bool weight = false)
+        public static void Train(IEnumerable<PFPairFeature> yourDataList, bool weight = false)
         {
             var mlContext = new MLContext();
 
@@ -48,34 +84,90 @@ namespace EngineLayer.DIA
             var trainData = split.TrainSet;
             var testData = split.TestSet;
 
-            var pipeline = mlContext.Transforms.Concatenate("Features", nameof(PFPair.Correlation), nameof(PFPair.ApexRtDelta))
+            var pipeline = mlContext.Transforms.Concatenate("Features", nameof(PFPairFeature.Correlation), nameof(PFPairFeature.ApexRtDelta))
                 .Append(mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(labelColumnName: "Label", featureColumnName: "Features"));
             var model = pipeline.Fit(trainData);
             var predictions = model.Transform(testData);
             var metrics = mlContext.BinaryClassification.Evaluate(predictions);
-
-            var predictor = mlContext.Model.CreatePredictionEngine<PrecursorFragmentPair, PredictionResult>(model);
-            Console.WriteLine($"AUC: {metrics.AreaUnderRocCurve:F4}");
-            Console.WriteLine($"F1 Score: {metrics.F1Score:F4}");
-            Console.WriteLine($"Accuracy: {metrics.Accuracy:P2}");
         }
 
-        public static PFPair GetPFPairsFromPfPairMetrics(PFpairMetrics pfPairMetrics)
+        public static PFPairFeature GetPFPairsFromPfPairMetrics(PFpairMetrics pfPairMetrics)
         {
-            var pfPair = new PFPair
+            var pfPair = new PFPairFeature
             {
                 Correlation = (float)pfPairMetrics.Correlation,
                 ApexRtDelta = (float)pfPairMetrics.ApexRtDelta,
                 Overlap = (float)pfPairMetrics.Overlap,
                 FragmentIntensity = (float)pfPairMetrics.FragmentIntensity,
+                PsmScore = (float)pfPairMetrics.PsmScore,
                 Label = pfPairMetrics.MatchedIonType == "NA" ? false : true
             };
             return pfPair;
         }
 
-        public static List<PFPair> GetPFPairsFromPFMetricsExcludingInternal(IEnumerable<PFpairMetrics> pfPairMetricsList)
+        public static void NeutralLossReSearchFromPFMetrics(IEnumerable<PFpairMetrics> pFpairMetricsList, List<double> neutralLosses)
         {
-            var list = new List<PFPair>();
+            var allTerminalFragments = pFpairMetricsList.Where(p => p.MatchedIonType == "Terminal").ToList();
+            var sortedFragments = pFpairMetricsList.Where(p => p.MatchedIonType == "NA").OrderBy(p => p.FragmentMass).ToList();
+            foreach(var frag in allTerminalFragments)
+            {
+                foreach (var loss in neutralLosses)
+                {
+                    double massToSearch = frag.FragmentMass - loss;
+                    var bestFrag = FindPfPair(sortedFragments, massToSearch, frag.FragmentCharge);
+                    if (bestFrag != null)
+                    {
+                        bestFrag.MatchedIonType = "NeutralLoss";
+                    }
+                }
+            }
+        }
+
+        public static PFpairMetricFile NeutralLossResearchFromPFpairMetricsFile(PFpairMetricFile pfPairMetricsFile, List<double> neutralLosses)
+        {
+            var results = pfPairMetricsFile.Results;
+            var groupedResults = results.GroupBy(p => p.PFgroupIndex).ToList();
+            foreach(var group in groupedResults)
+            {
+                if (group.First().TargetDecoy == "D" )
+                {
+                    continue; 
+                }
+                var allTerminalFragments = group.Where(p => p.MatchedIonType == "Terminal").ToList();
+                var sortedFragments = group.Where(p => p.MatchedIonType == "NA").OrderBy(p => p.FragmentMass).ToList();
+                foreach (var frag in allTerminalFragments)
+                {
+                    foreach (var loss in neutralLosses)
+                    {
+                        double massToSearch = frag.FragmentMass - loss;
+                        var bestFrag = FindPfPair(sortedFragments, massToSearch, frag.FragmentCharge);
+                        if (bestFrag != null)
+                        {
+                            bestFrag.MatchedIonType = "NeutralLoss";
+                        }
+                    }
+                }
+            }
+            var newPfPairMetricsFile = new PFpairMetricFile();
+            newPfPairMetricsFile.Results = results;
+            return newPfPairMetricsFile;
+        }
+
+        private static PFpairMetrics FindPfPair(IEnumerable<PFpairMetrics> sortedFragments, double targetMass, int targetCharge)
+        {
+            var frag = sortedFragments.Where(f => f.FragmentCharge == targetCharge && Math.Abs(f.FragmentMass - targetMass) < 1)
+                                      .OrderBy(f => Math.Abs(f.FragmentMass - targetMass))
+                                      .FirstOrDefault();
+            if (frag != null)
+            {
+                return frag;
+            }
+            return null;
+        }
+
+        public static List<PFPairFeature> GetPFPairsFromPFMetricsExcludingInternal(IEnumerable<PFpairMetrics> pfPairMetricsList)
+        {
+            var list = new List<PFPairFeature>();
             foreach (var pfPairMetrics in pfPairMetricsList)
             {
                 if (pfPairMetrics.MatchedIonType == "Internal") continue;
@@ -85,14 +177,14 @@ namespace EngineLayer.DIA
             return list;
         }
 
-        public static (float, float) ComputeWeights(List<PFPair> pfPairs)
+        public static (float, float) ComputeWeights(List<PFPairFeature> pfPairs)
         {
             float w0 = pfPairs.Count / (2 * pfPairs.Where(p => p.Label == false).Count());
             float w1 = pfPairs.Count / (2 * pfPairs.Where(p => p.Label == true).Count());
             return (w0, w1);
         }
 
-        public static void AssignWeightsToPFPairs(IEnumerable<PFPair> pfPairs, (float, float) weights)
+        public static void AssignWeightsToPFPairs(IEnumerable<PFPairFeature> pfPairs, (float, float) weights)
         {
             foreach (var pfPair in pfPairs)
             {
@@ -136,12 +228,15 @@ namespace EngineLayer.DIA
                     double overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursorMass.PeakCurve, fragmentMass.PeakCurve);
                     fragmentMass.PeakCurve.GetRawXYData();
                     double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorMass.PeakCurve, fragmentMass.PeakCurve);
-                    var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, fragmentMass.PeakCurve, overlap, corr, psmTsv.DecoyContamTarget);
+                    var sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursorMass.PeakCurve, fragmentMass.PeakCurve);
+                    var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, fragmentMass.PeakCurve, overlap, corr, sharedXIC, psmTsv.DecoyContamTarget);
                     pfGroup.PFpairs.Add(pfPair);
                 }
             }
             return pfGroup;
         }
+
+
 
         public static List<PFpairMetrics> GetPFPairMetricsFromPsm(PsmFromTsv psmTsv, List<Peak>[] ms1PeaksByScan, List<Peak>[] ms2PeaksByScan, DIAparameters diaParam)
         {
@@ -152,19 +247,20 @@ namespace EngineLayer.DIA
                 return null;
             }
             var pfGroup = new PrecursorFragmentsGroup(precursorMass.PeakCurve);
-            precursorMass.PeakCurve.GetRawXYData();
+            ISDEngine_static.PeakCurveSpline(precursorMass.PeakCurve, diaParam.Ms1SplineType, diaParam);
 
             var visited = new HashSet<Peak>();
             foreach (var matchedIon in psmTsv.MatchedIons.Where(i => i.IsInternalFragment == false))
             {
                 var fragmentMass = SearchPeakByScan(matchedIon.Mz.ToMass(matchedIon.Charge), matchedIon.Charge, ms2PeaksByScan[psmTsv.Ms2ScanNumber],
                                        diaParam.Ms2PeakFindingTolerance);
-                if (fragmentMass != null && fragmentMass.PeakCurve != null)//fragmentMass == null ||
+                if (fragmentMass != null && fragmentMass.PeakCurve != null)
                 {
                     double overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursorMass.PeakCurve, fragmentMass.PeakCurve);
                     fragmentMass.PeakCurve.GetRawXYData();
                     double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorMass.PeakCurve, fragmentMass.PeakCurve);
-                    var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, fragmentMass.PeakCurve, overlap, corr, psmTsv.DecoyContamTarget);
+                    double sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursorMass.PeakCurve, fragmentMass.PeakCurve);
+                    var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, fragmentMass.PeakCurve, overlap, corr, sharedXIC, psmTsv.DecoyContamTarget);
                     var pfPairMetrics = new PFpairMetrics(pfPair);
                     pfPairMetrics.MatchedIonType = "Terminal";
                     visited.Add(fragmentMass);
@@ -178,7 +274,8 @@ namespace EngineLayer.DIA
                 double overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursorMass.PeakCurve, mass.PeakCurve);
                 mass.PeakCurve.GetRawXYData();
                 double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursorMass.PeakCurve, mass.PeakCurve);
-                var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, mass.PeakCurve, overlap, corr, psmTsv.DecoyContamTarget);
+                double sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursorMass.PeakCurve, mass.PeakCurve);
+                var pfPair = new PrecursorFragmentPair(precursorMass.PeakCurve, mass.PeakCurve, overlap, corr, sharedXIC, psmTsv.DecoyContamTarget);
                 var pfPairMetrics = new PFpairMetrics(pfPair);
                 pfPairMetrics.MatchedIonType = "NA";
                 pfPairMetricsList.Add(pfPairMetrics);

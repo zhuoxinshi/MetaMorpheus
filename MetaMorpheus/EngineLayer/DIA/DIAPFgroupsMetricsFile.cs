@@ -32,12 +32,14 @@ namespace EngineLayer.DIA
         public int PrecursorCharge { get; set; }
         public double PrecursorApexRt { get; set; }
         public double PrecursorIntensity { get; set; }
+        public double FragmentMass { get; set; }
+        public int FragmentCharge { get; set; } 
         public double FragmentIntensity { get; set; }
         public double FragmentIonMz { get; set; }
         public double Correlation { get; set; }
         public double Overlap { get; set; }
         public double ApexRtDelta { get; set; }
-        public string TagetDecoy { get; set; }
+        public string TargetDecoy { get; set; }
         public string MatchedIonType { get; set; }
         public double RoundedApexRtDelta => Math.Round(ApexRtDelta, 2);
         public double RoundedCorrelation => Math.Round(Correlation, 1);
@@ -46,11 +48,15 @@ namespace EngineLayer.DIA
         public double PsmScore { get; set; }
         public int Ms2ScanNumber { get; set; }
         public double FragmentFractionalIntensity { get; set; } 
+        public int NormalizedIntensityRank { get; set; }
+        public double SharedXIC { get; set; }
 
         public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup = null, PsmFromTsv psmFromTsv = null)
         {
             Correlation = pfPair.Correlation;
             Overlap = pfPair.Overlap;
+            FragmentMass = pfPair.FragmentPeakCurve.MonoisotopicMass;
+            FragmentCharge = pfPair.FragmentPeakCurve.Charge;
             FragmentIntensity = pfPair.FragmentPeakCurve.TotalIntensity;
             ApexRtDelta = Math.Abs(pfPair.FragmentPeakCurve.ApexRT - pfPair.PrecursorPeakCurve.ApexRT);
             PrecursorMass = pfPair.PrecursorPeakCurve.MonoisotopicMass;
@@ -58,22 +64,23 @@ namespace EngineLayer.DIA
             PrecursorApexRt = pfPair.PrecursorPeakCurve.ApexRT;
             FragmentIonMz = pfPair.FragmentPeakCurve.MonoisotopicMass.ToMz(pfPair.FragmentPeakCurve.Charge);
             Ms2ScanNumber = pfPair.FragmentPeakCurve.Peaks.First().ScanNumber;
+            NormalizedIntensityRank = pfPair.NormalizedIntensityRank;
+            SharedXIC = pfPair.SharedXIC;
 
             if (psmFromTsv != null)
             {
                 if (psmFromTsv.DecoyContamTarget == "T")
                 {
-                    TagetDecoy = psmFromTsv.DecoyContamTarget;
+                    TargetDecoy = psmFromTsv.DecoyContamTarget;
                 }
                 else if (psmFromTsv.DecoyContamTarget == "D")
                 {
-                    TagetDecoy = psmFromTsv.DecoyContamTarget;
+                    TargetDecoy = psmFromTsv.DecoyContamTarget;
                 }
                 else
                 {
-                    TagetDecoy = "NA";
+                    TargetDecoy = "NA";
                 }
-
                 PsmScore = psmFromTsv.Score;
             }
             if (pfGroup != null)
@@ -93,10 +100,10 @@ namespace EngineLayer.DIA
             switch (psm.IsDecoy)
             {
                 case true:
-                    TagetDecoy = "D";
+                    TargetDecoy = "D";
                     break;
                 case false:
-                    TagetDecoy = "T";
+                    TargetDecoy = "T";
                     break;
             }
             PsmScore = psm.Score;
@@ -133,12 +140,38 @@ namespace EngineLayer.DIA
             Results = csv.GetRecords<PFpairMetrics>().ToList();
         }
 
-        public static PFpairMetricFile GetPFpairsFromPfGroupAndPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms)
+        //public static PFpairMetricFile GetPFpairsFromPfGroupAndPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms)
+        //{
+        //    List<PFpairMetrics> results = new List<PFpairMetrics>();
+        //    var sortedScanNumberArray = sortedPsms.Select(psm => psm.ScanNumber).ToArray();
+        //    foreach (var pfGroup in pfGroups)
+        //    {
+        //        int index = Array.BinarySearch(sortedScanNumberArray, pfGroup.PFgroupIndex);
+        //        if (index >= 0)
+        //        {
+        //            foreach (var pfPair in pfGroup.PFpairs)
+        //            {
+        //                var pfPairMetrics = new PFpairMetrics(pfPair, pfGroup);
+        //                pfPairMetrics.SetPsmInfo(sortedPsms[index]);
+        //                results.Add(pfPairMetrics);
+        //            }
+        //        }
+        //    }
+        //    var pfPairMetricFile = new PFpairMetricFile()
+        //    {
+        //        Results = results
+        //    };
+        //    return pfPairMetricFile;
+        //}
+
+        //only write out PFpairs that have a PSM associated with the pfGroup
+        public static PFpairMetricFile GetAllPFpairsFromPfGroupAndPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms, bool neutralLossSearch = false)
         {
             List<PFpairMetrics> results = new List<PFpairMetrics>();
             var sortedScanNumberArray = sortedPsms.Select(psm => psm.ScanNumber).ToArray();
             foreach (var pfGroup in pfGroups)
             {
+                var pfPairMetricsForThisGroup = new List<PFpairMetrics>();
                 int index = Array.BinarySearch(sortedScanNumberArray, pfGroup.PFgroupIndex);
                 if (index >= 0)
                 {
@@ -147,6 +180,13 @@ namespace EngineLayer.DIA
                         var pfPairMetrics = new PFpairMetrics(pfPair, pfGroup);
                         pfPairMetrics.SetPsmInfo(sortedPsms[index]);
                         results.Add(pfPairMetrics);
+                        pfPairMetricsForThisGroup.Add(pfPairMetrics);
+                    }
+                    //if we want to research the neutral loss fragments
+                    if (neutralLossSearch && index >= 0 && sortedPsms[index].IsDecoy == false)
+                    {
+                        //var allQualifiedPFpairs = pfPairMetricsForThisGroup.Where(p => p.TargetDecoy == "T" && p.MatchedIonType == "Terminal").ToList();
+                        TrainModel.NeutralLossReSearchFromPFMetrics(pfPairMetricsForThisGroup, new List<double> { 18.010564684, 17.0265491 });
                     }
                 }
             }
