@@ -64,5 +64,11 @@ namespace EngineLayer.DIA
             }
             return false;
         }
+
+        public override string ToString()
+        {
+            var str = Value + " ppm, Notches: " + string.Join(", ", AcceptableSortedMassShifts);
+            return str;
+        }
     }
 }

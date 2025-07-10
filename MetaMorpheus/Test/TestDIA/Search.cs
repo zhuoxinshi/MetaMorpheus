@@ -460,7 +460,7 @@ namespace Test.TestDIA
             var filePath24 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected-calib-averaged.mzML";
 
             var fileList = new List<string> { filePath21 };//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\random\ForML\YB_rep1_JustPair_debug";
+            var outputFolder = @"E:\ISD Project\TestSearch\random\ForML\YB_rep1_JustPair_-1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -483,7 +483,7 @@ namespace Test.TestDIA
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
         ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.JustPair,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 4, ms2NumPeaksThreshold: 2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5, neutralLossSearch: true);
+                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5, neutralLossSearch: true);
 
             //match all charge fragment ions
             searchTask.SearchParameters.WriteSpectralLibrary = true;

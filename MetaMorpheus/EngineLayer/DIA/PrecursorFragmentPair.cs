@@ -55,7 +55,7 @@ namespace EngineLayer.DIA
         {
             if (xy1 == null || xy2 == null)
             {
-                return 0;
+                return double.NaN;
             }
 
             double start = Math.Max(xy1[0].Item1, xy2[0].Item1);
@@ -66,7 +66,7 @@ namespace EngineLayer.DIA
             int numPoints = Math.Min(validxy1.Length, validxy2.Length);
             if (numPoints < 3)
             {
-                return double.NaN;
+                return -1;
             }
             var xy = validxy1.Take(numPoints).Zip(validxy2.Take(numPoints), (a, b) => (a.Item2, b.Item2)).ToArray();
             var y1 = xy.Select(p => p.Item1).ToArray();

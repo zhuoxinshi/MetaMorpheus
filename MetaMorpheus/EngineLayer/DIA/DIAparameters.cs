@@ -155,6 +155,8 @@ namespace EngineLayer.DIA
             settings.AppendLine("MaxRTRangeMS1: " + MaxRTRangeMS1);
             settings.AppendLine("MaxRTRangeMS2: " + MaxRTRangeMS2);
             settings.AppendLine("NumScansPerCycle: " + NumScansPerCycle);
+            settings.AppendLine("ms1NumPeaksThreshold: " + Ms1NumPeaksThreshold);
+            settings.AppendLine("ms2NumPeaksThreshold: " + Ms2NumPeaksThreshold);
             settings.Append("\n");
             settings.AppendLine("TrimMss2Peaks: " + TrimMs2Peaks);
             settings.AppendLine("TrimMs2MinSNR: " + TrimMs2MinSNR);
@@ -174,6 +176,7 @@ namespace EngineLayer.DIA
             settings.AppendLine("AverageMs2Scans: " + AverageMs2Scans);
             settings.AppendLine("MaxNumMissedScan: " + MaxNumMissedScan);
             settings.AppendLine("PeakSearchBinSize: " + PeakSearchBinSize);
+            settings.AppendLine("NeutralLossSearch: " + NeutralLossSearch);
 
             return settings;
         }
