@@ -126,5 +126,13 @@ namespace Test.TestDIA
             var isd100 = ms2Scans.Where(s => s.ScanFilter.Contains("100")).ToArray();
             var averagedIsd100Scans = averagedFile.GetAllScansList().Where(s => s.ScanFilter.Contains("100")).ToArray();
         }
+
+        [Test]
+        public static void VisualizeFake()
+        {
+            var peakList = new List<Peak>();
+            double[] intensityMultipliers = { 1, 3, 1};
+
+        }
     }
 }
