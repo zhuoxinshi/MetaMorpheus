@@ -56,6 +56,17 @@ namespace EngineLayer.DIA
         public int PFgroupIndex;
         public int NumHighCorrFragments { get; set; }
 
+        public void SetFragmentRankForPFpairs()
+        {
+            PFpairs = PFpairs.OrderByDescending(pair => pair.Correlation).ToList();
+            int rank = 1;
+            foreach (var pf in PFpairs)
+            {
+                pf.FragmentRank = rank;
+                rank++;
+            }
+        }
+
         //TODO: finish this
         public static PrecursorFragmentsGroup GroupPF(PeakCurve prePeakCurve, List<PeakCurve> fragPeakCurves)
         {
@@ -116,13 +127,16 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
-                var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
-                if (overlap > 0)
+                if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                 {
-                    double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
-                    double sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursor, ms2curve);
-                    var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr, sharedXIC);
-                    preFragGroup.PFpairs.Add(PFpair);
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                    if (overlap > 0)
+                    {
+                        double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                        double sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursor, ms2curve);
+                        var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr, sharedXIC);
+                        preFragGroup.PFpairs.Add(PFpair);
+                    }
                 }
             }
             if (preFragGroup.PFpairs.Count > 0)
@@ -152,7 +166,7 @@ namespace EngineLayer.DIA
             {
                 if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                 {
-                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                    var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio_umpire(precursor, ms2curve);
                     if (overlap > DIAparameters.OverlapRatioCutOff)
                     {
                         double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData_Umpire(precursor, ms2curve, DIAparameters.NoPointsPerMin);

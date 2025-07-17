@@ -239,16 +239,11 @@ namespace EngineLayer.DIA
             XYData = CalculateSpline(StartRT, EndRT, splineRtInterval, CubicSpline);
         }
 
-        public void GetExtendedCycleCubicSplineXYData(double splineRtInterval)
+        public void GetExtendedCycleCubicSplineXYData( double splineRtInterval, int numberOfPeaksToAdd = 1)
         {
-            var indexArray = Peaks.Select(p => (double)p.ZeroBasedScanIndex).ToList();
-            var intensityArray = Peaks.Select(p => p.Intensity).ToList();
-            indexArray.Insert(0, (double)(StartCycle - 1));
-            intensityArray.Insert(0, 0);
-            indexArray.Add((double)(EndCycle + 1));
-            intensityArray.Add(0);
-            var extendedCubicSpline = CubicSpline.InterpolateAkima(indexArray.ToArray(), intensityArray.ToArray());
-            XYData = CalculateSpline(indexArray.First(), indexArray.Last(), splineRtInterval, extendedCubicSpline);
+            AddPeaks(numberOfPeaksToAdd, out double[] newRtArray, out double[] newIntensityArray);
+            var extendedCubicSpline = CubicSpline.InterpolateAkima(newRtArray.ToArray(), newIntensityArray.ToArray());
+            XYData = CalculateSpline(newRtArray[0], newRtArray[newRtArray.Length - 1], splineRtInterval, extendedCubicSpline);
         }
 
         public void GetExtendedCycleCubicSplineSavgolSmoothedXYData(double splineRtInterval, int windowSize)
@@ -383,7 +378,7 @@ namespace EngineLayer.DIA
                     newRtArray[i] = rtArray[0] - (numberOfPeaksToAdd - i) * 1;
                     newIntensityArray[i] = 0;
                 }
-                else if (i >= rtArray.Length + numberOfPeaksToAdd - 1)
+                else if (i >= rtArray.Length + numberOfPeaksToAdd)
                 {
                     newRtArray[i] = newRtArray[i - 1] + 1;
                     newIntensityArray[i] = 0;

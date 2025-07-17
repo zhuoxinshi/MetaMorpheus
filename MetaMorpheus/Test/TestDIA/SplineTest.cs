@@ -13,6 +13,7 @@ using MzLibUtil;
 using Org.BouncyCastle.Asn1.Cmp;
 using Nett;
 using Plotly.NET.CSharp;
+using FlashLFQ;
 
 namespace Test.TestDIA
 {
@@ -130,9 +131,15 @@ namespace Test.TestDIA
         [Test]
         public static void VisualizeFake()
         {
-            var peakList = new List<Peak>();
-            double[] intensityMultipliers = { 1, 3, 1};
-
+            var peakList1 = new List<Peak>();
+            double[] intensityMultipliers = { 1, 3, 2};
+            for (int i = 0; i < intensityMultipliers.Length; i++)
+            {
+                peakList1.Add(new Peak(intensity: 1e5 * intensityMultipliers[i], rt: 1 + i / 10, ZeroBasedScanNumber: i + 5, mz: 500.0));
+            }
+            var pc = new PeakCurve(peakList1);
+            pc.GetExtendedCycleCubicSplineXYData(0.05, 1);
+            pc.VisualizeGeneral("cycle").Show();
         }
     }
 }

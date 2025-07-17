@@ -26,6 +26,7 @@ namespace EngineLayer.DIA
         public double MaxRTRangeMS1 { get; set; }
         public double MaxRTRangeMS2 { get; set; }
         public double PrecursorSNCutOff { get; set; }
+        public double PrecursorIntensityCutOff { get; set; }
         public double MinRTRangeForCWT { get; set; }
         public CwtParameters CwtParameters => new CwtParameters(2f, 150, 0.1f, 0.3f);
         public bool SplitMS2Peak { get; set; } 
@@ -69,7 +70,7 @@ namespace EngineLayer.DIA
 
         public DIAparameters(Tolerance ms1PeakFindingTolerance, Tolerance ms2PeakFindingTolerance, int maxNumMissedScan = 2, int binSize = 100, 
             double overlapRatioCutOff = 0.3, double correlationCutOff = 0.5, double apexRtTolerance = 0.1, int fragmentRankCutOff = 5000, int precursorRankCutOff = 1000
-            , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
+            , double maxRTrangeMS1 = 0.5, double maxRTrangeMS2 = 2, double highCorrThreshold = 0.5, int numHighCorrFragments = 0, double precursorSNRCutOff = 0, double precursorIntensityCutOff = 10000, double minRTRangeForCWT = 0.1,
             bool splitMS2Peak = false, bool splitMS1Peak = false, double splineRtInterval = 0.005, double minMS1Mass = 0, double minMS2Mass = 0, double maxMass = 99999, string type = "DIA", int apexCycleTolerance = 2, 
             double scanCycleSplineInterval = 0.025, int minMS1Charge = 1, int minMS2Charge = 1, bool averageMs2Scans = false, XICType ms1XICType = XICType.DeconHighestPeak, 
             XICType ms2XICType = XICType.Peak, PFGroupingType pfGroupingType = PFGroupingType.ScanCycle, PseudoMs2ConstructionType pseudoMs2Type = PseudoMs2ConstructionType.mzPeak, 
@@ -91,7 +92,8 @@ namespace EngineLayer.DIA
             HighCorrThreshold = highCorrThreshold;
             MaxRTRangeMS1 = maxRTrangeMS1;
             MaxRTRangeMS2 = maxRTrangeMS2;
-            PrecursorSNCutOff = precursorIntensityCutOff;
+            PrecursorSNCutOff = precursorSNRCutOff;
+            PrecursorIntensityCutOff = precursorIntensityCutOff;
             MinRTRangeForCWT = minRTRangeForCWT;
             SplitMS2Peak = splitMS2Peak;
             SplitMS1Peak = splitMS1Peak;

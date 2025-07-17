@@ -30,17 +30,17 @@ namespace Test.TestDIA
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\DIAEngine_static_deconHighestPeak-Peak_Umpire_corr0.5_apex0.2_overlap0.3_frag500_pre25_maxRT0.6_num2";
+            string outputFolder = @"E:\DIA\TestSearch\bu-DIAEngine_static_deconHighestPeak-Peak_Umpire_corr0.5_apex0.2_overlap0.2_frag100_pre10_maxRT0.5_num2_JustPair";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(10), new PpmTolerance(20), 
-                maxNumMissedScan:1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance:0.2, 
-                fragmentRankCutOff: 500, precursorRankCutOff: 25, maxRTrangeMS1: 0.6, maxRTrangeMS2: 0.6, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
-                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMS1Mass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
-                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.Umpire,
-                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, 
+            task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 
+                maxNumMissedScan:1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance:1, 
+                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
+                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMS1Mass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
+                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.JustPair,
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, 
                 splineRtInterval: 0.005, ms1NumPeaksThreshold: 2);
             // Use reflection to set max threads
             //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
@@ -82,7 +82,7 @@ namespace Test.TestDIA
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: 0.75, apexRtTolerance: 0.5,
                 fragmentRankCutOff: 200, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                precursorSNRCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
         ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.DIAEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
@@ -240,7 +240,7 @@ namespace Test.TestDIA
             searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmToleranceWithNotch(50, 2), new PpmToleranceWithNotch(50, 2),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
                 fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                precursorSNRCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
         ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
@@ -460,7 +460,7 @@ namespace Test.TestDIA
             var filePath24 = @"E:\ISD Project\ISD_250428\0504YB_rep_ISD&DIA&DDA_cali-avg-gptmd-xml\Task2-AveragingTask\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected-calib-averaged.mzML";
 
             var fileList = new List<string> { filePath21 };//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\random\ForML\YB_rep1_JustPair_-1";
+            var outputFolder = @"E:\ISD Project\TestSearch\random\ForML\YB_JustPair_-1_apex0.5";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -477,13 +477,13 @@ namespace Test.TestDIA
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmToleranceWithNotch(20, 2), new PpmToleranceWithNotch(20, 2),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance: 8,
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance: 0.5,
                 fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                 precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
         ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.JustPair,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5, neutralLossSearch: true);
+                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5, neutralLossSearch: false);
 
             //match all charge fragment ions
             searchTask.SearchParameters.WriteSpectralLibrary = true;

@@ -50,6 +50,8 @@ namespace EngineLayer.DIA
         public double FragmentFractionalIntensity { get; set; } 
         public int NormalizedIntensityRank { get; set; }
         public double SharedXIC { get; set; }
+        public int PrecursorRank { get; set; } 
+        public int FragmentRank { get; set; } 
 
         public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup = null, PsmFromTsv psmFromTsv = null)
         {
@@ -62,10 +64,20 @@ namespace EngineLayer.DIA
             PrecursorMass = pfPair.PrecursorPeakCurve.MonoisotopicMass;
             PrecursorCharge = pfPair.PrecursorPeakCurve.Charge;
             PrecursorApexRt = pfPair.PrecursorPeakCurve.ApexRT;
-            FragmentIonMz = pfPair.FragmentPeakCurve.MonoisotopicMass.ToMz(pfPair.FragmentPeakCurve.Charge);
+            if (pfPair.FragmentPeakCurve.MonoisotopicMass > 0)
+            {
+                FragmentIonMz = pfPair.FragmentPeakCurve.MonoisotopicMass.ToMz(pfPair.FragmentPeakCurve.Charge);
+            }
+            else
+            {
+                FragmentIonMz = pfPair.FragmentPeakCurve.AveragedMz;
+            }
+            
             Ms2ScanNumber = pfPair.FragmentPeakCurve.Peaks.First().ScanNumber;
             NormalizedIntensityRank = pfPair.NormalizedIntensityRank;
             SharedXIC = pfPair.SharedXIC;
+            PrecursorRank = pfPair.PrecursorRank;
+            FragmentRank = pfPair.FragmentRank;
 
             if (psmFromTsv != null)
             {
@@ -109,8 +121,8 @@ namespace EngineLayer.DIA
             PsmScore = psm.Score;
 
             var sortedMatchedIons = psm.MatchedFragmentIons.OrderBy(ion => ion.Mz).ToArray();
-            var roundedMz = sortedMatchedIons.Select(i => Math.Round(i.Mz, 2)).ToArray();
-            var index = Array.BinarySearch(roundedMz, Math.Round(FragmentIonMz, 2));
+            var roundedMz = sortedMatchedIons.Select(i => Math.Round(i.Mz, 1)).ToArray();
+            var index = Array.BinarySearch(roundedMz, Math.Round(FragmentIonMz, 1));
             if (index >= 0)
             {
                 MatchedIonType = sortedMatchedIons[index].NeutralTheoreticalProduct.SecondaryProductType == null? "Terminal" : "Internal";

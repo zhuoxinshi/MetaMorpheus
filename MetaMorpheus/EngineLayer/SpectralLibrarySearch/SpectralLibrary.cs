@@ -556,6 +556,12 @@ namespace EngineLayer
         {
             string[] split = fragmentIonLine.Split(fragmentSplit, StringSplitOptions.RemoveEmptyEntries);
 
+            //debug
+            if (split.Length == 0)
+            {
+                return null;
+            }
+
             // read fragment m/z
             var experMz = double.Parse(split[0], CultureInfo.InvariantCulture);
 

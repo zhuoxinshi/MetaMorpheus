@@ -40,8 +40,7 @@ namespace EngineLayer.DIA
                     DIAScanWindowMap.Remove(ms1window);
                 }
             }
-            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves.Values.SelectMany(p => p).Where(p =>p.Peaks.Count > 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
-            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves.Values.SelectMany(p => p).Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
+            ISDEngine_static.PeakCurveSpline(allMs1PeakCurves.Values.SelectMany(p => p).ToList(), diaParam.Ms1SplineType, diaParam, ms1Scans, ms2Scans);
 
             //Group Ms1PeakCurves by mass and apexRT
             //var ms1PeakCurveGroups = new Dictionary<(double min, double max), List<PeakCurve>>();
@@ -59,8 +58,20 @@ namespace EngineLayer.DIA
             {
                 allMs2PeakCurves[ms2Group.Key] = ISDEngine_static.GetAllPeakCurves(ms2Group.Value.ToArray(), commonParameters, diaParam, diaParam.Ms2XICType,
                     diaParam.Ms2PeakFindingTolerance, diaParam.MaxRTRangeMS2, out List<Peak>[] peaksByScan2, diaParam.CutMs2Peaks, null, diaParam.MinMS2Mass, diaParam.MinMS2Charge, diaParam.Ms2NumPeaksThreshold);
-                ISDEngine_static.PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count > 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
-                ISDEngine_static.PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].Where(p => p.Peaks.Count <= 4).ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
+                ISDEngine_static.PeakCurveSpline(allMs2PeakCurves[ms2Group.Key].ToList(), diaParam.Ms2SplineType, diaParam, ms1Scans, ms2Scans);
+            }
+
+            //if we want to do sharedXIC
+            if (diaParam.PFGroupingType == PFGroupingType.SharedXIC || diaParam.PFGroupingType == PFGroupingType.JustPair)
+            {
+                foreach(var pc in allMs1PeakCurves.SelectMany(p => p.Value))
+                {
+                    pc.GetNormalizedLinearSplinePeaks();
+                }
+                foreach (var pc in allMs2PeakCurves.SelectMany(p => p.Value))
+                {
+                    pc.GetNormalizedLinearSplinePeaks();
+                }
             }
 
             //precursor fragment grouping
@@ -75,7 +86,7 @@ namespace EngineLayer.DIA
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursorsInRange[i];
-                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+                        if (precursor.ApexIntensity < diaParam.PrecursorIntensityCutOff)
                         {
                             continue;
                         }
@@ -113,47 +124,38 @@ namespace EngineLayer.DIA
             //        }
             //    });
 
-            
+
             //pfGroups = pfGroups.Where(pf => pf.PFpairs.Count > 0 && pf.NumHighCorrFragments >= diaParam.NumHighCorrFragments).ToList();
 
             //combine precursor fragment groups
-            var groupedPfGroups = pfGroups
-                .GroupBy(g => (Math.Round(g.PrecursorPeakCurve.MonoisotopicMass, 1), g.PrecursorPeakCurve.ApexRT))
-                .ToList();
-            var combinedPFgroups = new List<PrecursorFragmentsGroup>();
-            int i = 1;
-            foreach(var group in groupedPfGroups)
-            {
-                var highestIntensityPrecursor = group.Select(g => g.PrecursorPeakCurve).OrderByDescending(p => p.ApexIntensity).First();
-                var combinedGroup = new PrecursorFragmentsGroup(highestIntensityPrecursor, group.SelectMany(p => p.PFpairs).ToList(), i);
-                combinedPFgroups.Add(combinedGroup);
-                i++;
-            }
+            //var groupedPfGroups = pfGroups
+            //    .GroupBy(g => (Math.Round(g.PrecursorPeakCurve.MonoisotopicMass, 1), g.PrecursorPeakCurve.ApexRT))
+            //    .ToList();
+            //var combinedPFgroups = new List<PrecursorFragmentsGroup>();
+            //int i = 1;
+            //foreach(var group in groupedPfGroups)
+            //{
+            //    var highestIntensityPrecursor = group.Select(g => g.PrecursorPeakCurve).OrderByDescending(p => p.ApexIntensity).First();
+            //    var combinedGroup = new PrecursorFragmentsGroup(highestIntensityPrecursor, group.SelectMany(p => p.PFpairs).ToList(), i);
+            //    combinedPFgroups.Add(combinedGroup);
+            //    i++;
+            //}
 
             //precursor fragment rank filtering
-            //foreach (var ms2curve in allMs2PeakCurves.Values.SelectMany(p => p))
-            //{
-            //    ms2curve.GetPrecursorRanks();
-            //}
-            //foreach (var group in combinedPFgroups)
-            //{
-            //    group.PFpairs = group.PFpairs.OrderByDescending(pf => pf.Correlation).Take(diaParam.FragmentRankCutOff).ToList();
-            //    group.PFpairs = group.PFpairs.Where(pf => pf.PrecursorRank <= diaParam.PrecursorRankCutOff).ToList();
-            //    group.GetNumberOfHighCorrFragments(diaParam);
-            //}
-            //combinedPFgroups = combinedPFgroups.Where(pf => pf.PFpairs.Count > 0 && pf.NumHighCorrFragments >= diaParam.NumHighCorrFragments).ToList();
+            foreach (var ms2curve in allMs2PeakCurves.Values.SelectMany(p => p))
+            {
+                ms2curve.GetPrecursorRanks();
+            }
+            foreach (var group in pfGroups)
+            {
+                //group.PFpairs = group.PFpairs.OrderByDescending(pf => pf.Correlation).Take(diaParam.FragmentRankCutOff).ToList();
+                //
+                group.SetFragmentRankForPFpairs();
+                group.GetNumberOfHighCorrFragments(diaParam);
+                group.PFpairs = group.PFpairs.Where(pf => pf.PrecursorRank <= diaParam.PrecursorRankCutOff && pf.FragmentRank <= diaParam.FragmentRankCutOff).ToList();
+            }
+            pfGroups = pfGroups.Where(pf => pf.PFpairs.Count > 0 && pf.NumHighCorrFragments >= diaParam.NumHighCorrFragments).ToList();
 
-            //write pfGroup file
-            if (diaParam.PFgroupsDictionary == null)
-            {
-                diaParam.PFgroupsDictionary = new Dictionary<string, List<PrecursorFragmentsGroup>>();
-            }
-            diaParam.PFgroupsDictionary[dataFile.FilePath] = combinedPFgroups;
-            if (diaParam.PeakCurveDictionary == null)
-            {
-                diaParam.PeakCurveDictionary = new Dictionary<string, List<PeakCurve>>();
-            }
-            diaParam.PeakCurveDictionary[dataFile.FilePath] = allMs1PeakCurves.SelectMany(p => p.Value).Concat(allMs2PeakCurves.SelectMany(p => p.Value)).ToList();
 
             //construct new ms2Scans
             int pfGroupIndex = 1;
@@ -164,6 +166,18 @@ namespace EngineLayer.DIA
                 var newScans = ISDEngine_static.ConstructNewMs2Scans(pfGroup, commonParameters, diaParam.PseudoMs2ConstructionType, dataFile.FilePath);
                 pseudoMs2Scans.Add(newScans);
             }
+
+            //write pfGroup file
+            if (diaParam.PFgroupsDictionary == null)
+            {
+                diaParam.PFgroupsDictionary = new Dictionary<string, List<PrecursorFragmentsGroup>>();
+            }
+            diaParam.PFgroupsDictionary[dataFile.FilePath] = pfGroups;
+            if (diaParam.PeakCurveDictionary == null)
+            {
+                diaParam.PeakCurveDictionary = new Dictionary<string, List<PeakCurve>>();
+            }
+            diaParam.PeakCurveDictionary[dataFile.FilePath] = allMs1PeakCurves.SelectMany(p => p.Value).Concat(allMs2PeakCurves.SelectMany(p => p.Value)).ToList();
 
             //debug
             var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();

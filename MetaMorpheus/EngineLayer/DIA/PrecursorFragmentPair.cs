@@ -41,6 +41,14 @@ namespace EngineLayer.DIA
             SharedXIC = sharedXIC;
             Label = label;
         }
+        public void SetPrecursorRank(int precursorRank)
+        {
+            PrecursorRank = precursorRank;
+        }
+        public void SetFragmentRank(int fragmentRank)
+        {
+            FragmentRank = fragmentRank;
+        }
         public PeakCurve PrecursorPeakCurve { get; set; }
         public PeakCurve FragmentPeakCurve { get; set; }    
         public double Correlation { get; set; }
@@ -163,29 +171,29 @@ namespace EngineLayer.DIA
             return corr;
         }
 
-        //public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
-        //{
-        //    double overlap = 0;
-        //    var ms1rtrange = curve1.EndRT - curve1.StartRT;
-        //    var ms2rtrange = curve2.EndRT - curve2.StartRT;
-        //    if (curve1.StartRT >= curve2.StartRT && curve1.StartRT <= curve2.EndRT && curve1.EndRT >= curve2.EndRT)
-        //    {
-        //        overlap = (curve2.EndRT - curve1.StartRT) / ms1rtrange;
-        //    }
-        //    else if (curve1.EndRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT && curve1.StartRT <= curve2.StartRT)
-        //    {
-        //        overlap = (curve1.EndRT - curve2.StartRT) / ms1rtrange;
-        //    }
-        //    else if (curve1.StartRT <= curve2.StartRT && curve1.EndRT >= curve2.EndRT)
-        //    {
-        //        overlap = ms2rtrange / ms1rtrange;
-        //    }
-        //    else if (curve1.StartRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT)
-        //    {
-        //        overlap = 1;
-        //    }
-        //    return overlap;
-        //}
+        public static double CalculateRTOverlapRatio_umpire(PeakCurve curve1, PeakCurve curve2)
+        {
+            double overlap = 0;
+            var ms1rtrange = curve1.EndRT - curve1.StartRT;
+            var ms2rtrange = curve2.EndRT - curve2.StartRT;
+            if (curve1.StartRT >= curve2.StartRT && curve1.StartRT <= curve2.EndRT && curve1.EndRT >= curve2.EndRT)
+            {
+                overlap = (curve2.EndRT - curve1.StartRT) / ms1rtrange;
+            }
+            else if (curve1.EndRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT && curve1.StartRT <= curve2.StartRT)
+            {
+                overlap = (curve1.EndRT - curve2.StartRT) / ms1rtrange;
+            }
+            else if (curve1.StartRT <= curve2.StartRT && curve1.EndRT >= curve2.EndRT)
+            {
+                overlap = ms2rtrange / ms1rtrange;
+            }
+            else if (curve1.StartRT >= curve2.StartRT && curve1.EndRT <= curve2.EndRT)
+            {
+                overlap = 1;
+            }
+            return overlap;
+        }
 
         public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
         {
