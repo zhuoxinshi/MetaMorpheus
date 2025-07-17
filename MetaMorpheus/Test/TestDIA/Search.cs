@@ -30,17 +30,17 @@ namespace Test.TestDIA
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\bu-DIAEngine_static_deconHighestPeak-Peak_Umpire_corr0.5_apex0.2_overlap0.2_frag100_pre10_maxRT0.5_num2_JustPair";
+            string outputFolder = @"E:\DIA\TestSearch\bu-DIAEngine_static_deconHighestPeak-Peak_Umpire_corr0.5_apex0.2_overlap0.2_frag100_pre10_maxRT0.5_num2_massCurve";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 
-                maxNumMissedScan:1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance:1, 
+                maxNumMissedScan:1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance:0.2, 
                 fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
                 precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMS1Mass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
-                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.JustPair,
-                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, 
+                scanCycleSplineInterval: 0.005, ms1XICType: XICType.MassCurve, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.Umpire,
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, 
                 splineRtInterval: 0.005, ms1NumPeaksThreshold: 2);
             // Use reflection to set max threads
             //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });

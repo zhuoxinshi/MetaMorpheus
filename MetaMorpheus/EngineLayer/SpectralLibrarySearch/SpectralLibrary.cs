@@ -189,6 +189,10 @@ namespace EngineLayer
             while (reader.Peek() > 0)
             {
                 string line = reader.ReadLine();
+                if (!line.IsNotNullOrEmpty())
+                {
+                    continue;
+                }
                 string[] split;
 
                 if (line.StartsWith("Name", StringComparison.InvariantCultureIgnoreCase))
@@ -213,10 +217,7 @@ namespace EngineLayer
                 }
                 else if (line.StartsWith("MW", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    split = line.Split(mwSplit);
-
-                    // get precursor m/z
-                    precursorMz = double.Parse(split[1].Trim(), CultureInfo.InvariantCulture);
+                    continue;
                 }
                 else if (line.StartsWith("Comment", StringComparison.InvariantCultureIgnoreCase))
                 {
