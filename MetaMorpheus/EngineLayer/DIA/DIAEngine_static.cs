@@ -80,7 +80,7 @@ namespace EngineLayer.DIA
             {
                 var precursorsInRange = allMs1PeakCurves[ms2group.Key].ToArray();
 
-                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+                Parallel.ForEach(Partitioner.Create(0, precursorsInRange.Length), new ParallelOptions { MaxDegreeOfParallelism = 10 },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
@@ -180,7 +180,7 @@ namespace EngineLayer.DIA
             diaParam.PeakCurveDictionary[dataFile.FilePath] = allMs1PeakCurves.SelectMany(p => p.Value).Concat(allMs2PeakCurves.SelectMany(p => p.Value)).ToList();
 
             //debug
-            var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();
+            //var sortedGroups = pfGroups.OrderByDescending(p => p.PrecursorPeakCurve.MonoisotopicMass).ToList();
 
             return pseudoMs2Scans;
         }
@@ -188,13 +188,35 @@ namespace EngineLayer.DIA
         public static Dictionary<(double min, double max), List<MsDataScan>> ConstructMs2Groups(MsDataScan[] ms2Scans)
         {
             var DIAScanWindowMap = new Dictionary<(double min, double max), List<MsDataScan>>();
+            if (ms2Scans[0].IsolationRange == null && ms2Scans[0].SelectedIonMZ != 0)
+            {
+                return ConstructMs2Groups_SelectedIonMz(ms2Scans);
+            }
             foreach (var ms2 in ms2Scans)
             {
-                (double min, double max) range = new(Math.Round(ms2.IsolationRange.Minimum, 0), Math.Round(ms2.IsolationRange.Maximum, 0));
+                (double min, double max) range = new(Math.Round(ms2.IsolationRange.Minimum, 2), Math.Round(ms2.IsolationRange.Maximum, 2));
                 if (!DIAScanWindowMap.ContainsKey(range))
                 {
-                    DIAScanWindowMap[range] = new List<MsDataScan>();
+                    DIAScanWindowMap[range] = new List<MsDataScan> { ms2 };
+                }
+                else
+                {
                     DIAScanWindowMap[range].Add(ms2);
+                }
+            }
+            return DIAScanWindowMap;
+        }
+
+        public static Dictionary<(double min, double max), List<MsDataScan>> ConstructMs2Groups_SelectedIonMz(MsDataScan[] ms2Scans)
+        {
+            double distance = (ms2Scans[1].SelectedIonMZ.Value - ms2Scans[0].SelectedIonMZ.Value)/2.0;
+            var DIAScanWindowMap = new Dictionary<(double min, double max), List<MsDataScan>>();
+            foreach (var ms2 in ms2Scans)
+            {
+                (double min, double max) range = new(Math.Round(ms2.SelectedIonMZ.Value - distance, 2), Math.Round(ms2.SelectedIonMZ.Value + distance, 2));
+                if (!DIAScanWindowMap.ContainsKey(range))
+                {
+                    DIAScanWindowMap[range] = new List<MsDataScan> { ms2 };
                 }
                 else
                 {

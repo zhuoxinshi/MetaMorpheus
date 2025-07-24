@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Plotly.NET;
 using EngineLayer.DIA;
+using Microsoft.ML.Trainers.LightGbm;
 
 namespace Test.TestDIA
 {
@@ -78,7 +79,7 @@ namespace Test.TestDIA
                     pfGroupMetricsList.Add(pfGroupMetrics);
                     foreach(var pair in pfGroup.PFpairs)
                     {
-                        var pfPair = new PFpairMetrics(pair, pfGroup, psm);
+                        var pfPair = new PFpairMetrics(pair, pfGroup, null, psm);
                         pfPairsList.Add(pfPair);
                     }
                 }
@@ -153,7 +154,6 @@ namespace Test.TestDIA
                 };
                 dataList.Add(data);
             }
-            TrainModel.Train(dataList);
         }
 
         public static double ComputeAUC(double[] scores, int[] labels)
@@ -192,7 +192,6 @@ namespace Test.TestDIA
             metricsFile.LoadResults();
             var results = metricsFile.Results.Where(pf => pf.TargetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 10).ToList();
             var pfPairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(metricsFile.Results);
-            TrainModel.Train(pfPairs);
         }
 
         [Test]
@@ -257,10 +256,54 @@ namespace Test.TestDIA
             var featureFile = new PFpairFeatureFile { Results = allPFPairs, FilePath = featureFilePath };
             featureFile.WriteResults(featureFilePath);
             var num = allPFPairs.Where(p => p.Label == true).Count();
-            TrainModel.Train(allPFPairs, true);
             var pfFilePath = @"E:\ISD Project\TestIsdDataAnalysis\TestML_pfPairMetrics_YB_PSM.tsv";
             var pfPairMetricFile = new PFpairMetricFile { FilePath = pfFilePath, Results = AllPFPairMetrics };
             pfPairMetricFile.WriteResults(pfFilePath);
+        }
+
+        [Test]
+        public static void ModelTrainingFromPFpairMetricsFile()
+        {
+            var metricsFilePath = @"E:\ISD Project\TestSearch\random\ForML\YB_rep1_JustPair_-1_neutralLoss\search\PFgrouping\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected_PFpairMetrics.tsv";
+            var metricsFile = new PFpairMetricFile { FilePath = metricsFilePath };
+            metricsFile.LoadResults();
+            var results = metricsFile.Results.Where(pf => pf.TargetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 10).ToList();
+            var featurePairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(metricsFile.Results);
+            var modelPath = @"E:\ISD Project\TestDataForML\0504YB_rep1_FastTree.zip";
+            var model = TrainModel.TrainFastTree(featurePairs, new List<string> { "Correlation", "ApexRtDelta", "FragmentIntensity", "SharedXIC"}, modelPath);
+        }
+
+        public class ModelInput
+        {
+            public float Feature1 { get; set; }
+            public float Feature2 { get; set; }
+            public bool Label { get; set; } // ← not bool
+        }
+
+        [Test]
+        public static void Debug()
+        {
+            var mlContext = new MLContext();
+            var samples = new List<ModelInput>
+            {
+                new ModelInput { Feature1 = 0.5f, Feature2 = 1.5f, Label = true },
+                new ModelInput { Feature1 = 1.0f, Feature2 = 2.0f, Label = false },
+                new ModelInput { Feature1 = 0.8f, Feature2 = 1.8f, Label = true },
+                new ModelInput { Feature1 = 1.2f, Feature2 = 2.2f, Label = false }
+            };
+            var data = mlContext.Data.LoadFromEnumerable(samples);
+            var pipeline = mlContext.Transforms.Concatenate("Features", "Feature1", "Feature2")
+                .Append(mlContext.BinaryClassification.Trainers.LightGbm(
+                    new LightGbmBinaryTrainer.Options
+                    {
+                        LabelColumnName = "Label",
+                        FeatureColumnName = "Features",
+                        NumberOfIterations = 50,
+                        LearningRate = 0.1,
+                        UseCategoricalSplit = false,
+                        Seed = 42
+                    }));
+            pipeline.Fit(data);
         }
     }
 }

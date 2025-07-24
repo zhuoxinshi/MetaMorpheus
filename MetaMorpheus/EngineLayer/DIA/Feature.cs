@@ -19,8 +19,8 @@ namespace EngineLayer.DIA
         public void GetPeakCurve()
         {
             var peakCurve = new PeakCurve();
-            var startCycle = PeakCurves.Min(p => p.StartCycle);
-            var endCycle = PeakCurves.Max(p => p.EndCycle);
+            var startCycle = PeakCurves.Min(p => p.StartScanIndex);
+            var endCycle = PeakCurves.Max(p => p.EndScanIndex);
             for (int i = startCycle; i <= endCycle; i++)
             {
                 foreach(var peak in PeakCurves)

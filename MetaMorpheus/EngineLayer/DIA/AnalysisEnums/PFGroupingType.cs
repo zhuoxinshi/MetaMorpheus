@@ -16,6 +16,8 @@ namespace EngineLayer.DIA
         Umpire,
         MassCurveRT,
         SharedXIC,
-        JustPair
+        JustPair,
+        ML,
+        RetentionTime_tree,
     }
 }

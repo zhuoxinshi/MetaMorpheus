@@ -1,13 +1,17 @@
 ﻿using Chemistry;
+using EngineLayer.FdrAnalysis;
 using MassSpectrometry;
+using Microsoft.ML;
 using MzLibUtil;
 using Plotly.NET;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ThermoFisher.CommonCore.Data.Business;
+using Accord.Collections;
+using C5;
 
 namespace EngineLayer.DIA
 {
@@ -83,10 +87,6 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
-                //if (ms2curve.ApexIntensity > precursor.ApexIntensity)
-                //{
-                //    continue;
-                //}
                 if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                 {
                     var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
@@ -105,6 +105,43 @@ namespace EngineLayer.DIA
                     }
                 }
 
+            }
+            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
+            //{
+            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
+            //    preFragGroup.PFpairs = filtered.ToList();
+            //}
+            if (preFragGroup.PFpairs.Count > 0)
+            {
+                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
+                return preFragGroup;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public static PrecursorFragmentsGroup GroupPrecursorFragments_tree(PeakCurve precursor, TreeDictionary<double, List<PeakCurve>> ms2curves, DIAparameters DIAparameters)
+        {
+            var preFragGroup = new PrecursorFragmentsGroup(precursor);
+            var eligibleMs2curves = ms2curves.RangeFromTo(precursor.ApexRT - DIAparameters.ApexRtTolerance, precursor.ApexRT + DIAparameters.ApexRtTolerance).SelectMany(kv => kv.Value).ToList();
+            foreach (var ms2curve in eligibleMs2curves)
+            {
+                var overlap = PrecursorFragmentPair.CalculateRTOverlapRatio(precursor, ms2curve);
+                if (overlap > DIAparameters.OverlapRatioCutOff)
+                {
+                    double corr = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                    if (corr > DIAparameters.CorrelationCutOff)
+                    {
+                        var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr);
+                        lock (ms2curve.PFpairs)
+                        {
+                            ms2curve.PFpairs.Add(PFpair);
+                        }
+                        preFragGroup.PFpairs.Add(PFpair);
+                    }
+                }
             }
             //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
             //{
@@ -136,6 +173,10 @@ namespace EngineLayer.DIA
                         double sharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursor, ms2curve);
                         var PFpair = new PrecursorFragmentPair(precursor, ms2curve, overlap, corr, sharedXIC);
                         preFragGroup.PFpairs.Add(PFpair);
+                        lock(ms2curve.PFpairs)
+                        {
+                            ms2curve.PFpairs.Add(PFpair);
+                        }
                     }
                 }
             }
@@ -154,13 +195,48 @@ namespace EngineLayer.DIA
             }
         }
 
+        public static List<PrecursorFragmentsGroup> PFGroups_ML(List<PeakCurve> allMs1PeakCurves, List<PeakCurve> ms2curves, DIAparameters diaParam, string modelPath)
+        {
+            var pfGroups = new List<PrecursorFragmentsGroup>(); 
+            var mlContext = new MLContext();
+            var model = mlContext.Model.Load(modelPath, out var modelInputSchema);
+            var predictionEngine = mlContext.Model.CreatePredictionEngine<PFPairFeature, PFpairPrediction>(model);
+            Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+                (partitionRange, loopState) =>
+                {
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        var precursor = allMs1PeakCurves[i];
+                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+                        {
+                            continue;
+                        }
+                        var pfGroup = new PrecursorFragmentsGroup(precursor);
+                        foreach (var ms2curve in ms2curves)
+                        {
+                            if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= diaParam.ApexRtTolerance)
+                            {
+                                var pfPairFeature = new PFPairFeature(precursor, ms2curve);
+                                var prediction = predictionEngine.Predict(pfPairFeature);
+                                if (prediction.Probability >= diaParam.MLProbThreshold)
+                                {
+                                    pfGroup.PFpairs.Add(new PrecursorFragmentPair(precursor, ms2curve));
+                                }
+                            }
+                        }
+                        if (pfGroup.PFpairs.Count > 0)
+                        {
+                            lock(pfGroups)
+                                pfGroups.Add(pfGroup);
+                        }
+                    }
+                });
+            
+            return pfGroups;
+        }
+
         public static PrecursorFragmentsGroup UmpireGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)
         {
-            //if (Math.Abs(precursor.MonoisotopicMass - 9461) < 1 && precursor.Charge == 12)
-            //{
-            //    //debug
-            //    int stop = 0;
-            //}
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
@@ -182,14 +258,6 @@ namespace EngineLayer.DIA
                     }
                 }
             }
-            //if (preFragGroup.PFpairs.Count > DIAparameters.FragmentRankCutOff)
-            //{
-            //    var filtered = preFragGroup.PFpairs.OrderByDescending(pair => pair.Correlation).Take(DIAparameters.FragmentRankCutOff);
-            //    preFragGroup.PFpairs = filtered.ToList();
-            //}
-
-            //debug
-            var allFragMzs = preFragGroup.PFpairs.Select(pf => pf.FragmentPeakCurve.Peaks.First().HighestPeakMz).OrderBy(p => p).ToList();
             if (preFragGroup.PFpairs.Count > 0)
             {
                 preFragGroup.PFpairs = preFragGroup.PFpairs.OrderBy(pair => pair.FragmentPeakCurve.AveragedMz).ToList();
@@ -206,12 +274,12 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
 
             //Get all ms2 XICs in range
-            var ms2curvesInRange = ms2curves.Where(p => (p.StartCycle >= precursor.StartCycle && p.StartCycle <= precursor.EndCycle)
-            || (p.EndCycle >= precursor.StartCycle && p.EndCycle <= precursor.EndCycle)).ToList();
+            var ms2curvesInRange = ms2curves.Where(p => (p.StartScanIndex >= precursor.StartScanIndex && p.StartScanIndex <= precursor.EndScanIndex)
+            || (p.EndScanIndex >= precursor.StartScanIndex && p.EndScanIndex <= precursor.EndScanIndex)).ToList();
 
             foreach (var ms2curve in ms2curvesInRange)
             {
-                var ms2peaks = ms2curve.Peaks.Where(p => p.ZeroBasedScanIndex >= precursor.StartCycle && p.ZeroBasedScanIndex <= precursor.EndCycle).ToList();
+                var ms2peaks = ms2curve.Peaks.Where(p => p.ZeroBasedScanIndex >= precursor.StartScanIndex && p.ZeroBasedScanIndex <= precursor.EndScanIndex).ToList();
                 if (ms2peaks.Count < 5)
                 {
                     continue;

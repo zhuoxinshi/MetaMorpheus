@@ -397,7 +397,7 @@ namespace EngineLayer.DIA
             var preFragGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in ms2curves)
             {
-                if (ms2curve.ApexCycle >= precursor.StartCycle && ms2curve.ApexCycle <= precursor.EndCycle)
+                if (ms2curve.ApexScanIndex >= precursor.StartScanIndex && ms2curve.ApexScanIndex <= precursor.EndScanIndex)
                 {
                     if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= DIAparameters.ApexRtTolerance)
                     {

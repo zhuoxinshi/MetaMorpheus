@@ -30,30 +30,35 @@ namespace Test.TestDIA
             SearchTask task = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
-            string outputFolder = @"E:\DIA\TestSearch\bu-DIAEngine_static_deconHighestPeak-Peak_Umpire_corr0.5_apex0.2_overlap0.2_frag100_pre10_maxRT0.5_num2_massCurve";
+            //task.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            string outputFolder = @"E:\DIA\TestSearch\bu-DIAEngine_static_deconHighestPeak-JustPair_num4_targetOnly_writeLib_numIsotopes3";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
             task.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(5), new PpmTolerance(20), 
-                maxNumMissedScan:1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance:0.2, 
-                fragmentRankCutOff: 100, precursorRankCutOff: 10, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
-                precursorIntensityCutOff: 300000, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMS1Mass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
-                scanCycleSplineInterval: 0.005, ms1XICType: XICType.MassCurve, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.Umpire,
-                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, 
-                splineRtInterval: 0.005, ms1NumPeaksThreshold: 2);
+                maxNumMissedScan:1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance: 0.5, 
+                fragmentRankCutOff: 1000, precursorRankCutOff: 1000, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
+                precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMS1Mass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
+                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.JustPair,
+                pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, 
+                splineRtInterval: 0.005, ms1NumPeaksThreshold: 4, ms2NumPeaksThreshold: 4, neutralLossSearch: true, numIsotopes: 3);
             // Use reflection to set max threads
             //task.CommonParameters.GetType().GetProperty("MaxThreadsToUsePerFile").SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
             //var type = task.CommonParameters.GetType();
             //var property = type.GetProperty("MaxThreadsToUsePerFile");
             //property.SetMethod.Invoke(task.CommonParameters, new object[] { 1 });
 
+            //match all charge fragment ions
+            task.SearchParameters.WriteSpectralLibrary = true;
+
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
+            string umpireFile = @"E:\DIA\DIA-Umpire data\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
             string benchmarkDb = @"E:\REF_EColi_K12_UPS1_combined.fasta";
             string humanDb = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
             string yeast_xml = @"E:\ISD Project\ISD_240812\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
-            task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
-        }
+            task.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { umpireFile }, "test");
+         }
 
         [Test]
         public static void TestTopDownDIASearch()
@@ -220,8 +225,8 @@ namespace Test.TestDIA
             var filePath50 = @"E:\ISD Project\ISD_250428\YD_ISD_cali-avg_1.0.8\Task2-AveragingTask\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected-calib-averaged.mzML";
             
 
-            var fileList = new List<string> { filePath50 };//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\random\YD_averaged_try50ppm";
+            var fileList = new List<string> { filePath13, };//filePath21, filePath22, filePath23,
+            var outputFolder = @"E:\ISD Project\TestSearch\random\0429yd_test-speed";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -235,16 +240,16 @@ namespace Test.TestDIA
             string tomlFile_variableMods = @"E:\ISD Project\ISD_250428\variableMods\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_FixedOnly_noInternal = @"E:\ISD Project\ISD_250428\0504YB_rep_DDA_gptmd-xml_prunedDb_noInternal\Task Settings\Task2-SearchTaskconfig.toml";
 
-            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
-            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmToleranceWithNotch(50, 2), new PpmToleranceWithNotch(50, 2),
-                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.3, correlationCutOff: 0.5, apexRtTolerance: 0.3,
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+            //searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
+                maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance: 0.3,
                 fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
-                precursorSNRCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
+                precursorSNRCutOff: 0.01, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.005f, type: "DIA",
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
+        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.ExtendedCycleSpline, ms2SplineType: SplineType.ExtendedCycleSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold:2, combineFragments: true, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5) ;
+                ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold:2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5) ;
 
             //match all charge fragment ions
             searchTask.SearchParameters.WriteSpectralLibrary = true;
@@ -263,7 +268,7 @@ namespace Test.TestDIA
             var cali_task = Toml.ReadFile<CalibrationTask>(cali_toml, MetaMorpheusTask.tomlConfig);
             cali_task.CommonParameters = searchTask.CommonParameters.Clone();
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
 
             string YC_gptmd = @"E:\CE\250318_CE\YC_cali-avged_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
@@ -524,7 +529,7 @@ namespace Test.TestDIA
             var file = new PFpairMetricFile(pfPairMetricsFilePath);
             file.LoadResults();
             var outputPath = pfPairMetricsFilePath.Replace(".tsv", "_neutralLossResearch.tsv");
-            var newFile = TrainModel.NeutralLossResearchFromPFpairMetricsFile(file, new List<double> { 18.010564684, 17.0265491 });
+            var newFile = PFpairMetricFile.NeutralLossResearchFromPFpairMetricsFile(file, new List<double> { 18.010564684, 17.0265491 });
             newFile.WriteResults(outputPath);
         }
 
@@ -735,14 +740,14 @@ namespace Test.TestDIA
             var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";
             string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
 
-            var fileList2 = new List<string> { filePathB, filePathC, filePathD, filePathE };
-            var outFolder2 = @"E:\ISD Project\TestSearch\ASMS\ind_nocali";
+            var fileList2 = new List<string> {  filePathD};
+            var outFolder2 = @"E:\ISD Project\TestSearch\ASMS\ind_nocali_testSpeed-D";
             if (!Directory.Exists(outFolder))
             {
                 Directory.CreateDirectory(outFolder);
             }
-            var corrList = new List<double> { 0.25, 0.5, 0.75 };
-            var apexList = new List<double> { 0.15, 0.3, 0.5 };
+            var corrList = new List<double> { 0.5, 0.75 };
+            var apexList = new List<double> { 0.3, 0.5 };
 
             foreach(double corr in corrList)
             {
@@ -751,10 +756,10 @@ namespace Test.TestDIA
                     foreach (var file in fileList2)
                     {
                         var searchList = new List<string> { file };
-                        SearchTask searchTask1 = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+                        SearchTask searchTask1 = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
                         var resultFolder = Path.Combine(outFolder2, Path.GetFileNameWithoutExtension(file), $"{corr}, {apex}");
                         searchTask1.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
-                       maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0, correlationCutOff: corr, apexRtTolerance: apex,
+                       maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: corr, apexRtTolerance: apex,
                        fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                        precursorIntensityCutOff: 0.01, splineTimeInterval: 0.005f, type: "DIA", scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
                        ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
@@ -766,13 +771,12 @@ namespace Test.TestDIA
                             Directory.CreateDirectory(resultFolder);
                         }
                         gptmdTask.CommonParameters = searchTask1.CommonParameters;
-                        var taskList = new List<(string, MetaMorpheusTask)> {  ("search", searchTask1) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+                        var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask1) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
                         var engine = new EverythingRunnerEngine(taskList, searchList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, resultFolder);
                         engine.Run();
                     }
                 }
             }
-            
         }
 
         [Test]

@@ -20,8 +20,7 @@ using System.Xml.Linq;
 using EngineLayer.DIA.CWT;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.Optimization;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using static Python.Runtime.TypeSpec;
+using C5;
 
 namespace EngineLayer.DIA
 {
@@ -58,20 +57,20 @@ namespace EngineLayer.DIA
         public MzRange IsolationRange { get; set; }
         public double MonoisotopicMass { get; set; }
         public int Charge { get; set; }
-        public double StartRT => Peaks.Select(p => p.RetentionTime).OrderBy(t => t).First();
-        public double EndRT => Peaks.Select(p => p.RetentionTime).OrderByDescending(t => t).First();
-        public int StartCycle => Peaks.Select(p => p.ZeroBasedScanIndex).OrderBy(t => t).First();
-        public int EndCycle => Peaks.Select(p => p.ZeroBasedScanIndex).OrderByDescending(t => t).First();
+        public double StartRT { get; set; }
+        public double EndRT { get; set; }
+        public int StartScanIndex { get; set; }
+        public int EndScanIndex { get; set; }
         public double StartMz {  get; set; }
         public double EndMz { get; set; }
         public MzRange MzRange => new MzRange(StartMz, EndMz);
-        public double ApexRT => Peaks.OrderByDescending(p => p.Intensity).First().RetentionTime;
-        public int ApexCycle => Peaks.OrderByDescending(p => p.Intensity).First().ZeroBasedScanIndex;
-        public double ApexSN => Peaks.OrderByDescending(p => p.Intensity).First().SN;
-        public double ApexIntensity => Peaks.Max(p => p.Intensity);
-        public double TotalIntensity => Peaks.Sum(p => p.Intensity);
-        public virtual double AveragedMz => AverageMz();
-        public double AveragedIntensity => AverageIntensity();
+        public double ApexRT { get; set; }
+        public int ApexScanIndex { get; set; }
+        public double ApexSN { get; set; }
+        public double ApexIntensity  { get; set; }
+        public double TotalIntensity { get; set; }
+        public virtual double AveragedMz { get; set; }
+        public double AveragedIntensity { get; set; }
         public LinearSpline LinearSpline { get; set; }
         public CubicSpline CubicSpline { get; set; }    
         public CubicSpline Ms1SpaceSpline { get; set; }
@@ -94,6 +93,35 @@ namespace EngineLayer.DIA
         public (int, double)[] NormalizedLinearSplinePeaks { get; set; }
 
         public double AveragedMass => AverageMass();
+
+        public void SetXicInfo()
+        {
+            ApexRT = Peaks.OrderByDescending(p => p.Intensity).First().RetentionTime;
+            StartRT = Peaks.Min(p => p.RetentionTime);
+            EndRT = Peaks.Max(p => p.RetentionTime);
+            ApexScanIndex = Peaks.OrderByDescending(p => p.Intensity).First().ZeroBasedScanIndex;
+            StartScanIndex = Peaks.Min(p => p.ZeroBasedScanIndex);
+            EndScanIndex = Peaks.Max(p => p.ZeroBasedScanIndex);
+            ApexIntensity = Peaks.Max(p => p.Intensity);
+            AveragedMz = AverageMz();
+            AveragedIntensity = AverageIntensity();
+            ApexSN = Peaks.OrderByDescending(p => p.Intensity).First().SN;
+            TotalIntensity = Peaks.Sum(p => p.Intensity);
+        }
+
+        public static TreeDictionary<double, List<PeakCurve>> GetPeakCurveTree(List<PeakCurve> peakCurves)
+        {
+            var peakCurveTree = new TreeDictionary<double, List<PeakCurve>>();
+            foreach (var peakCurve in peakCurves)
+            {
+                if (!peakCurveTree.Contains(peakCurve.ApexRT))
+                {
+                    peakCurveTree[peakCurve.ApexRT] = new List<PeakCurve>();
+                }
+                peakCurveTree[peakCurve.AveragedMz].Add(peakCurve);
+            }
+            return peakCurveTree;
+        }
 
         public virtual double AverageMz()
         {
@@ -163,20 +191,20 @@ namespace EngineLayer.DIA
             var intensityArray = Peaks.Select(p => p.Intensity).ToArray();
             var linearSpline = LinearSpline.InterpolateSorted(cycleArray, intensityArray);
 
-            int maxLength = EndCycle - StartCycle + 1;
+            int maxLength = EndScanIndex - StartScanIndex + 1;
             var linearSplinePeaks = new (int, double)[maxLength];
             NormalizedLinearSplinePeaks = new (int, double)[maxLength];
             for (int i = 0; i < maxLength; i++)
             {
                 int j = 0;
-                if (Peaks[j].ZeroBasedScanIndex == StartCycle + i)
+                if (Peaks[j].ZeroBasedScanIndex == StartScanIndex + i)
                 {
                     linearSplinePeaks[i] = (Peaks[i].ZeroBasedScanIndex, Peaks[i].Intensity);
                     j++;
                 }
                 else
                 {
-                    linearSplinePeaks[i] = (StartCycle + i, linearSpline.Interpolate((double) (StartCycle + i)));
+                    linearSplinePeaks[i] = (StartScanIndex + i, linearSpline.Interpolate((double) (StartScanIndex + i)));
                 }
             }
             for (int i = 0; i < maxLength; i++)
@@ -341,7 +369,7 @@ namespace EngineLayer.DIA
             double[] imputedY = ImputeMissingValues(CubicSpline, out double[] rtArray);
             double[] y = CalculateSavgolSmoothedData(imputedY, windowSize);
             XYData = new (double, double)[y.Length];
-            double cycleInterval = (double)(EndCycle - StartCycle) / (y.Length - 1);
+            double cycleInterval = (double)(EndScanIndex - StartScanIndex) / (y.Length - 1);
             for (int i = 0; i < y.Length; i++)
             {
                 XYData[i] = (rtArray[i], y[i]);
@@ -404,12 +432,12 @@ namespace EngineLayer.DIA
 
         public void GetScanCycleCubicSplineXYData(double splineCycleInterval)
         {
-            int numPoints = (int)Math.Floor((EndCycle - StartCycle) / splineCycleInterval) + 1;
+            int numPoints = (int)Math.Floor((EndScanIndex - StartScanIndex) / splineCycleInterval) + 1;
             double splineRtInterval = (EndRT - StartRT) / (numPoints - 1);
             GetCubicSplineXYData(splineRtInterval);
             for (int i = 0; i < XYData.Length; i++)
             {
-                var cyclePoint = StartCycle + i * splineCycleInterval;
+                var cyclePoint = StartScanIndex + i * splineCycleInterval;
                 XYData[i] = (cyclePoint, XYData[i].Item2);
             }
         }
@@ -454,8 +482,8 @@ namespace EngineLayer.DIA
             var ms1SpaceCubicSpline = CubicSpline.InterpolateAkima(ms1SpaceRts, Peaks.Select(p => p.Intensity).ToArray());
 
             double meanInterval = CalculateAverageInterval();
-            var numPoints = EndCycle - StartCycle + 1;
-            int[] cycles = Enumerable.Range(StartCycle, numPoints).ToArray();
+            var numPoints = EndScanIndex - StartScanIndex + 1;
+            int[] cycles = Enumerable.Range(StartScanIndex, numPoints).ToArray();
             var x = new double[numPoints];
             var y = new double[numPoints];
             var indexList = Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
@@ -570,7 +598,7 @@ namespace EngineLayer.DIA
             var sortedIndex = Peaks.Select(p => (double)p.ZeroBasedScanIndex).OrderBy(t => t).ToArray();
             var sortedIntensity = Peaks.Select(p => p.Intensity).ToArray();
             var spline = CubicSpline.InterpolateAkima(sortedIndex, sortedIntensity);
-            XYData = CalculateSpline(StartCycle, EndCycle, interval, spline);
+            XYData = CalculateSpline(StartScanIndex, EndScanIndex, interval, spline);
             if (XYData.Select(xy => xy.Item2).Contains(double.NaN))
             {
                 int stop = 0;
@@ -597,8 +625,8 @@ namespace EngineLayer.DIA
         private double[] ImputeMissingValues(IInterpolation spline, out double[] x)
         {
             double meanInterval = CalculateAverageInterval();
-            var numPoints = EndCycle - StartCycle + 1;
-            int[] cycles = Enumerable.Range(StartCycle, numPoints).ToArray();
+            var numPoints = EndScanIndex - StartScanIndex + 1;
+            int[] cycles = Enumerable.Range(StartScanIndex, numPoints).ToArray();
             var rts = Peaks.Select(p => p.RetentionTime).ToArray();
             x = new double[numPoints];
             var y = new double[numPoints];

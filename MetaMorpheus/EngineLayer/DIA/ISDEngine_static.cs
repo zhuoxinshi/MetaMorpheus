@@ -12,6 +12,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TopDownProteomics;
+using C5;
 
 namespace EngineLayer.DIA
 {
@@ -60,41 +61,65 @@ namespace EngineLayer.DIA
 
             //precursor fragment grouping
             var pfGroups = new List<PrecursorFragmentsGroup>();
-            var allFragments = allMs2PeakCurves.Values.SelectMany(p => p).ToList();
+            //if (diaParam.PFGroupingType != PFGroupingType.ML && diaParam.PFGroupingType != PFGroupingType.RetentionTime_tree)
+            //{
+            //    if (diaParam.CombineFragments == false)
+            //    {
+            //        foreach (var ms2Group in allMs2PeakCurves)
+            //        {
+            //            var groups = GetAllPfGroups2(allMs1PeakCurves, ms2Group.Value, diaParam);
+            //            pfGroups.AddRange(groups);
+            //        }
+            //    }
+            //    else
+            //    {
+            //        var allFragments = allMs2PeakCurves.Values.SelectMany(p => p).ToList();
+            //        pfGroups = GetAllPfGroups2(allMs1PeakCurves, allFragments, diaParam);
+            //    }
+            //}
+            //else if (diaParam.PFGroupingType == PFGroupingType.ML)
+            //{
+            //    foreach (var ms2Group in allMs2PeakCurves)
+            //    {
+            //        var groups = PrecursorFragmentsGroup.PFGroups_ML(allMs1PeakCurves, ms2Group.Value, diaParam, diaParam.MLModelPath);
+            //        pfGroups.AddRange(groups);
+            //    }
+            //} 
             Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
-                (partitionRange, loopState) =>
-                {
-                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    (partitionRange, loopState) =>
                     {
-                        var precursor = allMs1PeakCurves[i];
-                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+                        for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                         {
-                            continue;
-                        }
-
-                        if (diaParam.CombineFragments == false)
-                        {
-                            foreach (var fragments in allMs2PeakCurves.Values)
+                            var precursor = allMs1PeakCurves[i];
+                            if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
                             {
-                                var pfGroup = PFgrouping(precursor, fragments, diaParam);
-                                if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                                continue;
+                            }
+
+                            if (diaParam.CombineFragments == false)
+                            {
+                                foreach (var fragments in allMs2PeakCurves.Values)
                                 {
-                                    lock (pfGroups)
-                                        pfGroups.Add(pfGroup);
-                                    //pfGroup.VisualizeXYData().Show();
+                                    var pfGroup = PFgrouping(precursor, fragments, diaParam);
+                                    if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                                    {
+                                        lock (pfGroups)
+                                            pfGroups.Add(pfGroup);
+                                        //pfGroup.VisualizeXYData().Show();
+                                    }
                                 }
                             }
-                        } else
-                        {
-                            var pfGroup = PFgrouping(precursor, allFragments, diaParam);
-                            if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                            else
                             {
-                                lock (pfGroups)
-                                    pfGroups.Add(pfGroup);
+                                //var pfGroup = PFgrouping(precursor, allFragments, diaParam);
+                                //if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                                //{
+                                //    lock (pfGroups)
+                                //        pfGroups.Add(pfGroup);
+                                //}
                             }
                         }
-                    }
-                });
+                    });
 
             //precursor fragment rank filtering
             if (diaParam.RankFilter)
@@ -206,8 +231,36 @@ namespace EngineLayer.DIA
             {
                 pc.Index = index;
                 index++;
+                pc.SetXicInfo();
             }
             return peakCurves;
+        }
+
+        public static List<PrecursorFragmentsGroup> GetAllPFgroups(List<PeakCurve> allMs1PeakCurves, Dictionary<double, List<PeakCurve>> allMs2PeakCurves, DIAparameters diaParam)
+        {
+            var pfGroups = new List<PrecursorFragmentsGroup>();
+            switch (diaParam.PFGroupingType)
+            {
+                case PFGroupingType.ML:
+                    foreach (var ms2Group in allMs2PeakCurves)
+                    {
+                        var groups = PrecursorFragmentsGroup.PFGroups_ML(allMs1PeakCurves, ms2Group.Value, diaParam, diaParam.MLModelPath);
+                        pfGroups.AddRange(groups);
+                    }
+                    return pfGroups;
+                case PFGroupingType.RetentionTime_tree:
+                    foreach (var ms2Group in allMs2PeakCurves)
+                    {
+                        var ms2Tree = PeakCurve.GetPeakCurveTree(ms2Group.Value);
+                        foreach(var precursor in allMs1PeakCurves)
+                        {
+                            var group = PrecursorFragmentsGroup.GroupPrecursorFragments_tree(precursor, ms2Tree, diaParam);
+                            if (group != null) pfGroups.Add(group);
+                        }
+                    }
+                    return pfGroups;
+                default: return null;
+            }
         }
 
         public static void PeakCurveSpline(PeakCurve pc, SplineType splineType, DIAparameters diaParam)
@@ -575,6 +628,31 @@ namespace EngineLayer.DIA
             }
         }
 
+        public static List<PrecursorFragmentsGroup> GetAllPfGroups2(List<PeakCurve> precursors, List<PeakCurve> fragments, DIAparameters diaParam)
+        {
+            var allGroups = new List<PrecursorFragmentsGroup>();
+            Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+                (partitionRange, loopState) =>
+                {
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        var precursor = precursors[i];
+                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+                        {
+                            continue;
+                        }
+
+                        var pfGroup = PFgrouping(precursor, fragments, diaParam);
+                        if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                        {
+                            lock (allGroups)
+                                allGroups.Add(pfGroup);
+                            //pfGroup.VisualizeXYData().Show();
+                        }
+                    }
+                });
+            return allGroups;
+        }
 
         public static Ms2ScanWithSpecificMass ConstructNewMs2Scans(PrecursorFragmentsGroup pfGroup, CommonParameters commonParameters, PseudoMs2ConstructionType pseudoMs2Type, string dataFilePath)
         {
@@ -716,6 +794,41 @@ namespace EngineLayer.DIA
             }
             return map;
         }
+
+    //    Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+    //            (partitionRange, loopState) =>
+    //            {
+    //                for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+    //                {
+    //                    var precursor = allMs1PeakCurves[i];
+    //                    if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+    //                    {
+    //                        continue;
+    //                    }
+
+    //                    if (diaParam.CombineFragments == false)
+    //                    {
+    //                        foreach (var fragments in allMs2PeakCurves.Values)
+    //                        {
+    //                            var pfGroup = PFgrouping(precursor, fragments, diaParam);
+    //                            if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+    //                            {
+    //                                lock (pfGroups)
+    //                                    pfGroups.Add(pfGroup);
+    //                                //pfGroup.VisualizeXYData().Show();
+    //                            }
+    //                        }
+    //                    } else
+    //                    {
+    //                        var pfGroup = PFgrouping(precursor, allFragments, diaParam);
+    //                        if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+    //                        {
+    //                            lock (pfGroups)
+    //                                pfGroups.Add(pfGroup);
+    //                        }
+    //                    }
+    //                }
+    //            });
     }
 }
     

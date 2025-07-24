@@ -197,35 +197,35 @@ namespace EngineLayer.DIA
 
         public static double CalculateRTOverlapRatio(PeakCurve curve1, PeakCurve curve2)
         {
-            if (curve1.StartCycle <= curve2.StartCycle && curve1.EndCycle >= curve2.EndCycle)
+            if (curve1.StartScanIndex <= curve2.StartScanIndex && curve1.EndScanIndex >= curve2.EndScanIndex)
             {
                 return 1;
             }
-            int maxStart = Math.Max(curve1.StartCycle, curve2.StartCycle);
-            int minEnd = Math.Min(curve1.EndCycle, curve2.EndCycle);
-            int minStart = Math.Min(curve1.StartCycle, curve2.StartCycle);
-            int maxEnd = Math.Max(curve1.EndCycle, curve2.EndCycle);
+            int maxStart = Math.Max(curve1.StartScanIndex, curve2.StartScanIndex);
+            int minEnd = Math.Min(curve1.EndScanIndex, curve2.EndScanIndex);
+            int minStart = Math.Min(curve1.StartScanIndex, curve2.StartScanIndex);
+            int maxEnd = Math.Max(curve1.EndScanIndex, curve2.EndScanIndex);
             return (maxEnd - minStart) == 0 ? 0 : (minEnd - maxStart) / (double)(maxEnd - minStart);
         }
 
         public static double CalculateRTOverlapRatio_scanCycle(PeakCurve curve1, PeakCurve curve2)
         {
             double overlap = 0;
-            var ms1rtrange = curve1.EndCycle - curve1.StartCycle;
-            var ms2rtrange = curve2.EndCycle - curve2.StartCycle;
-            if (curve1.StartCycle >= curve2.StartCycle && curve1.StartCycle <= curve2.EndCycle && curve1.EndCycle >= curve2.EndCycle)
+            var ms1rtrange = curve1.EndScanIndex - curve1.StartScanIndex;
+            var ms2rtrange = curve2.EndScanIndex - curve2.StartScanIndex;
+            if (curve1.StartScanIndex >= curve2.StartScanIndex && curve1.StartScanIndex <= curve2.EndScanIndex && curve1.EndScanIndex >= curve2.EndScanIndex)
             {
-                overlap = (curve2.EndCycle - curve1.StartCycle) / ms1rtrange;
+                overlap = (curve2.EndScanIndex - curve1.StartScanIndex) / ms1rtrange;
             }
-            else if (curve1.EndCycle >= curve2.StartCycle && curve1.EndCycle <= curve2.EndCycle && curve1.StartCycle <= curve2.StartCycle)
+            else if (curve1.EndScanIndex >= curve2.StartScanIndex && curve1.EndScanIndex <= curve2.EndScanIndex && curve1.StartScanIndex <= curve2.StartScanIndex)
             {
-                overlap = (curve1.EndCycle - curve2.StartCycle) / ms1rtrange;
+                overlap = (curve1.EndScanIndex - curve2.StartScanIndex) / ms1rtrange;
             }
-            else if (curve1.StartCycle <= curve2.StartCycle && curve1.EndCycle >= curve2.EndCycle)
+            else if (curve1.StartScanIndex <= curve2.StartScanIndex && curve1.EndScanIndex >= curve2.EndScanIndex)
             {
                 overlap = ms2rtrange / ms1rtrange;
             }
-            else if (curve1.StartCycle >= curve2.StartCycle && curve1.EndCycle <= curve2.EndCycle)
+            else if (curve1.StartScanIndex >= curve2.StartScanIndex && curve1.EndScanIndex <= curve2.EndScanIndex)
             {
                 overlap = 1;
             }
@@ -234,10 +234,10 @@ namespace EngineLayer.DIA
 
         public static double CalculateRTOverlapRatio_scanCycle2(PeakCurve curve1, PeakCurve curve2)
         {
-            var start = Math.Min(curve1.StartCycle, curve2.StartCycle);
-            var end = Math.Max(curve1.EndCycle, curve2.EndCycle);
-            var overlapStart = Math.Max(curve1.StartCycle, curve2.StartCycle);
-            var overlapEnd = Math.Min(curve1.EndCycle, curve2.EndCycle);
+            var start = Math.Min(curve1.StartScanIndex, curve2.StartScanIndex);
+            var end = Math.Max(curve1.EndScanIndex, curve2.EndScanIndex);
+            var overlapStart = Math.Max(curve1.StartScanIndex, curve2.StartScanIndex);
+            var overlapEnd = Math.Min(curve1.EndScanIndex, curve2.EndScanIndex);
 
             double overlap = (overlapEnd - overlapStart)/(end - start);
             return overlap;
@@ -431,8 +431,8 @@ namespace EngineLayer.DIA
             var scanCycles1 = peakList1.Select(p => p.ZeroBasedScanIndex).ToArray();
             var scanCycles2 = peakList2.Select(p => p.ZeroBasedScanIndex).ToArray();
 
-            var start = (int)Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var end = (int)Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var start = (int)Math.Max(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var end = (int)Math.Min(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
             int numPoints = end - start  + 1;
             if (numPoints < 6)
             {
@@ -467,8 +467,8 @@ namespace EngineLayer.DIA
         public static double CalculateCorr_scanCycleSpline_preCalculated(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
             double interval = peakCurve1.ScanCycleSmoothedData[1].Item1 - peakCurve1.ScanCycleSmoothedData[0].Item1;
-            var start = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var end = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var start = Math.Max(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var end = Math.Min(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
             var numPoints = (int)((end - start) / interval) + 1;
             if (numPoints < 6)
             {
@@ -494,10 +494,10 @@ namespace EngineLayer.DIA
 
         public static double CalculateOverlapAreaRatio(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
-            var start = Math.Min(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var end = Math.Max(peakCurve1.EndCycle, peakCurve2.EndCycle);
-            var overlapStart = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var overlapEnd = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var start = Math.Min(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var end = Math.Max(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
+            var overlapStart = Math.Max(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var overlapEnd = Math.Min(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
 
             if (peakCurve1.NormalizedPeaks == null)
             {
@@ -544,13 +544,13 @@ namespace EngineLayer.DIA
 
         public static double CalculateSharedXIC(PeakCurve peakCurve1, PeakCurve peakCurve2, bool visualize = false)
         {
-            if (peakCurve1.EndCycle <= peakCurve2.StartCycle || peakCurve2.EndCycle <= peakCurve1.StartCycle)
+            if (peakCurve1.EndScanIndex <= peakCurve2.StartScanIndex || peakCurve2.EndScanIndex <= peakCurve1.StartScanIndex)
             {
                 return 0;
             }
 
-            var overlapStart = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var overlapEnd = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var overlapStart = Math.Max(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var overlapEnd = Math.Min(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
             var maxLength = overlapEnd - overlapStart + 1;
 
             var overlapArea = new List<(double, double)>();
@@ -594,10 +594,10 @@ namespace EngineLayer.DIA
 
         public static double CalculateOverlapAreaRatio_spline(PeakCurve peakCurve1, PeakCurve peakCurve2)
         {
-            var start = Math.Min(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var end = Math.Max(peakCurve1.EndCycle, peakCurve2.EndCycle);
-            var overlapStart = Math.Max(peakCurve1.StartCycle, peakCurve2.StartCycle);
-            var overlapEnd = Math.Min(peakCurve1.EndCycle, peakCurve2.EndCycle);
+            var start = Math.Min(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var end = Math.Max(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
+            var overlapStart = Math.Max(peakCurve1.StartScanIndex, peakCurve2.StartScanIndex);
+            var overlapEnd = Math.Min(peakCurve1.EndScanIndex, peakCurve2.EndScanIndex);
 
             if (peakCurve1.NormalizedPeaks == null)
             {

@@ -1013,7 +1013,7 @@ namespace TaskLayer
             {
                 var DIApsmsGroupedByFile = FilteredPsms.Filter(Parameters.AllPsms,
                 CommonParameters,
-                includeDecoys: true,
+                includeDecoys: false,
                 includeContaminants: false,
                 includeAmbiguous: true,
                 includeHighQValuePsms: true).FilteredPsmsList.GroupBy(f => f.FullFilePath);
@@ -1035,7 +1035,7 @@ namespace TaskLayer
                     var pfPairsToWrite = new List<PFpairMetrics>();
                     var psmsOfThisFile = DIApsmsGroupedByFile.Where(g => g.Key == file.Key).First().OrderBy(psm => psm.ScanNumber).ToArray();
 
-                    var pfPairMetricsFile = PFpairMetricFile.GetAllPFpairsFromPfGroupAndPsms(file.Value, psmsOfThisFile, CommonParameters.DIAparameters.NeutralLossSearch);
+                    var pfPairMetricsFile = PFpairMetricFile.GetAllPFpairsFromPfGroupAndPsms(file.Value, psmsOfThisFile, CommonParameters.DIAparameters);
                     string name = Path.GetFileNameWithoutExtension(file.Key);
                     string pfPairMetricsFilePath = Path.Combine(folderPath, name + "_PFpairMetrics.tsv");
                     pfPairMetricsFile.WriteResults(pfPairMetricsFilePath);
@@ -1058,32 +1058,38 @@ namespace TaskLayer
                     peakCurveMetricsFile.WriteResults(Path.Combine(folderPath, name + "_PeakCurveMetrics.tsv"));
 
                     //quant
-                    var psmsForQuant = FilteredPsms.Filter(Parameters.AllPsms,
+                    if (CommonParameters.DIAparameters.DoQuant)
+                    {
+                        var psmsForQuant = FilteredPsms.Filter(Parameters.AllPsms,
                         CommonParameters,
                         includeDecoys: false,
                         includeContaminants: false,
                         includeAmbiguous: true,
                         includeHighQValuePsms: false).FilteredPsmsList.GroupBy(f => f.FullFilePath);
 
-                    var diaQuantFilePath = Path.Combine(quantFolderPath, name + "_Quant.tsv");
-                    var psmsOfThisFileForQuant = psmsForQuant.Where(g => g.Key == file.Key).First().ToArray();
-                    var psmsToWrite = psmsOfThisFileForQuant.OrderByDescending(psm => psm.Score).GroupBy(p => ( p.FullSequence, p.ScanPrecursorCharge)).Select(g => g.FirstOrDefault()).ToArray();
-                    var pfGroupsForThisFile = file.Value.OrderBy(g => g.PFgroupIndex).ToArray();
-                    var sortedPfGroupIndex = pfGroupsForThisFile.Select(g => g.PFgroupIndex).ToArray();
-                    var diaQuantFile = DIAQuantFile.CreateDIAQuantFile(psmsToWrite, pfGroupsForThisFile);
-                    diaQuantFile.WriteResults(diaQuantFilePath);
+                        var diaQuantFilePath = Path.Combine(quantFolderPath, name + "_Quant.tsv");
+                        var psmsOfThisFileForQuant = psmsForQuant.Where(g => g.Key == file.Key).First().ToArray();
+                        var psmsToWrite = psmsOfThisFileForQuant.OrderByDescending(psm => psm.Score).GroupBy(p => (p.FullSequence, p.ScanPrecursorCharge)).Select(g => g.FirstOrDefault()).ToArray();
+                        var pfGroupsForThisFile = file.Value.OrderBy(g => g.PFgroupIndex).ToArray();
+                        var sortedPfGroupIndex = pfGroupsForThisFile.Select(g => g.PFgroupIndex).ToArray();
+                        var diaQuantFile = DIAQuantFile.CreateDIAQuantFile(psmsToWrite, pfGroupsForThisFile);
+                        diaQuantFile.WriteResults(diaQuantFilePath);
 
-                    //proteoform quant
-                    var groupedResults = diaQuantFile.Results.GroupBy(q => q.PrecursorFullSequence);
-                    foreach (var group in groupedResults)
-                    {
-                        var proteoformQuantResult = new DIAProteoformQuant(name, group.ToList());
-                        allProteoformQuantResults.Add(proteoformQuantResult);
+                        //proteoform quant
+                        var groupedResults = diaQuantFile.Results.GroupBy(q => q.PrecursorFullSequence);
+                        foreach (var group in groupedResults)
+                        {
+                            var proteoformQuantResult = new DIAProteoformQuant(name, group.ToList());
+                            allProteoformQuantResults.Add(proteoformQuantResult);
+                        }
                     }
                 }
-                var proteoformQuantFilePath = Path.Combine(quantFolderPath, "ProteoformQuant.tsv");
-                var proteoformQuantFile = new DIAProteoformQuantFile { Results = allProteoformQuantResults };
-                proteoformQuantFile.WriteResults(proteoformQuantFilePath);
+                if (CommonParameters.DIAparameters.DoQuant)
+                {
+                    var proteoformQuantFilePath = Path.Combine(quantFolderPath, "ProteoformQuant.tsv");
+                    var proteoformQuantFile = new DIAProteoformQuantFile { Results = allProteoformQuantResults };
+                    proteoformQuantFile.WriteResults(proteoformQuantFilePath);
+                }
             }
 
             //DDA quant

@@ -18,6 +18,14 @@ using System.Globalization;
 using System.IO;
 using Omics.Fragmentation;
 using MassSpectrometry;
+using Microsoft.ML.Trainers;
+using Numerics.NET.DataAnalysis.Models;
+using Microsoft.ML.Trainers.LightGbm;
+using BayesianEstimation;
+using MathNet.Numerics.Distributions;
+using Microsoft.ML.Data;
+using System.Data;
+using System.ComponentModel;
 
 namespace EngineLayer.DIA
 {
@@ -33,6 +41,52 @@ namespace EngineLayer.DIA
         public float Weight { get; set; }
 
         public PFPairFeature() { }
+
+        public PFPairFeature(PeakCurve precursor, PeakCurve fragment)
+        {
+            Correlation = (float)PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, fragment);
+            ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
+            Overlap = (float)PrecursorFragmentPair.CalculateOverlapAreaRatio(precursor, fragment);
+            FragmentIntensity = (float)fragment.ApexIntensity;
+            SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
+        }
+    }
+
+    public class PFpairPrediction
+    {
+        [ColumnName("PredictedLabel")]
+        public bool Prediction;
+
+        // No need to specify ColumnName attribute, because the field
+        // name "Probability" is the column name we want.
+        public float Probability;
+
+        public float Score;
+    }
+
+    public class PFPairFeatureGbm
+    {
+        public bool Label { get; set; }
+        [VectorType(4)]
+        public float[] Features { get; set; }
+
+        public PFPairFeatureGbm() { }
+        public PFPairFeatureGbm(PFPairFeature pfPairFeature, List<string> featureList)
+        {
+            Features = new float[4];
+            for (int i = 0; i < featureList.Count; i++)
+            {
+                Features[i] = (float)pfPairFeature.GetType().GetProperty(featureList[i])?.GetValue(pfPairFeature);
+            }
+        }
+
+        public static IEnumerable<PFPairFeatureGbm> ConvertFeatureSamplesToGbm(IEnumerable<PFPairFeature> pfPairFeatures, List<string> featureList)
+        {
+            foreach(var pfPairFeature in pfPairFeatures)
+            {
+                yield return new PFPairFeatureGbm(pfPairFeature, featureList);
+            }
+        }
     }
 
     public class PFpairFeatureFile : ResultFile<PFPairFeature>, IResultFile
@@ -69,29 +123,125 @@ namespace EngineLayer.DIA
 
     public class TrainModel
     {
-        public static void Train(IEnumerable<PFPairFeature> yourDataList, bool weight = false)
+        public static ITransformer TrainGradientBoostedTree(IEnumerable<PFPairFeature> samples, List<string> featureList, string modelPath = null)
         {
+            var filteredSamples = UnderSample(samples); 
+            var gbmSamples = PFPairFeatureGbm.ConvertFeatureSamplesToGbm(filteredSamples, featureList);
+
             var mlContext = new MLContext();
+            IDataView data = mlContext.Data.LoadFromEnumerable(gbmSamples);
 
-            if (weight)
-            {
-                AssignWeightsToPFPairs(yourDataList, ComputeWeights(yourDataList.ToList()));
-            }
-            IDataView data = mlContext.Data.LoadFromEnumerable(yourDataList);
-
-            // Split into train/test
+            var pipeline = mlContext.BinaryClassification.Trainers.LightGbm(
+                new LightGbmBinaryTrainer.Options
+                {
+                    //LabelColumnName = "Label",
+                    //FeatureColumnName = "Features",
+                    //NumberOfLeaves = 64,
+                    //MinimumExampleCountPerLeaf = 10,
+                    //LearningRate = 0.1,
+                    //NumberOfIterations = 100,
+                    //Seed = 42
+                });
             var split = mlContext.Data.TrainTestSplit(data, testFraction: 0.2);
             var trainData = split.TrainSet;
             var testData = split.TestSet;
+            var model = pipeline.Fit(data);
+            var predictions = model.Transform(testData);
+            var metrics = mlContext.BinaryClassification.Evaluate(predictions);
+            if (modelPath!=null)
+            {
+                mlContext.Model.Save(model, data.Schema, modelPath);
+            }
+            return model;
+        }
 
-            var pipeline = mlContext.Transforms.Concatenate("Features", nameof(PFPairFeature.Correlation), nameof(PFPairFeature.ApexRtDelta))
-                .Append(mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(labelColumnName: "Label", featureColumnName: "Features"));
+        public static ITransformer TrainLogisticRegression(IEnumerable<PFPairFeature> samples, List<string> featureList, string modelPath = null)
+        {
+            var filteredSamples = UnderSample(samples);
+
+            var mlContext = new MLContext();
+            IDataView data = mlContext.Data.LoadFromEnumerable(filteredSamples);
+
+            var pipeline = mlContext.Transforms.Concatenate("Features", featureList.ToArray())
+                .Append(mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(labelColumnName: "Label", featureColumnName: "Features")); 
+            var split = mlContext.Data.TrainTestSplit(data, testFraction: 0.2);
+            var trainData = split.TrainSet;
+            var testData = split.TestSet;
             var model = pipeline.Fit(trainData);
             var predictions = model.Transform(testData);
             var metrics = mlContext.BinaryClassification.Evaluate(predictions);
+
+            if (modelPath != null)
+            {
+                mlContext.Model.Save(model, data.Schema, modelPath);
+            }
+            return model;
         }
 
-        public static PFPairFeature GetPFPairsFromPfPairMetrics(PFpairMetrics pfPairMetrics)
+        public static ITransformer TrainFastTree(IEnumerable<PFPairFeature> samples, List<string> featureList, string modelPath = null)
+        {
+            var filteredSamples = UnderSample(samples);
+
+            var mlContext = new MLContext();
+            IDataView data = mlContext.Data.LoadFromEnumerable(filteredSamples);
+
+            var pipeline = mlContext.Transforms.Concatenate("Features", featureList.ToArray())
+                .Append(mlContext.BinaryClassification.Trainers.FastTree(
+                        labelColumnName: "Label",
+                        featureColumnName: "Features",
+                        numberOfTrees: 100,  // Example: 100 trees
+                        learningRate: 0.2f // Example: learning rate of 0.2
+                    )); 
+            var split = mlContext.Data.TrainTestSplit(data, testFraction: 0.2);
+            var trainData = split.TrainSet;
+            var testData = split.TestSet;
+            var model = pipeline.Fit(trainData);
+            var predictions = model.Transform(testData);
+            var metrics = mlContext.BinaryClassification.Evaluate(predictions);
+
+            if (modelPath != null)
+            {
+                mlContext.Model.Save(model, data.Schema, modelPath);
+            }
+            return model;
+        }
+
+        public static IEnumerable<PFPairFeature> RandomSample(IEnumerable<PFPairFeature> pfPairs, int targetCount)
+        {
+            if (pfPairs.Count() <= targetCount)
+            {
+                return pfPairs;
+            }
+            var random = new Random(42);
+            var sampledPairs = pfPairs.OrderBy(x => random.Next()).Take(targetCount).ToList();
+            return sampledPairs;
+        }
+
+        public static IEnumerable<PFPairFeature> UnderSample(IEnumerable<PFPairFeature> allPairFeatures, int targetCount = 0)
+        {
+            var positives = allPairFeatures.Where(p => p.Label == true);
+            var negatives = allPairFeatures.Where(p => p.Label == false);
+            int posNum = positives.Count();
+            int negNum = negatives.Count();
+            if (positives.Count() < negatives.Count())
+            {
+                if (targetCount == 0) 
+                    negatives = RandomSample(negatives, positives.Count());
+                else
+                    negatives = RandomSample(negatives, targetCount);
+            }
+            else
+            {
+                if (targetCount == 0)
+                    positives = RandomSample(positives, negatives.Count());
+                else
+                    positives = RandomSample(positives, targetCount);
+            }
+            var filteredPairs = positives.Concat(negatives).ToList();
+            return filteredPairs;
+        }
+
+        public static PFPairFeature GetPFPairFeatureFromPfPairMetrics(PFpairMetrics pfPairMetrics)
         {
             var pfPair = new PFPairFeature
             {
@@ -100,68 +250,23 @@ namespace EngineLayer.DIA
                 Overlap = (float)pfPairMetrics.Overlap,
                 FragmentIntensity = (float)pfPairMetrics.FragmentIntensity,
                 PsmScore = (float)pfPairMetrics.PsmScore,
+                SharedXIC = (float)pfPairMetrics.SharedXIC,
                 Label = pfPairMetrics.MatchedIonType == "NA" ? false : true
             };
             return pfPair;
         }
 
-        public static void NeutralLossReSearchFromPFMetrics(IEnumerable<PFpairMetrics> pFpairMetricsList, List<double> neutralLosses)
-        {
-            var allTerminalFragments = pFpairMetricsList.Where(p => p.MatchedIonType == "Terminal").ToList();
-            var sortedFragments = pFpairMetricsList.Where(p => p.MatchedIonType == "NA").OrderBy(p => p.FragmentMass).ToList();
-            foreach(var frag in allTerminalFragments)
-            {
-                foreach (var loss in neutralLosses)
-                {
-                    double massToSearch = frag.FragmentMass - loss;
-                    var bestFrag = FindPfPair(sortedFragments, massToSearch, frag.FragmentCharge);
-                    if (bestFrag != null)
-                    {
-                        bestFrag.MatchedIonType = "NeutralLoss";
-                    }
-                }
-            }
-        }
 
-        public static PFpairMetricFile NeutralLossResearchFromPFpairMetricsFile(PFpairMetricFile pfPairMetricsFile, List<double> neutralLosses)
+        public static List<PrecursorFragmentsGroup> GetAllPfGroups_ML(List<PeakCurve> ms1curves, List<PeakCurve> ms2curves, DIAparameters diaParam)
         {
-            var results = pfPairMetricsFile.Results;
-            var groupedResults = results.GroupBy(p => p.PFgroupIndex).ToList();
-            foreach(var group in groupedResults)
+            var allGroups = new List<PrecursorFragmentsGroup>();
+            var pseudoGroups = new List<PrecursorFragmentsGroup>();
+            foreach (var precursor in ms1curves)
             {
-                if (group.First().TargetDecoy == "D" )
-                {
-                    continue; 
-                }
-                var allTerminalFragments = group.Where(p => p.MatchedIonType == "Terminal").ToList();
-                var sortedFragments = group.Where(p => p.MatchedIonType == "NA").OrderBy(p => p.FragmentMass).ToList();
-                foreach (var frag in allTerminalFragments)
-                {
-                    foreach (var loss in neutralLosses)
-                    {
-                        double massToSearch = frag.FragmentMass - loss;
-                        var bestFrag = FindPfPair(sortedFragments, massToSearch, frag.FragmentCharge);
-                        if (bestFrag != null)
-                        {
-                            bestFrag.MatchedIonType = "NeutralLoss";
-                        }
-                    }
-                }
+                var pseudoGroup = PrecursorFragmentsGroup.JustPair(precursor, ms2curves, diaParam);
+                pseudoGroups.Add(pseudoGroup);
             }
-            var newPfPairMetricsFile = new PFpairMetricFile();
-            newPfPairMetricsFile.Results = results;
-            return newPfPairMetricsFile;
-        }
 
-        private static PFpairMetrics FindPfPair(IEnumerable<PFpairMetrics> sortedFragments, double targetMass, int targetCharge)
-        {
-            var frag = sortedFragments.Where(f => f.FragmentCharge == targetCharge && Math.Abs(f.FragmentMass - targetMass) < 1)
-                                      .OrderBy(f => Math.Abs(f.FragmentMass - targetMass))
-                                      .FirstOrDefault();
-            if (frag != null)
-            {
-                return frag;
-            }
             return null;
         }
 
@@ -170,8 +275,8 @@ namespace EngineLayer.DIA
             var list = new List<PFPairFeature>();
             foreach (var pfPairMetrics in pfPairMetricsList)
             {
-                if (pfPairMetrics.MatchedIonType == "Internal") continue;
-                var pfPair = GetPFPairsFromPfPairMetrics(pfPairMetrics);
+                if (pfPairMetrics.MatchedIonType == "Internal" || pfPairMetrics.MatchedIonType == "NeutralLoss") continue;
+                var pfPair = GetPFPairFeatureFromPfPairMetrics(pfPairMetrics);
                 list.Add(pfPair);
             }
             return list;
@@ -188,7 +293,7 @@ namespace EngineLayer.DIA
         {
             foreach (var pfPair in pfPairs)
             {
-                pfPair.Weight = pfPair.Label ? weights.Item2 : weights.Item1;
+                pfPair.Weight = pfPair.Label == true ? weights.Item2 : weights.Item1;
             }
         }
 

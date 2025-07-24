@@ -24,8 +24,8 @@ namespace EngineLayer.DIA
         public void CombinePeakCurves()
         {
             CombinedPeakCurve = new PeakCurve();
-            var start = PeakCurves.Select(p => p.StartCycle).Min();
-            var end = PeakCurves.Select(p => p.EndCycle).Max();
+            var start = PeakCurves.Select(p => p.StartScanIndex).Min();
+            var end = PeakCurves.Select(p => p.EndScanIndex).Max();
             for (int i = start; i <= end; i++)
             {
                 var peaksAtCycle = new List<Peak>();

@@ -138,11 +138,11 @@ namespace Test.TestDIA
                 Assert.That(testCase.PeakCurve.AveragedMz, Is.EqualTo(testCase.ExpectedAveragedMz));
                 Assert.That(testCase.PeakCurve.AveragedIntensity, Is.EqualTo(testCase.ExpectedAveragedIntensity));
                 Assert.That(testCase.PeakCurve.ApexRT, Is.EqualTo(testCase.ExpectedApexRT));
-                Assert.That(testCase.PeakCurve.ApexCycle, Is.EqualTo(testCase.ExpectedApexCycle));
+                Assert.That(testCase.PeakCurve.ApexScanIndex, Is.EqualTo(testCase.ExpectedApexCycle));
                 Assert.That(testCase.PeakCurve.StartRT, Is.EqualTo(testCase.ExpectedStartRT));
                 Assert.That(testCase.PeakCurve.EndRT, Is.EqualTo(testCase.ExpectedEndRT));
-                Assert.That(testCase.PeakCurve.StartCycle, Is.EqualTo(testCase.ExpectedStartCycle));
-                Assert.That(testCase.PeakCurve.EndCycle, Is.EqualTo(testCase.ExpectedEndCycle));
+                Assert.That(testCase.PeakCurve.StartScanIndex, Is.EqualTo(testCase.ExpectedStartCycle));
+                Assert.That(testCase.PeakCurve.EndScanIndex, Is.EqualTo(testCase.ExpectedEndCycle));
             }
         }
 
@@ -177,11 +177,11 @@ namespace Test.TestDIA
             foreach (var testCase in testCases)
             {
                 Assert.That(testCase.PeakCurve.ApexRT, Is.EqualTo(testCase.ExpectedApexRT).Within(0.01));
-                Assert.That(testCase.PeakCurve.ApexCycle, Is.EqualTo(testCase.ExpectedApexCycle));
+                Assert.That(testCase.PeakCurve.ApexScanIndex, Is.EqualTo(testCase.ExpectedApexCycle));
                 Assert.That(testCase.PeakCurve.StartRT, Is.EqualTo(testCase.ExpectedStartRT).Within(0.25));
                 Assert.That(testCase.PeakCurve.EndRT, Is.EqualTo(testCase.ExpectedEndRT).Within(0.25));
-                Assert.That(testCase.PeakCurve.StartCycle, Is.EqualTo(testCase.ExpectedStartCycle).Within(12));
-                Assert.That(testCase.PeakCurve.EndCycle, Is.EqualTo(testCase.ExpectedEndCycle).Within(12));
+                Assert.That(testCase.PeakCurve.StartScanIndex, Is.EqualTo(testCase.ExpectedStartCycle).Within(12));
+                Assert.That(testCase.PeakCurve.EndScanIndex, Is.EqualTo(testCase.ExpectedEndCycle).Within(12));
             }
         }
 

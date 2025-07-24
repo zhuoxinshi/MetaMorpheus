@@ -21,6 +21,7 @@ using Omics.SpectrumMatch;
 using Easy.Common.Extensions;
 using System.Security.Cryptography.X509Certificates;
 using Chemistry;
+using MzLibUtil;
 
 namespace EngineLayer.DIA
 {
@@ -35,6 +36,7 @@ namespace EngineLayer.DIA
         public double FragmentMass { get; set; }
         public int FragmentCharge { get; set; } 
         public double FragmentIntensity { get; set; }
+        [Optional]
         public double FragmentIonMz { get; set; }
         public double Correlation { get; set; }
         public double Overlap { get; set; }
@@ -46,14 +48,20 @@ namespace EngineLayer.DIA
         public double RoundedOverlap => Math.Round(Overlap, 1);
         public int Ms2Group { get; set; }
         public double PsmScore { get; set; }
+        [Optional]
+        public double RoundedPsmScore => Math.Round(PsmScore, 0);
         public int Ms2ScanNumber { get; set; }
-        public double FragmentFractionalIntensity { get; set; } 
+        public double FragmentFractionalIntensity { get; set; }
+        [Optional]
         public int NormalizedIntensityRank { get; set; }
+        [Optional]
         public double SharedXIC { get; set; }
-        public int PrecursorRank { get; set; } 
+        [Optional]
+        public int PrecursorRank { get; set; }
+        [Optional]
         public int FragmentRank { get; set; } 
 
-        public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup = null, PsmFromTsv psmFromTsv = null)
+        public PFpairMetrics(PrecursorFragmentPair pfPair, PrecursorFragmentsGroup pfGroup = null, SpectralMatch psm = null,PsmFromTsv psmFromTsv = null)
         {
             Correlation = pfPair.Correlation;
             Overlap = pfPair.Overlap;
@@ -79,26 +87,19 @@ namespace EngineLayer.DIA
             PrecursorRank = pfPair.PrecursorRank;
             FragmentRank = pfPair.FragmentRank;
 
-            if (psmFromTsv != null)
-            {
-                if (psmFromTsv.DecoyContamTarget == "T")
-                {
-                    TargetDecoy = psmFromTsv.DecoyContamTarget;
-                }
-                else if (psmFromTsv.DecoyContamTarget == "D")
-                {
-                    TargetDecoy = psmFromTsv.DecoyContamTarget;
-                }
-                else
-                {
-                    TargetDecoy = "NA";
-                }
-                PsmScore = psmFromTsv.Score;
-            }
             if (pfGroup != null)
             {
                 PFgroupIndex = pfGroup.PFgroupIndex;
                 FragmentFractionalIntensity = pfPair.FragmentPeakCurve.ApexIntensity / pfGroup.PFpairs.Sum(pf => pf.FragmentPeakCurve.ApexIntensity);
+            }
+            if (psm != null)
+            {
+                SetPsmInfo(psm);
+            }
+
+            if (psmFromTsv != null)
+            {
+                SetPsmTsvInfo(psmFromTsv);
             }
         }
 
@@ -126,11 +127,90 @@ namespace EngineLayer.DIA
             if (index >= 0)
             {
                 MatchedIonType = sortedMatchedIons[index].NeutralTheoreticalProduct.SecondaryProductType == null? "Terminal" : "Internal";
+                if (FragmentCharge == 0)
+                {
+                    FragmentCharge = sortedMatchedIons[index].Charge;
+                }
             }
             else
             {
                 MatchedIonType = "NA";
             }
+        }
+
+        public void SetPsmTsvInfo(PsmFromTsv psmFromTsv)
+        {
+            if (psmFromTsv.DecoyContamTarget == "T")
+            {
+                TargetDecoy = psmFromTsv.DecoyContamTarget;
+            }
+            else if (psmFromTsv.DecoyContamTarget == "D")
+            {
+                TargetDecoy = psmFromTsv.DecoyContamTarget;
+            }
+            else
+            {
+                TargetDecoy = "NA";
+            }
+            PsmScore = psmFromTsv.Score;
+        }
+
+        public static void NeutralLossReSearchFromPFMetrics_neutralMass(IEnumerable<PFpairMetrics> pFpairMetricsList, List<double> neutralLosses, Tolerance ppmTolerance)
+        {
+            var allTerminalFragments = pFpairMetricsList.Where(p => p.MatchedIonType == "Terminal").ToList();
+            var unmatchedFragments = pFpairMetricsList.Where(p => p.MatchedIonType == "NA").ToList();
+            foreach (var frag in allTerminalFragments)
+            {
+                foreach (var loss in neutralLosses)
+                {
+                    double massToSearch = frag.FragmentMass - loss;
+                    var bestFrag = PFpairMetrics.FindPfPair(unmatchedFragments, massToSearch, frag.FragmentCharge, ppmTolerance);
+                    if (bestFrag != null)
+                    {
+                        bestFrag.MatchedIonType = "NeutralLoss";
+                    }
+                }
+            }
+        }
+
+        public static void IsotopeReSearch(List<PFpairMetrics> pfPairMetrics, DIAparameters diaParam)
+        {
+            var allMatchedIons = pfPairMetrics.Where(pf => pf.MatchedIonType == "Terminal").ToList();
+            var unmatchedIons = pfPairMetrics.Where(pf => pf.MatchedIonType == "NA").ToList();
+            foreach(var pair in allMatchedIons)
+            {
+                var isotopes = SearchIsotopesOfOnePeak(unmatchedIons, pair.FragmentIonMz, pair.FragmentCharge, diaParam.NumIsotopesToSearch, diaParam.Ms2PeakFindingTolerance);
+                if (isotopes.Count > 0)
+                    foreach(var isotope in isotopes) isotope.MatchedIonType = "Isotope";
+            }
+        }
+        public static List<PFpairMetrics> SearchIsotopesOfOnePeak(IEnumerable<PFpairMetrics> allPairs, double knownMz, int knownCharge, int numIsotopes, Tolerance ppmTolerance)
+        {
+            var foundPairs = new List<PFpairMetrics>();
+            for (int i = 1; i <= numIsotopes; i++)
+            {
+                double isotopeMz = (knownMz.ToMass(knownCharge) + i * Constants.C13MinusC12).ToMz(knownCharge);
+                var pair = FindPfPair(allPairs, isotopeMz, 0, ppmTolerance);
+                if (pair != null)
+                {
+                    foundPairs.Add(pair);
+                }
+            }
+            return foundPairs;
+        }
+        public static PFpairMetrics FindPfPair(IEnumerable<PFpairMetrics> allPairs, double targetM, int targetCharge, Tolerance ppmTolerance)
+        {
+            PFpairMetrics frag = null;
+            if (targetCharge > 0)
+            {
+                frag = allPairs.Where(f => f.FragmentCharge == targetCharge && ppmTolerance.Within(targetM, f.FragmentMass))
+                                      .OrderBy(f => Math.Abs(f.FragmentMass - targetM)).FirstOrDefault();
+            }
+            else
+            {
+                frag = allPairs.Where(f => ppmTolerance.Within(targetM, f.FragmentIonMz)).OrderByDescending(f => f.FragmentIntensity).FirstOrDefault();
+            }
+            return frag;
         }
 
         public PFpairMetrics() { }
@@ -177,7 +257,7 @@ namespace EngineLayer.DIA
         //}
 
         //only write out PFpairs that have a PSM associated with the pfGroup
-        public static PFpairMetricFile GetAllPFpairsFromPfGroupAndPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms, bool neutralLossSearch = false)
+        public static PFpairMetricFile GetAllPFpairsFromPfGroupAndPsms(List<PrecursorFragmentsGroup> pfGroups, SpectralMatch[] sortedPsms, DIAparameters diaParam)
         {
             List<PFpairMetrics> results = new List<PFpairMetrics>();
             var sortedScanNumberArray = sortedPsms.Select(psm => psm.ScanNumber).ToArray();
@@ -189,16 +269,20 @@ namespace EngineLayer.DIA
                 {
                     foreach (var pfPair in pfGroup.PFpairs)
                     {
-                        var pfPairMetrics = new PFpairMetrics(pfPair, pfGroup);
-                        pfPairMetrics.SetPsmInfo(sortedPsms[index]);
+                        var pfPairMetrics = new PFpairMetrics(pfPair, pfGroup, sortedPsms[index]);
                         results.Add(pfPairMetrics);
                         pfPairMetricsForThisGroup.Add(pfPairMetrics);
                     }
+                    //if we want to research isotopes
+                    if (diaParam.NumIsotopesToSearch != 0)
+                    {
+                        PFpairMetrics.IsotopeReSearch(pfPairMetricsForThisGroup, diaParam);
+                    }
                     //if we want to research the neutral loss fragments
-                    if (neutralLossSearch && index >= 0 && sortedPsms[index].IsDecoy == false)
+                    if (diaParam.NeutralLossSearch && index >= 0 && sortedPsms[index].IsDecoy == false)
                     {
                         //var allQualifiedPFpairs = pfPairMetricsForThisGroup.Where(p => p.TargetDecoy == "T" && p.MatchedIonType == "Terminal").ToList();
-                        TrainModel.NeutralLossReSearchFromPFMetrics(pfPairMetricsForThisGroup, new List<double> { 18.010564684, 17.0265491 });
+                        PFpairMetrics.NeutralLossReSearchFromPFMetrics_neutralMass(pfPairMetricsForThisGroup, new List<double> { 18.010564684, 17.0265491 }, diaParam.Ms2PeakFindingTolerance);
                     }
                 }
             }
@@ -207,6 +291,36 @@ namespace EngineLayer.DIA
                 Results = results
             };
             return pfPairMetricFile;
+        }
+
+        public static PFpairMetricFile NeutralLossResearchFromPFpairMetricsFile(PFpairMetricFile pfPairMetricsFile, List<double> neutralLosses)
+        {
+            var results = pfPairMetricsFile.Results;
+            var groupedResults = results.GroupBy(p => p.PFgroupIndex).ToList();
+            foreach (var group in groupedResults)
+            {
+                if (group.First().TargetDecoy == "D")
+                {
+                    continue;
+                }
+                var allTerminalFragments = group.Where(p => p.MatchedIonType == "Terminal").ToList();
+                var sortedFragments = group.Where(p => p.MatchedIonType == "NA").OrderBy(p => p.FragmentMass).ToList();
+                foreach (var frag in allTerminalFragments)
+                {
+                    foreach (var loss in neutralLosses)
+                    {
+                        double massToSearch = frag.FragmentMass - loss;
+                        var bestFrag = PFpairMetrics.FindPfPair(sortedFragments, massToSearch, frag.FragmentCharge, new PpmTolerance(10));
+                        if (bestFrag != null)
+                        {
+                            bestFrag.MatchedIonType = "NeutralLoss";
+                        }
+                    }
+                }
+            }
+            var newPfPairMetricsFile = new PFpairMetricFile();
+            newPfPairMetricsFile.Results = results;
+            return newPfPairMetricsFile;
         }
 
         public override void WriteResults(string outputPath)

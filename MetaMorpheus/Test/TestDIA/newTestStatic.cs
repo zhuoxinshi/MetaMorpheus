@@ -333,8 +333,8 @@ namespace Test.TestDIA
             //Find the RT range for all the XICs
             var allPCs = new List<PeakCurve> { pc1017 };
             allPCs.AddRange(precursorPCs);
-            var startCycle = allPCs.Min(p => p.StartCycle);
-            var endCycle = allPCs.Max(p => p.EndCycle);
+            var startCycle = allPCs.Min(p => p.StartScanIndex);
+            var endCycle = allPCs.Max(p => p.EndScanIndex);
             var rtLength = endCycle - startCycle + 1;
             var totalPreIntensity = precursorPCs.Select(p => p.Peaks.Select(p => p.Intensity).Sum()).Sum();
 
@@ -354,7 +354,7 @@ namespace Test.TestDIA
             {
                 for (int j = startCycle; j <= endCycle; j++)
                 {
-                    if (j < precursorPCs[i].StartCycle || j > precursorPCs[i].EndCycle)
+                    if (j < precursorPCs[i].StartScanIndex || j > precursorPCs[i].EndScanIndex)
                     {
                         dataMatrix[i, j] = 0;
                         continue;
