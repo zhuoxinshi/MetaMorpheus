@@ -53,75 +53,8 @@ namespace EngineLayer.DIA
                 }
             }
 
-            //Group precursors
-            //var highestIntensityPrecursors = allMs1PeakCurves
-            //    .GroupBy(p => (Math.Round(p.MonoisotopicMass, 1), p.ApexRT))
-            //    .Select(g => g.OrderByDescending(p => p.ApexIntensity).First())
-            //    .ToList();
-
             //precursor fragment grouping
-            var pfGroups = new List<PrecursorFragmentsGroup>();
-            //if (diaParam.PFGroupingType != PFGroupingType.ML && diaParam.PFGroupingType != PFGroupingType.RetentionTime_tree)
-            //{
-            //    if (diaParam.CombineFragments == false)
-            //    {
-            //        foreach (var ms2Group in allMs2PeakCurves)
-            //        {
-            //            var groups = GetAllPfGroups2(allMs1PeakCurves, ms2Group.Value, diaParam);
-            //            pfGroups.AddRange(groups);
-            //        }
-            //    }
-            //    else
-            //    {
-            //        var allFragments = allMs2PeakCurves.Values.SelectMany(p => p).ToList();
-            //        pfGroups = GetAllPfGroups2(allMs1PeakCurves, allFragments, diaParam);
-            //    }
-            //}
-            //else if (diaParam.PFGroupingType == PFGroupingType.ML)
-            //{
-            //    foreach (var ms2Group in allMs2PeakCurves)
-            //    {
-            //        var groups = PrecursorFragmentsGroup.PFGroups_ML(allMs1PeakCurves, ms2Group.Value, diaParam, diaParam.MLModelPath);
-            //        pfGroups.AddRange(groups);
-            //    }
-            //} 
-            Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
-                    (partitionRange, loopState) =>
-                    {
-                        for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
-                        {
-                            var precursor = allMs1PeakCurves[i];
-                            if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
-                            {
-                                continue;
-                            }
-
-                            if (diaParam.CombineFragments == false)
-                            {
-                                foreach (var fragments in allMs2PeakCurves.Values)
-                                {
-                                    var pfGroup = PFgrouping(precursor, fragments, diaParam);
-                                    if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
-                                    {
-                                        lock (pfGroups)
-                                            pfGroups.Add(pfGroup);
-                                        //pfGroup.VisualizeXYData().Show();
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                //var pfGroup = PFgrouping(precursor, allFragments, diaParam);
-                                //if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
-                                //{
-                                //    lock (pfGroups)
-                                //        pfGroups.Add(pfGroup);
-                                //}
-                            }
-                        }
-                    });
-
-            //pfGroups = PrecursorFragmentsGroup.MLgrouping(allMs1PeakCurves, allMs2PeakCurves, diaParam, diaParam.MLModelPath);
+            var pfGroups = GetAllPFgroups(allMs1PeakCurves, allMs2PeakCurves, diaParam);
 
             //precursor fragment rank filtering
             if (diaParam.RankFilter)
@@ -241,6 +174,13 @@ namespace EngineLayer.DIA
         public static List<PrecursorFragmentsGroup> GetAllPFgroups(List<PeakCurve> allMs1PeakCurves, Dictionary<double, List<PeakCurve>> allMs2PeakCurves, DIAparameters diaParam)
         {
             var pfGroups = new List<PrecursorFragmentsGroup>();
+            if (diaParam.CombineFragments)
+            {
+                allMs2PeakCurves = new Dictionary<double, List<PeakCurve>>()
+                {
+                    { 0, allMs2PeakCurves.SelectMany(p => p.Value).ToList() }
+                };
+            }
             switch (diaParam.PFGroupingType)
             {
                 case PFGroupingType.ML:
@@ -250,14 +190,17 @@ namespace EngineLayer.DIA
                     foreach (var ms2Group in allMs2PeakCurves)
                     {
                         var ms2Tree = PeakCurve.GetPeakCurveTree(ms2Group.Value);
-                        foreach(var precursor in allMs1PeakCurves)
-                        {
-                            var group = PrecursorFragmentsGroup.GroupPrecursorFragments_tree(precursor, ms2Tree, diaParam);
-                            if (group != null) pfGroups.Add(group);
-                        }
+                        var groups = GetAllPfGroupsForOneMs2Group_tree(allMs1PeakCurves, ms2Tree, diaParam);
+                        pfGroups.AddRange(groups);
                     }
                     return pfGroups;
-                default: return null;
+                default:
+                    foreach (var ms2Group in allMs2PeakCurves)
+                    {
+                        var groups = GetAllPfGroupsForOneMs2Group(allMs1PeakCurves, ms2Group.Value, diaParam);
+                        pfGroups.AddRange(groups);
+                    }
+                    return pfGroups;
             }
         }
 
@@ -626,7 +569,57 @@ namespace EngineLayer.DIA
             }
         }
 
-        public static List<PrecursorFragmentsGroup> GetAllPfGroups2(List<PeakCurve> precursors, List<PeakCurve> fragments, DIAparameters diaParam)
+        public static List<PrecursorFragmentsGroup> GetAllPfGroupsForOneMs2Group(List<PeakCurve> precursors, List<PeakCurve> fragments, DIAparameters diaParam)
+        {
+            var allGroups = new List<PrecursorFragmentsGroup>();
+            Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = diaParam.NumberOfThreadsForGrouping },
+                (partitionRange, loopState) =>
+                {
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        var precursor = precursors[i];
+                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+                        {
+                            continue;
+                        }
+
+                        var pfGroup = PFgrouping(precursor, fragments, diaParam);
+                        if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                        {
+                            lock (allGroups)
+                                allGroups.Add(pfGroup);
+                        }
+                    }
+                });
+            return allGroups;
+        }
+
+        public static List<PrecursorFragmentsGroup> GetAllPfGroupsForOneMs2Group_tree(List<PeakCurve> precursors, TreeDictionary<double, List<PeakCurve>> fragments, DIAparameters diaParam)
+        {
+            var allGroups = new List<PrecursorFragmentsGroup>();
+            Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = diaParam.NumberOfThreadsForGrouping },
+                (partitionRange, loopState) =>
+                {
+                    for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
+                    {
+                        var precursor = precursors[i];
+                        if (precursor.ApexSN < diaParam.PrecursorSNCutOff)
+                        {
+                            continue;
+                        }
+
+                        var pfGroup = PrecursorFragmentsGroup.GroupPrecursorFragments_tree(precursor, fragments, diaParam);
+                        if (pfGroup != null && pfGroup.PFpairs.Count > diaParam.MinPFpairCount)
+                        {
+                            lock (allGroups)
+                                allGroups.Add(pfGroup);
+                        }
+                    }
+                });
+            return allGroups;
+        }
+
+        public static List<PrecursorFragmentsGroup> GetAllPfGroupsForOneMs2Tree(List<PeakCurve> precursors, List<PeakCurve> fragments, DIAparameters diaParam)
         {
             var allGroups = new List<PrecursorFragmentsGroup>();
             Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
@@ -645,7 +638,6 @@ namespace EngineLayer.DIA
                         {
                             lock (allGroups)
                                 allGroups.Add(pfGroup);
-                            //pfGroup.VisualizeXYData().Show();
                         }
                     }
                 });

@@ -740,9 +740,10 @@ namespace Test.TestDIA
             string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
             var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";
             string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+            string debug_xml = @"E:\ISD Project\TestSearch\ASMS\Individual_nocali\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected\0.5, 0.3\GPTMD\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
 
             var fileList2 = new List<string> {  filePathD};
-            var outFolder2 = @"E:\ISD Project\TestSearch\ASMS\debug-D";
+            var outFolder2 = @"E:\ISD Project\TestSearch\random\test-speed_D";
             if (!Directory.Exists(outFolder))
             {
                 Directory.CreateDirectory(outFolder);
@@ -759,7 +760,7 @@ namespace Test.TestDIA
                         var searchList = new List<string> { file };
                         SearchTask searchTask1 = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
                         var resultFolder = Path.Combine(outFolder2, Path.GetFileNameWithoutExtension(file), $"{corr}, {apex}");
-                        searchTask1.CommonParameters.DIAparameters = new DIAparameters(new PpmToleranceWithNotch(20, 2), new PpmToleranceWithNotch(20, 2),
+                        searchTask1.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
                        maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: corr, apexRtTolerance: apex,
                        fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                        precursorIntensityCutOff: 0.01, splineTimeInterval: 0.005f, type: "DIA", scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
@@ -772,7 +773,7 @@ namespace Test.TestDIA
                             Directory.CreateDirectory(resultFolder);
                         }
                         gptmdTask.CommonParameters = searchTask1.CommonParameters;
-                        var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask1) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+                        var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask1) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
                         var engine = new EverythingRunnerEngine(taskList, searchList, new List<DbForTask> { new DbForTask(yeast_xml, false) }, resultFolder);
                         engine.Run();
                     }

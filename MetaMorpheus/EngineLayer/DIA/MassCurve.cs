@@ -205,7 +205,12 @@ namespace EngineLayer.DIA
                     {
                         missedScans = 0;
                         xic.Add(mass);
-                        mass.PeakCurve = newMassCurve; 
+                        mass.PeakCurve = newMassCurve;
+
+                        if (mass.RetentionTime - targetMass.RetentionTime > maxRTrange)
+                        {
+                            break;
+                        }
                     }
                     else
                     {
@@ -214,10 +219,6 @@ namespace EngineLayer.DIA
                 }
 
                 if (missedScans > maxMissedScans)
-                {
-                    break;
-                }
-                if (newMassCurve.EndRT - newMassCurve.ApexRT > maxRTrange)
                 {
                     break;
                 }
@@ -240,6 +241,11 @@ namespace EngineLayer.DIA
                         missedScans = 0;
                         xic.Add(mass);
                         mass.PeakCurve = newMassCurve; // Changed from PeakCurve to MassCurve
+
+                        if (targetMass.RetentionTime - mass.RetentionTime > maxRTrange)
+                        {
+                            break;
+                        }
                     }
                     else
                     {
@@ -248,10 +254,6 @@ namespace EngineLayer.DIA
                 }
 
                 if (missedScans > maxMissedScans)
-                {
-                    break;
-                }
-                if (newMassCurve.ApexRT - newMassCurve.StartRT > maxRTrange)
                 {
                     break;
                 }
