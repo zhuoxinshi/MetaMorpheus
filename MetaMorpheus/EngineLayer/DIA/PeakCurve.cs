@@ -114,11 +114,12 @@ namespace EngineLayer.DIA
             var peakCurveTree = new TreeDictionary<double, List<PeakCurve>>();
             foreach (var peakCurve in peakCurves)
             {
-                if (!peakCurveTree.Contains(peakCurve.ApexRT))
+                double roundedRt = Math.Round(peakCurve.ApexRT, 3);
+                if (!peakCurveTree.Contains(roundedRt))
                 {
-                    peakCurveTree[peakCurve.ApexRT] = new List<PeakCurve>();
+                    peakCurveTree[roundedRt] = new List<PeakCurve>();
                 }
-                peakCurveTree[peakCurve.AveragedMz].Add(peakCurve);
+                peakCurveTree[roundedRt].Add(peakCurve);
             }
             return peakCurveTree;
         }

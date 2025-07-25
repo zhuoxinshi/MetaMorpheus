@@ -75,7 +75,7 @@ namespace EngineLayer.DIA
                             break;
                         }
 
-                        if (ToleranceWithinNotch(targetMass.MonoisotopicMass, mass.MonoisotopicMass, tolerance) && mass.ZeroBasedScanIndex == zeroBasedScanIndex && mass.Charge == targetMass.Charge
+                        if (tolerance.Within(mass.MonoisotopicMass, targetMass.MonoisotopicMass) && mass.ZeroBasedScanIndex == zeroBasedScanIndex && mass.Charge == targetMass.Charge
                             && (bestMass == null || Math.Abs(mass.MonoisotopicMass - targetMass.MonoisotopicMass) < Math.Abs(bestMass.MonoisotopicMass - targetMass.MonoisotopicMass)))
                         {
                             bestMass = mass;
@@ -97,7 +97,7 @@ namespace EngineLayer.DIA
                 if (j < massTable.Length && massTable[j] != null)
                 {
                     List<DeconvolutedMass> bin = massTable[j];//.Where(m => m.Charge == charge).ToList()
-                    if (bin.Count == 0) continue;
+                    //if (bin.Count == 0) continue;
                     int index = BinarySearchForIndexedMass(bin, zeroBasedScanIndex);
 
                     for (int i = index; i < bin.Count; i++)

@@ -52,6 +52,12 @@ namespace EngineLayer.DIA
         }
     }
 
+    public class MyInput
+    {
+        [VectorType(5)] // Because you have 5 features
+        public float[] features { get; set; }
+    }
+
     public class PFpairPrediction
     {
         [ColumnName("PredictedLabel")]

@@ -121,6 +121,8 @@ namespace EngineLayer.DIA
                         }
                     });
 
+            //pfGroups = PrecursorFragmentsGroup.MLgrouping(allMs1PeakCurves, allMs2PeakCurves, diaParam, diaParam.MLModelPath);
+
             //precursor fragment rank filtering
             if (diaParam.RankFilter)
             {
@@ -242,11 +244,7 @@ namespace EngineLayer.DIA
             switch (diaParam.PFGroupingType)
             {
                 case PFGroupingType.ML:
-                    foreach (var ms2Group in allMs2PeakCurves)
-                    {
-                        var groups = PrecursorFragmentsGroup.PFGroups_ML(allMs1PeakCurves, ms2Group.Value, diaParam, diaParam.MLModelPath);
-                        pfGroups.AddRange(groups);
-                    }
+                    pfGroups = PrecursorFragmentsGroup.MLgrouping(allMs1PeakCurves, allMs2PeakCurves, diaParam, diaParam.MLModelPath);
                     return pfGroups;
                 case PFGroupingType.RetentionTime_tree:
                     foreach (var ms2Group in allMs2PeakCurves)

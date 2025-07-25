@@ -195,12 +195,27 @@ namespace EngineLayer.DIA
             }
         }
 
-        public static List<PrecursorFragmentsGroup> PFGroups_ML(List<PeakCurve> allMs1PeakCurves, List<PeakCurve> ms2curves, DIAparameters diaParam, string modelPath)
+        public static List<PrecursorFragmentsGroup> MLgrouping(List<PeakCurve> allMs1PeakCurves, Dictionary<double, List<PeakCurve>> ms2curves, DIAparameters diaParam, string modelPath)
         {
-            var pfGroups = new List<PrecursorFragmentsGroup>(); 
+            var pfGroups = new List<PrecursorFragmentsGroup>();
+            var allMs2Trees = new Dictionary<double, TreeDictionary<double, List<PeakCurve>>>();
+            foreach(var group in ms2curves)
+            {
+                var ms2Tree = PeakCurve.GetPeakCurveTree(group.Value);
+                allMs2Trees.Add(group.Key, ms2Tree);
+            }
+            
             var mlContext = new MLContext();
-            var model = mlContext.Model.Load(modelPath, out var modelInputSchema);
-            var predictionEngine = mlContext.Model.CreatePredictionEngine<PFPairFeature, PFpairPrediction>(model);
+            ITransformer model = null;
+            if (modelPath.Contains("onnx"))
+            {
+                model = mlContext.Transforms.ApplyOnnxModel(modelPath).Fit(mlContext.Data.LoadFromEnumerable(new List<MyInput>()));
+            }
+            else
+            {
+                model = mlContext.Model.Load(modelPath, out var modelInputSchema);
+            }
+            var predictionEngine = mlContext.Model.CreatePredictionEngine<MyInput, PFpairPrediction>(model);
             Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
                 (partitionRange, loopState) =>
                 {
@@ -211,28 +226,39 @@ namespace EngineLayer.DIA
                         {
                             continue;
                         }
-                        var pfGroup = new PrecursorFragmentsGroup(precursor);
-                        foreach (var ms2curve in ms2curves)
+                        foreach(var ms2group in allMs2Trees)
                         {
-                            if (Math.Abs(ms2curve.ApexRT - precursor.ApexRT) <= diaParam.ApexRtTolerance)
+                            var pfGroup = MLgroupingForOnePFgroup(precursor, ms2group.Value, diaParam, predictionEngine);
+                            if (pfGroup != null)
                             {
-                                var pfPairFeature = new PFPairFeature(precursor, ms2curve);
-                                var prediction = predictionEngine.Predict(pfPairFeature);
-                                if (prediction.Probability >= diaParam.MLProbThreshold)
+                                lock(pfGroups)
                                 {
-                                    pfGroup.PFpairs.Add(new PrecursorFragmentPair(precursor, ms2curve));
+                                    pfGroups.Add(pfGroup);
                                 }
                             }
-                        }
-                        if (pfGroup.PFpairs.Count > 0)
-                        {
-                            lock(pfGroups)
-                                pfGroups.Add(pfGroup);
                         }
                     }
                 });
             
             return pfGroups;
+        }
+
+        public static PrecursorFragmentsGroup MLgroupingForOnePFgroup(PeakCurve precursor, TreeDictionary<double, List<PeakCurve>> ms2Tree, DIAparameters diaParam, PredictionEngine<MyInput, PFpairPrediction> predictionEngine)
+        {
+            var candidateMs2curves = ms2Tree.RangeFromTo(precursor.ApexRT - diaParam.ApexRtTolerance, precursor.ApexRT + diaParam.ApexRtTolerance).SelectMany(kv => kv.Value).ToList();
+            var pfGroup = new PrecursorFragmentsGroup(precursor);
+            foreach (var ms2curve in candidateMs2curves)
+            {
+                var pfPairFeature = new MyInput();
+                var prediction = predictionEngine.Predict(pfPairFeature);
+                if (prediction.Probability >= diaParam.MLProbThreshold)
+                {
+                    pfGroup.PFpairs.Add(new PrecursorFragmentPair(precursor, ms2curve));
+                }
+            }
+            if (pfGroup.PFpairs.Count > 0)
+                return pfGroup;
+            return null;
         }
 
         public static PrecursorFragmentsGroup UmpireGrouping(PeakCurve precursor, List<PeakCurve> ms2curves, DIAparameters DIAparameters)

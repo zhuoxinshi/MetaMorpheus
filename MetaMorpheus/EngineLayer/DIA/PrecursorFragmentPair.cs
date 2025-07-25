@@ -61,10 +61,10 @@ namespace EngineLayer.DIA
 
         public static double CalculateCorrelation((double, double)[] xy1, (double, double)[] xy2)
         {
-            if (xy1 == null || xy2 == null)
-            {
-                return double.NaN;
-            }
+            //if (xy1 == null || xy2 == null)
+            //{
+            //    return double.NaN;
+            //}
 
             double start = Math.Max(xy1[0].Item1, xy2[0].Item1);
             double end = Math.Min(xy1[xy1.Length - 1].Item1, xy2[xy2.Length - 1].Item1);
@@ -72,10 +72,10 @@ namespace EngineLayer.DIA
             var validxy1 = xy1.Where(p => p.Item1 >= start && p.Item1 <= end).ToArray();
             var validxy2 = xy2.Where(p => p.Item1 >= start && p.Item1 <= end).ToArray();
             int numPoints = Math.Min(validxy1.Length, validxy2.Length);
-            if (numPoints < 3)
-            {
-                return -1;
-            }
+            //if (numPoints < 3)
+            //{
+            //    return -1;
+            //}
             var xy = validxy1.Take(numPoints).Zip(validxy2.Take(numPoints), (a, b) => (a.Item2, b.Item2)).ToArray();
             var y1 = xy.Select(p => p.Item1).ToArray();
             var y2 = xy.Select(p => p.Item2).ToArray();
