@@ -8,18 +8,9 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using System.Globalization;
-using EngineLayer;
-using Omics.Fragmentation;
-using Readers;
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using LinqStatistics;
-using System.Windows.Markup;
-using Omics.SpectrumMatch;
-using Easy.Common.Extensions;
-using System.Security.Cryptography.X509Certificates;
 using Chemistry;
 using MzLibUtil;
 
@@ -28,29 +19,45 @@ namespace EngineLayer.DIA
 
     public class PFpairMetrics
     {
+        [Optional]
         public int PFgroupIndex { get; set; }
+        [Optional]
         public double PrecursorMass { get; set; }
+        [Optional]
         public int PrecursorCharge { get; set; }
+        [Optional]
         public double PrecursorApexRt { get; set; }
+        [Optional]
         public double PrecursorIntensity { get; set; }
+        [Optional]
         public double FragmentMass { get; set; }
-        public int FragmentCharge { get; set; } 
+        [Optional]
+        public int FragmentCharge { get; set; }
+        [Optional]
         public double FragmentIntensity { get; set; }
         [Optional]
         public double FragmentIonMz { get; set; }
         public double Correlation { get; set; }
         public double Overlap { get; set; }
         public double ApexRtDelta { get; set; }
+        [Optional]
         public string TargetDecoy { get; set; }
         public string MatchedIonType { get; set; }
+        [Optional]
         public double RoundedApexRtDelta => Math.Round(ApexRtDelta, 2);
+        [Optional]
         public double RoundedCorrelation => Math.Round(Correlation, 1);
+        [Optional]
         public double RoundedOverlap => Math.Round(Overlap, 1);
+        [Optional]
         public int Ms2Group { get; set; }
+        [Optional]
         public double PsmScore { get; set; }
         [Optional]
         public double RoundedPsmScore => Math.Round(PsmScore, 0);
+        [Optional]
         public int Ms2ScanNumber { get; set; }
+        [Optional]
         public double FragmentFractionalIntensity { get; set; }
         [Optional]
         public int NormalizedIntensityRank { get; set; }

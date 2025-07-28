@@ -264,13 +264,12 @@ namespace Test.TestDIA
         [Test]
         public static void ModelTrainingFromPFpairMetricsFile()
         {
-            var metricsFilePath = @"E:\ISD Project\TestSearch\random\ForML\YB_rep1_JustPair_-1_neutralLoss\search\PFgrouping\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_labelCorrected_PFpairMetrics.tsv";
+            var metricsFilePath = @"E:\ISD Project\TestDataForML\DataForYingjie\0504YB_rep1_corr-1_neutralLoss.tsv";
             var metricsFile = new PFpairMetricFile { FilePath = metricsFilePath };
             metricsFile.LoadResults();
             var results = metricsFile.Results.Where(pf => pf.TargetDecoy == "T" && pf.MatchedIonType != "Internal" && pf.PsmScore >= 10).ToList();
-            var featurePairs = TrainModel.GetPFPairsFromPFMetricsExcludingInternal(metricsFile.Results);
             var modelPath = @"E:\ISD Project\TestDataForML\0504YB_rep1_FastTree.zip";
-            var model = TrainModel.TrainFastTree(featurePairs, new List<string> { "Correlation", "ApexRtDelta", "FragmentIntensity", "SharedXIC"}, modelPath);
+            var model = TrainModel.TrainFastTree(results, new List<string> { "Correlation", "ApexRtDelta", "FragmentIntensity", "SharedXIC", "NormalizedIntensityRank"}, modelPath);
         }
 
         public class ModelInput

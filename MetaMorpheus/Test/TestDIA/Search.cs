@@ -13,11 +13,6 @@ using static System.Net.WebRequestMethods;
 using MzLibUtil;
 using Plotly.NET;
 using Nett;
-using System.IO.Compression;
-using static Plotly.NET.StyleParam.Range;
-using System.Windows;
-using FlashLFQ;
-using static iText.StyledXmlParser.Jsoup.Select.Evaluator;
 
 namespace Test.TestDIA
 {
@@ -226,7 +221,7 @@ namespace Test.TestDIA
             
 
             var fileList = new List<string> { filePath21, };//filePath21, filePath22, filePath23,
-            var outputFolder = @"E:\ISD Project\TestSearch\random\tryML";
+            var outputFolder = @"E:\ISD Project\TestSearch\random\tryML3gptmd";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -240,9 +235,10 @@ namespace Test.TestDIA
             string tomlFile_variableMods = @"E:\ISD Project\ISD_250428\variableMods\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_FixedOnly_noInternal = @"E:\ISD Project\ISD_250428\0504YB_rep_DDA_gptmd-xml_prunedDb_noInternal\Task Settings\Task2-SearchTaskconfig.toml";
 
+            string modelPath = @"E:\ISD Project\TestDataForML\0504YB_rep1_FastTree.zip";
+
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
             //searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string modelPath = @"E:\ISD Project\TestDataForML\catBoost_YB.onnx";
             searchTask.CommonParameters.DIAparameters = new DIAparameters(new PpmTolerance(20), new PpmTolerance(20),
                 maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: 0.5, apexRtTolerance: 0.5,
                 fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
@@ -250,7 +246,7 @@ namespace Test.TestDIA
                 apexCycleTolerance: 2, scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
         ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.ML,
                 pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold:2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5, mlModelPath: modelPath);
+                ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 21, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold:2, combineFragments: false, rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5, mlModelPath: modelPath, mlProbThreshold:0.55, numberOfThreadsForGrouping: 15);
 
             //match all charge fragment ions
             searchTask.SearchParameters.WriteSpectralLibrary = true;
@@ -269,7 +265,7 @@ namespace Test.TestDIA
             var cali_task = Toml.ReadFile<CalibrationTask>(cali_toml, MetaMorpheusTask.tomlConfig);
             cali_task.CommonParameters = searchTask.CommonParameters.Clone();
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
 
             string YC_gptmd = @"E:\CE\250318_CE\YC_cali-avged_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
             string gptmdDb = @"E:\ISD Project\ISD_250428\0428YB_gptmd-xml\Task1-GPTMDTask\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";

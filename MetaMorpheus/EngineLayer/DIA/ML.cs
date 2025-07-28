@@ -3,12 +3,6 @@ using Microsoft.ML;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EngineLayer.DIA;
-using System.Reflection.Emit;
-using MathNet.Numerics.Statistics;
-using MathNet.Numerics.Random;
 using MzLibUtil;
 using System.Linq.Expressions;
 using CsvHelper.Configuration;
@@ -16,16 +10,13 @@ using CsvHelper;
 using Readers;
 using System.Globalization;
 using System.IO;
-using Omics.Fragmentation;
-using MassSpectrometry;
-using Microsoft.ML.Trainers;
-using Numerics.NET.DataAnalysis.Models;
 using Microsoft.ML.Trainers.LightGbm;
 using BayesianEstimation;
 using MathNet.Numerics.Distributions;
 using Microsoft.ML.Data;
 using System.Data;
-using System.ComponentModel;
+using Proteomics.AminoAcidPolymer;
+using ThermoFisher.CommonCore.Data.Business;
 
 namespace EngineLayer.DIA
 {
@@ -35,6 +26,7 @@ namespace EngineLayer.DIA
         public float ApexRtDelta { get; set; }   // e.g., RT diff
         public float Overlap { get; set; }      // e.g., XIC overlap
         public float FragmentIntensity { get; set; } // e.g., fragment intensity
+        public float NormalizedIntensityRank { get; set; } // e.g., normalized intensity rank
         public float PsmScore { get; set; } 
         public float SharedXIC { get; set; } 
         public bool Label { get; set; }       
@@ -50,12 +42,67 @@ namespace EngineLayer.DIA
             FragmentIntensity = (float)fragment.ApexIntensity;
             SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
         }
+
+        public PFPairFeature(PFpairMetrics pfPairMetrics)
+        {
+            Correlation = (float)pfPairMetrics.Correlation;
+            ApexRtDelta = (float)pfPairMetrics.ApexRtDelta;
+            Overlap = (float)pfPairMetrics.Overlap;
+            FragmentIntensity = (float)pfPairMetrics.FragmentIntensity;
+            SharedXIC = (float)pfPairMetrics.SharedXIC;
+            NormalizedIntensityRank = (float)pfPairMetrics.NormalizedIntensityRank;
+            if (pfPairMetrics.MatchedIonType == "NA") Label = false;
+            if (pfPairMetrics.MatchedIonType == "Terminal") Label = true;
+            if (pfPairMetrics.MatchedIonType == "NeutralLoss") Label = true;
+        }
+
+        public PFPairFeature(PrecursorFragmentPair pfPair)
+        {
+            Correlation = (float)pfPair.Correlation;
+            ApexRtDelta = (float)Math.Abs(pfPair.PrecursorPeakCurve.ApexRT - pfPair.FragmentPeakCurve.ApexRT);
+            Overlap = (float)pfPair.Overlap;
+            FragmentIntensity = (float)pfPair.FragmentPeakCurve.ApexIntensity;
+            SharedXIC = (float)pfPair.SharedXIC;
+            NormalizedIntensityRank = (float)pfPair.NormalizedIntensityRank;
+        }
+
+        public static IEnumerable<PFPairFeature> ConvertPfPairMetricsToPfPairFeatures(IEnumerable<PFpairMetrics> pfPairMetricsList)
+        {
+            foreach (var pfPairMetrics in pfPairMetricsList)
+            {
+                yield return new PFPairFeature(pfPairMetrics);
+            }
+        }
     }
 
     public class MyInput
     {
         [VectorType(5)] // Because you have 5 features
         public float[] features { get; set; }
+
+        public MyInput(float[] features)
+        {
+            this.features = features;
+        }
+
+        public MyInput(PeakCurve precursor, PeakCurve fragment)
+        {
+            features = new float[5];
+            features[0] = (float)PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, fragment);
+            features[1] = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
+            features[2] = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
+            features[3] = (float)fragment.ApexIntensity;
+        }
+
+        public MyInput(PrecursorFragmentPair pfPair)
+        {
+            features = new float[5];
+            features[0] = (float)pfPair.Correlation;
+            features[1] = (float)Math.Abs(pfPair.PrecursorPeakCurve.ApexRT - pfPair.FragmentPeakCurve.ApexRT);
+            features[2] = (float)pfPair.SharedXIC;
+            features[3] = (float)pfPair.FragmentPeakCurve.ApexIntensity;
+            features[4] = (float)pfPair.NormalizedIntensityRank;
+        }
     }
 
     public class PFpairPrediction
@@ -63,8 +110,6 @@ namespace EngineLayer.DIA
         [ColumnName("PredictedLabel")]
         public bool Prediction;
 
-        // No need to specify ColumnName attribute, because the field
-        // name "Probability" is the column name we want.
         public float Probability;
 
         public float Score;
@@ -129,8 +174,9 @@ namespace EngineLayer.DIA
 
     public class TrainModel
     {
-        public static ITransformer TrainGradientBoostedTree(IEnumerable<PFPairFeature> samples, List<string> featureList, string modelPath = null)
+        public static ITransformer TrainGradientBoostedTree(IEnumerable<PFpairMetrics> pairMetrics, List<string> featureList, string modelPath = null)
         {
+            var samples = PFPairFeature.ConvertPfPairMetricsToPfPairFeatures(pairMetrics);
             var filteredSamples = UnderSample(samples); 
             var gbmSamples = PFPairFeatureGbm.ConvertFeatureSamplesToGbm(filteredSamples, featureList);
 
@@ -161,8 +207,9 @@ namespace EngineLayer.DIA
             return model;
         }
 
-        public static ITransformer TrainLogisticRegression(IEnumerable<PFPairFeature> samples, List<string> featureList, string modelPath = null)
+        public static ITransformer TrainLogisticRegression(IEnumerable<PFpairMetrics> pairMetrics, List<string> featureList, string modelPath = null)
         {
+            var samples = PFPairFeature.ConvertPfPairMetricsToPfPairFeatures(pairMetrics);
             var filteredSamples = UnderSample(samples);
 
             var mlContext = new MLContext();
@@ -184,8 +231,9 @@ namespace EngineLayer.DIA
             return model;
         }
 
-        public static ITransformer TrainFastTree(IEnumerable<PFPairFeature> samples, List<string> featureList, string modelPath = null)
+        public static ITransformer TrainFastTree(IEnumerable<PFpairMetrics> pairMetrics, List<string> featureList, string modelPath = null)
         {
+            var samples = PFPairFeature.ConvertPfPairMetricsToPfPairFeatures(pairMetrics);
             var filteredSamples = UnderSample(samples);
 
             var mlContext = new MLContext();

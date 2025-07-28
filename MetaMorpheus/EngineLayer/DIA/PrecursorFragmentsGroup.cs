@@ -71,6 +71,17 @@ namespace EngineLayer.DIA
             }
         }
 
+        public void SetNormalizedIntensityRankForPFpairs()
+        {
+            PFpairs = PFpairs.OrderByDescending(pair => pair.FragmentPeakCurve.ApexIntensity).ToList();
+            int rank = 1;
+            foreach (var pf in PFpairs)
+            {
+                pf.NormalizedIntensityRank = rank;
+                rank++;
+            }
+        }
+
         //TODO: finish this
         public static PrecursorFragmentsGroup GroupPF(PeakCurve prePeakCurve, List<PeakCurve> fragPeakCurves)
         {
@@ -182,11 +193,7 @@ namespace EngineLayer.DIA
             }
             if (preFragGroup.PFpairs.Count > 0)
             {
-                preFragGroup.PFpairs = preFragGroup.PFpairs.OrderByDescending(pair => pair.FragmentPeakCurve.ApexIntensity).ToList();
-                for (int i = 0; i < preFragGroup.PFpairs.Count; i++)
-                {
-                    preFragGroup.PFpairs[i].NormalizedIntensityRank = i + 1;
-                }
+                preFragGroup.SetNormalizedIntensityRankForPFpairs();
                 return preFragGroup;
             }
             else
@@ -215,8 +222,8 @@ namespace EngineLayer.DIA
             {
                 model = mlContext.Model.Load(modelPath, out var modelInputSchema);
             }
-            var predictionEngine = mlContext.Model.CreatePredictionEngine<MyInput, PFpairPrediction>(model);
-            Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
+            var predictionEngine = mlContext.Model.CreatePredictionEngine<PFPairFeature, PFpairPrediction>(model);
+            Parallel.ForEach(Partitioner.Create(0, allMs1PeakCurves.Count), new ParallelOptions { MaxDegreeOfParallelism = diaParam.NumberOfThreadsForGrouping },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
@@ -243,17 +250,26 @@ namespace EngineLayer.DIA
             return pfGroups;
         }
 
-        public static PrecursorFragmentsGroup MLgroupingForOnePFgroup(PeakCurve precursor, TreeDictionary<double, List<PeakCurve>> ms2Tree, DIAparameters diaParam, PredictionEngine<MyInput, PFpairPrediction> predictionEngine)
+        public static PrecursorFragmentsGroup MLgroupingForOnePFgroup(PeakCurve precursor, TreeDictionary<double, List<PeakCurve>> ms2Tree, DIAparameters diaParam, PredictionEngine<PFPairFeature, PFpairPrediction> predictionEngine)
         {
             var candidateMs2curves = ms2Tree.RangeFromTo(precursor.ApexRT - diaParam.ApexRtTolerance, precursor.ApexRT + diaParam.ApexRtTolerance).SelectMany(kv => kv.Value).ToList();
             var pfGroup = new PrecursorFragmentsGroup(precursor);
+            var pseudoGroup = new PrecursorFragmentsGroup(precursor);
             foreach (var ms2curve in candidateMs2curves)
             {
-                var pfPairFeature = new MyInput();
-                var prediction = predictionEngine.Predict(pfPairFeature);
+                var pfPair = new PrecursorFragmentPair(precursor, ms2curve);
+                pfPair.Correlation = PrecursorFragmentPair.CalculatePeakCurveCorrXYData(precursor, ms2curve);
+                pfPair.SharedXIC = PrecursorFragmentPair.CalculateSharedXIC(precursor, ms2curve);
+                pseudoGroup.PFpairs.Add(pfPair);
+            }
+            pseudoGroup.SetNormalizedIntensityRankForPFpairs();
+            foreach (var pair in pseudoGroup.PFpairs)
+            {
+                var myInput = new PFPairFeature(pair);
+                var prediction = predictionEngine.Predict(myInput);
                 if (prediction.Probability >= diaParam.MLProbThreshold)
                 {
-                    pfGroup.PFpairs.Add(new PrecursorFragmentPair(precursor, ms2curve));
+                    pfGroup.PFpairs.Add(pair);
                 }
             }
             if (pfGroup.PFpairs.Count > 0)
