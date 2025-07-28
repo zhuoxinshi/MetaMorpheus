@@ -31,7 +31,7 @@ namespace Test.TestDIA
             task.CommonParameters.TrimMsMsPeaks = false;
             task.CommonParameters.TrimMs1Peaks = false;
             //task.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\TestSearch\bu-DIAEngine_static_deconHighestPeak-JustPair_num4_targetOnly_writeLib_numIsotopes3";
+            string outputFolder = @"E:\DIA\TestSearch\speed";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -40,7 +40,7 @@ namespace Test.TestDIA
                 maxNumMissedScan:1, overlapRatioCutOff: 0, correlationCutOff: -1, apexRtTolerance: 0.5, 
                 fragmentRankCutOff: 1000, precursorRankCutOff: 1000, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0, 
                 precursorIntensityCutOff: 0, splitMS2Peak: false, splitMS1Peak: false, splineTimeInterval: 0.05f, minMS1Mass: 0, maxMass: 10000, type: "DIA", apexCycleTolerance: 3,
-                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.JustPair,
+                scanCycleSplineInterval: 0.005, ms1XICType: XICType.DeconHighestPeak, ms2XICType: XICType.Peak, cutMs1Peaks: false, cutMs2Peaks: false, pfGroupingType: PFGroupingType.RetentionTime,
                 pseudoMs2Type: PseudoMs2ConstructionType.mzPeak, analysisType: AnalysisType.DIAEngine_static, ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, 
                 splineRtInterval: 0.005, ms1NumPeaksThreshold: 4, ms2NumPeaksThreshold: 4, neutralLossSearch: true, numIsotopes: 3);
             // Use reflection to set max threads
@@ -743,7 +743,7 @@ namespace Test.TestDIA
             string debug_xml = @"E:\ISD Project\TestSearch\ASMS\Individual_nocali\04-29-25_PEPPI-YD_105min_ISD60-80-100_preFilter800-1000-1200_RF_labelCorrected\0.5, 0.3\GPTMD\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16GPTMD.xml";
 
             var fileList2 = new List<string> {  filePathD};
-            var outFolder2 = @"E:\ISD Project\TestSearch\random\test-speed_D";
+            var outFolder2 = @"E:\ISD Project\TestSearch\random\test-speed_D_tree";
             if (!Directory.Exists(outFolder))
             {
                 Directory.CreateDirectory(outFolder);
@@ -764,9 +764,9 @@ namespace Test.TestDIA
                        maxNumMissedScan: 2, binSize: 1, overlapRatioCutOff: 0.2, correlationCutOff: corr, apexRtTolerance: apex,
                        fragmentRankCutOff: 150, precursorRankCutOff: 20, maxRTrangeMS1: 0.5, maxRTrangeMS2: 0.5, highCorrThreshold: 0.5, numHighCorrFragments: 0,
                        precursorIntensityCutOff: 0.01, splineTimeInterval: 0.005f, type: "DIA", scanCycleSplineInterval: 0.05, minMS1Mass: 4000, minMS1Charge: 4, minMS2Charge: 1, minMS2Mass: 0, splineRtInterval: 0.005,
-                       ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.Umpire,
+                       ms1XICType: XICType.MassCurve, ms2XICType: XICType.MassCurve, pfGroupingType: PFGroupingType.RetentionTime,
                        pseudoMs2Type: PseudoMs2ConstructionType.neutralMass, analysisType: AnalysisType.ISDEngine_static, cutMs1Peaks: false, cutMs2Peaks: false,
-                       ms1SplineType: SplineType.UmpireBSpline, ms2SplineType: SplineType.UmpireBSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false,
+                       ms1SplineType: SplineType.NoSpline, ms2SplineType: SplineType.NoSpline, sgFilterWindowSize: 7, ms1NumPeaksThreshold: 2, ms2NumPeaksThreshold: 2, combineFragments: false,
                        rankFilter: false, minPFpairCount: 10, sharedXICCutOff: 0.5);
                         if (!Directory.Exists(resultFolder))
                         {
