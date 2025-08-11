@@ -135,7 +135,7 @@ namespace EngineLayer.Gptmd
                                 double score = CalculatePeptideScore(scan, matchedIons, false);
 
                                 // plus 2 is to translate from zero based string array index to OneBasedModification index
-                                int modSite = pepWithSetMods.OneBasedStartResidue + j + 1;
+                                int modSite = pepWithSetMods.OneBasedStartResidue + j;
                                 if (!Filters.All(f => f.Passes(newPep, psm, score, originalScore, matchedIons, j + 2, pepWithSetMods.Length, mod)))
                                     continue;
 
