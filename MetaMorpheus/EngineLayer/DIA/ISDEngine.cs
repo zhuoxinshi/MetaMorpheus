@@ -14,8 +14,7 @@ namespace EngineLayer.DIA
     public class ISDEngine : DIAEngine
     {
         private readonly MsDataFile DataFile;
-        public List<double> sourceVoltages { get; set; } 
-        public ISDEngine(List<double> sourceVoltages, DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
+        public ISDEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
         {
         }
 

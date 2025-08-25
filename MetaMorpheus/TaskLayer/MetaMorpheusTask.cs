@@ -27,6 +27,7 @@ using Transcriptomics;
 using Transcriptomics.Digestion;
 using Easy.Common.Extensions;
 using Readers;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -389,6 +390,12 @@ namespace TaskLayer
 
         public static IEnumerable<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
+            if (commonParameters.DIAparameters != null)
+            {
+                var isdEngine = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                isdEngine.Run();
+                return isdEngine.PseudoMs2Scans;
+            }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);
 
             if (scansWithPrecursors.Length == 0)
