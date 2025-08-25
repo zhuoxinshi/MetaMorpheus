@@ -22,8 +22,8 @@ namespace Test.DIATests
         [Test]
         public static void SearchCE()
         {
-            var filePath1 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_105min_ISD60-80-100_micro1_labelCorrected.mzML";
-            var fileList = new List<string> { filePath1, };
+            var filePath1 = @"E:\CE\250730_CE\08-19-25_CE_ammon-acet_PEPPI-YB_500nL-pHjunction_ISD60-80_preFilter700-900-1100.raw";
+            var fileList = new List<string> { filePath1};
             var outputFolder = @"E:\ISD Project\TestSearch\DIAupdate\test1_ISD";
             if (!Directory.Exists(outputFolder))
             {
@@ -53,7 +53,7 @@ namespace Test.DIATests
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+            var taskList = new List<(string, MetaMorpheusTask)> {("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
 
             string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
             var yeast_fasta = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_10_02.fasta";

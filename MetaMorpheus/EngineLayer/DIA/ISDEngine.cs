@@ -16,6 +16,8 @@ namespace EngineLayer.DIA
         private readonly MsDataFile DataFile;
         public ISDEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
         {
+            DIAparams = DIAparameters;
+            DataFile = dataFile;
         }
 
         protected override MetaMorpheusEngineResults RunSpecific()
