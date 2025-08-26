@@ -34,6 +34,16 @@ namespace EngineLayer.DIA
             }
         }
 
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(BaseToString());
+            sb.AppendLine($"NeutralMassXicConstructorSettings: ");
+            sb.AppendLine($"DeconvolutionParameters: {DeconParameters}");
+            sb.AppendLine($"MinMass: {MinMass}");
+            sb.AppendLine($"MinCharge: {MinCharge}");
+            return base.ToString();
+        }
     }
 }
 
