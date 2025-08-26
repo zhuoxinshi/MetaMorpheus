@@ -69,22 +69,21 @@ namespace Test.DIATests
             string tomlFile = @"E:\Aneuploidy\searchToml_commonFixedVariable_noTrim_writeLib\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             //task.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\TestSearch\speed";
+            string outputFolder = @"E:\DIA\bottomUp\umpire_try1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(10), 2, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new XicCubicSpline(0.05, numberOfPeaksToAdd: 1));
             var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3, new XicCubicSpline(0.05, numberOfPeaksToAdd: 1));
-            var pfGroupingEngine = new XicGroupingEngine(0.15f, 0.2, 0.5, 10, 10);
+            var pfGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 20, fragmentRankThreshold: 250);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.MzPeak);
 
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
             string umpireFile = @"E:\DIA\DIA-Umpire data\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
             string benchmarkDb = @"E:\REF_EColi_K12_UPS1_combined.fasta";
             string humanDb = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
-            string yeast_xml = @"E:\ISD Project\ISD_240812\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
-            searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
+            searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { umpireFile }, "test");
         }
     }
 }
