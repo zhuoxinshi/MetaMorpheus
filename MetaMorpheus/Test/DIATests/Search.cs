@@ -33,7 +33,7 @@ namespace Test.DIATests
             string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
 
-            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 4000, 4, new XicLinearSpline(0.05, numberOfPeaksToAdd: 1));
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new XicLinearSpline(0.05, numberOfPeaksToAdd: 1));
