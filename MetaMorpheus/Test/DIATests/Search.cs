@@ -69,7 +69,7 @@ namespace Test.DIATests
             string tomlFile = @"E:\Aneuploidy\searchToml_commonFixedVariable_noTrim_writeLib\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             //task.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\bottomUp_update\oldData_try1";
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData_try1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
