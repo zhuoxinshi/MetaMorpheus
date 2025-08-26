@@ -74,8 +74,8 @@ namespace Test.DIATests
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 0.5, 5, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new XicCubicSpline(0.05));
-            var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 5, new XicCubicSpline(0.05));
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new XicCubicSpline(0.05));
+            var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3, new XicCubicSpline(0.05));
             var pfGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 10, fragmentRankThreshold: 200);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.DIA, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.MzPeak);
 
