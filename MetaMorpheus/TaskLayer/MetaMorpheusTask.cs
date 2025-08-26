@@ -392,9 +392,17 @@ namespace TaskLayer
         {
             if (commonParameters.DIAparameters != null)
             {
-                var isdEngine = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
-                isdEngine.Run();
-                return isdEngine.PseudoMs2Scans;
+                switch (commonParameters.DIAparameters.AnalysisType)
+                {
+                    case(AnalysisType.DIA):
+                        var diaEngine = new DIAEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                        diaEngine.Run();
+                        return diaEngine.PseudoMs2Scans;
+                    case (AnalysisType.ISD):
+                        var isdEngine = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                        isdEngine.Run();
+                        return isdEngine.PseudoMs2Scans;
+                }
             }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);
 

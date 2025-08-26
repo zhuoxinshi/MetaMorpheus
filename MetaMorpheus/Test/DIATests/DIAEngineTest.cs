@@ -242,7 +242,7 @@ namespace Test.DIATests
             }
             var testMsDataFile = new GenericMsDataFile(allScans, new SourceFile("no nativeID format", "mzML format", null, null, null));
 
-            var DIAparams = new DIAparameters(new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)), new MzPeakXicConstructor(new PpmTolerance(5), 2, 1, 3), new XicGroupingEngine(0.1f, 0.5, 0.5), PseudoMs2ConstructionType.MzPeak);
+            var DIAparams = new DIAparameters(AnalysisType.DIA, new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)), new MzPeakXicConstructor(new PpmTolerance(5), 2, 1, 3), new XicGroupingEngine(0.1f, 0.5, 0.5), PseudoMs2ConstructionType.MzPeak);
             var diaEngine = new DIAEngine(DIAparams, testMsDataFile, new CommonParameters(), new List<(string FileName, CommonParameters Parameters)>(), new List<string> { "test" });
             diaEngine.Run();
 
