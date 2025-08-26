@@ -123,7 +123,7 @@ namespace EngineLayer.DIA
                     break;
                 case PseudoMs2ConstructionType.Mass:
                     neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => new IsotopicEnvelope(1,
-                            new List<(double mz, double intensity)> { (1, 1) }, pf.FragmentXic.AveragedMassOrMz, pf.FragmentXic.Peaks.Cast<IndexedMass>().First().Charge, 1, 0)).ToArray();
+                            new List<(double mz, double intensity)> { (1, 1) }, pf.FragmentXic.ApexPeak.M, pf.FragmentXic.Peaks.Cast<IndexedMass>().First().Charge, 1, 0)).ToArray();
                     break;
                 default:
                     throw new ArgumentException("Invalid pseudo MS2 construction type specified.");
