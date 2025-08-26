@@ -76,8 +76,9 @@ namespace Test.DIATests
             }
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new XicCubicSpline(0.05));
             var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3, new XicCubicSpline(0.05));
-            var pfGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 10, fragmentRankThreshold: 200);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.DIA, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.MzPeak);
+            var xicGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 10, fragmentRankThreshold: 200);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.2f, 0.2, 0.5, 10, 0, 10, 200);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.DIA, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.MzPeak);
 
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
             string umpireFile = @"E:\DIA\DIA-Umpire data\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
