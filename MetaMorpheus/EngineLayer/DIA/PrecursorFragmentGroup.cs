@@ -41,6 +41,13 @@ namespace EngineLayer.DIA
 
         public static double CalculateXicCorrXYData_Umpire(ExtractedIonChromatogram xic1, ExtractedIonChromatogram xic2, int NoPointPerInterval)
         {
+            if (xic1.XYData == null || xic2.XYData == null)
+            {
+                var xy1 = xic1.Peaks.Select(p => ((float)p.ZeroBasedScanIndex, p.Intensity)).ToArray();
+                var xy2 = xic2.Peaks.Select(p => ((float)p.ZeroBasedScanIndex, p.Intensity)).ToArray();
+                return CalculateCorrelation(xy1, xy2);
+            }
+
             double start = Math.Max(xic1.XYData[0].Item1, xic2.XYData[0].Item1);
 
             //int num = Math.Min(curve1.SmoothedData.Count, curve2.SmoothedData.Count) / 2;
