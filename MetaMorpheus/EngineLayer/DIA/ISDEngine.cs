@@ -28,7 +28,7 @@ namespace EngineLayer.DIA
             ReLabelIsdScans(isdVoltageMap, allScans);
 
             //Get all MS1 and MS2 XICs
-            var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXics(ms1Scans);
+            var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans);
             var allMs2Xics = new Dictionary<double, List<ExtractedIonChromatogram>>();
             foreach (var ms2Group in isdVoltageMap)
             {
