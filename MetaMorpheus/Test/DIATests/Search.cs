@@ -70,7 +70,7 @@ namespace Test.DIATests
             string tomlFile = @"E:\Aneuploidy\searchToml_commonFixedVariable_noTrim_writeLib\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\umpire_try_25-300_afterMerge";
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\umpire_try_10-100_deconHighest";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -79,7 +79,7 @@ namespace Test.DIATests
             //var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3, new Bspline(2, 150));
             var ms2XicConstructor = new DeconHighestPeakXicConstructor(new PpmTolerance(5), 1, 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, new Bspline(2, 150));
             //var xicGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 10, fragmentRankThreshold: 200);
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.5, 10, 0, 25, 300);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.5, 10, 0, 10, 100);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.DIA, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.MzPeak);
 
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
