@@ -70,16 +70,16 @@ namespace Test.DIATests
             string tomlFile = @"E:\Aneuploidy\searchToml_commonFixedVariable_noTrim_writeLib\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\umpire_try_15-150_deconHighest";
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\umpire_try_0.2f_10-200_mass";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            //var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(10), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new Bspline(2, 150));
-            var ms1XicConstructor = new DeconHighestPeakXicConstructor(new PpmTolerance(5), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, new Bspline(2, 150));//min number of fragments cannot be 0
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(10), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            //var ms1XicConstructor = new DeconHighestPeakXicConstructor(new PpmTolerance(5), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, new Bspline(2, 150));//min number of fragments cannot be 0
             var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3, new Bspline(2, 150));
             //var xicGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 10, fragmentRankThreshold: 200);
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.5, 10, 1, 15, 150);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.2f, 0.2, 0.7, 10, 1, 10, 200);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.DIA, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.MzPeak);
 
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
