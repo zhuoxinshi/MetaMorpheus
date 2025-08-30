@@ -50,6 +50,7 @@ namespace EngineLayer.DIA
 
             //Convert pfGroups to pseudo MS2 scans
             PseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
+            var group = allPfGroups.Any(g => g == null || g.PFpairs == null);
             int pfGroupIndex = 1;
             foreach (var pfGroup in allPfGroups)
             {
