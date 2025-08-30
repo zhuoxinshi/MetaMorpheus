@@ -4,12 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EngineLayer.DIA
+namespace EngineLayer.DIA.ML
 {
-    public enum PseudoMs2ConstructionType
+    public enum PseudoSearchScanType
     {
-        MzPeak,
-        Mass,
+        DirectSearch,
+        TargetDecoy,
+        MatchedIonType
     }
-
 }

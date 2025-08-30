@@ -14,6 +14,7 @@ namespace EngineLayer.DIA
     public class ISDEngine : DIAEngine
     {
         private readonly MsDataFile DataFile;
+        public SearchParameters
         public ISDEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
         {
             DIAparams = DIAparameters;
