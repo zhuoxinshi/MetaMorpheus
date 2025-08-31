@@ -10,7 +10,6 @@ using EngineLayer.DIA.ML;
 using Chemistry;
 using System.Collections.Concurrent;
 using EngineLayer.ClassicSearch;
-using Readers.SpectralLibrary;
 using Omics;
 using Microsoft.ML;
 
@@ -21,6 +20,7 @@ namespace EngineLayer.DIA
         private readonly MsDataFile DataFile;
         public PseudoSearchScanType PseudoSearchScanType { get; set; }
         private readonly List<IBioPolymer> Proteins;
+        public List<string> Features { get; set; }
         public DIA_MLEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
         {
             DIAparams = DIAparameters;
