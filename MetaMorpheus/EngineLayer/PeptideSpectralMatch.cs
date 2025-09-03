@@ -13,7 +13,7 @@ namespace EngineLayer
             Ms2ScanWithSpecificMass scan, CommonParameters commonParameters, List<MatchedFragmentIon> matchedFragmentIons) 
             : base(peptide, notch, score, scanIndex, scan, commonParameters, matchedFragmentIons)
         {
-
+            ScanPrecursorHighestIsotopeMz = scan.PrecursorHighestIsotopeMz;
         }
 
         #region Silac

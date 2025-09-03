@@ -39,6 +39,7 @@ namespace EngineLayer
 
         public MsDataScan TheScan { get; }
         public double PrecursorMonoisotopicPeakMz { get; }
+        public double PrecursorHighestIsotopeMz { get; set; }
         public double PrecursorMass { get; }
         public int PrecursorCharge { get; }
         public double PrecursorIntensity { get; }

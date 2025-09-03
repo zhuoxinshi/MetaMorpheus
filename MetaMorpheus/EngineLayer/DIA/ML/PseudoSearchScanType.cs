@@ -4,12 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EngineLayer.DIA.ML
+namespace EngineLayer.DIA
 {
     public enum PseudoSearchScanType
     {
         DirectSearch,
-        TargetDecoy,
-        MatchedIonType
+        AllOverlap,
     }
 }

@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 
 namespace EngineLayer.DIA
 {
-    public enum AnalysisType
+    public enum ModelType
     {
-        ISD,
-        DIA,
-        MLbased,
+        LogisticRegression,
+        FastTree
     }
 }

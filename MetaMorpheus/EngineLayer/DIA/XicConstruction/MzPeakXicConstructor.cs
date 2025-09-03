@@ -16,10 +16,10 @@ namespace EngineLayer.DIA
         {
         }
 
-        public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, MzRange isolationRange = null)
+        public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null)
         {
             var mzPeakIndexingEngine = PeakIndexingEngine.InitializeIndexingEngine(scans);
-            return mzPeakIndexingEngine.GetAllXics(PeakFindingTolerance, MaxMissedScansAllowed, MaxPeakHalfWidth, MinNumberOfPeaks, out var matchedPeaks);
+            return mzPeakIndexingEngine.GetAllXics(PeakFindingTolerance, MaxMissedScansAllowed, MaxPeakHalfWidth, MinNumberOfPeaks, out matchedPeaks);
         }
     }
 }

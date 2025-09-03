@@ -93,7 +93,7 @@ namespace EngineLayer.DIA
             return null;
         }
 
-        protected static SortedDictionary<double, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics)
+        public static SortedDictionary<double, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics)
         {
             var tree = new SortedDictionary<double, List<ExtractedIonChromatogram>>();
             foreach (var xic in xics)
@@ -106,7 +106,7 @@ namespace EngineLayer.DIA
             return tree;
         }
 
-        protected static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<double, List<ExtractedIonChromatogram>> apexSortedFragmentXics, double targetApexRt, double rtTolerance)
+        public static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<double, List<ExtractedIonChromatogram>> apexSortedFragmentXics, double targetApexRt, double rtTolerance)
         {
             double minRt = Math.Round(targetApexRt - rtTolerance, 2);
             double maxRt = Math.Round(targetApexRt + rtTolerance, 2);

@@ -34,11 +34,11 @@ namespace EngineLayer.DIA
             XicSplineEngine = xicSpline;
         }
 
-        public abstract List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, MzRange isolationRange = null);
+        public abstract List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null);
 
-        public List<ExtractedIonChromatogram> GetAllXicsWithXicSpline(MsDataScan[] scans, MzRange isolationRange = null, int? numberOfThreads = null)
+        public List<ExtractedIonChromatogram> GetAllXicsWithXicSpline(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null,  int? numberOfThreads = null)
         {
-            var allXics = GetAllXics(scans, isolationRange);
+            var allXics = GetAllXics(scans, out matchedPeaks, isolationRange);
             if (XicSplineEngine != null)
             {
                 Parallel.ForEach(Partitioner.Create(0, allXics.Count), new ParallelOptions { MaxDegreeOfParallelism = numberOfThreads.HasValue ? numberOfThreads.Value : Environment.ProcessorCount - 2 },

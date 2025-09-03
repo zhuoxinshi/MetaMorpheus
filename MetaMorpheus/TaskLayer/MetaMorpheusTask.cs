@@ -28,6 +28,8 @@ using Transcriptomics.Digestion;
 using Easy.Common.Extensions;
 using Readers;
 using EngineLayer.DIA;
+using System.Runtime.CompilerServices;
+using CsvHelper;
 
 namespace TaskLayer
 {
@@ -402,6 +404,10 @@ namespace TaskLayer
                         var isdEngine = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
                         isdEngine.Run();
                         return isdEngine.PseudoMs2Scans;
+                    case (AnalysisType.MLbased):
+                        var mlEngine = new DIA_MLEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                        mlEngine.Run();
+                        return mlEngine.PseudoMs2Scans;
                 }
             }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);

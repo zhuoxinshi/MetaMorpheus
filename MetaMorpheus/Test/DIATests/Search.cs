@@ -88,5 +88,29 @@ namespace Test.DIATests
             string humanDb = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
             searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
         }
+
+        [Test]
+        public static void TestMLSearch()
+        {
+            string tomlFile = @"E:\Aneuploidy\searchToml_commonFixedVariable_noTrim_writeLib\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_try1_randomForest";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+            //var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(10), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            var ms1XicConstructor = new DeconHighestPeakXicConstructor(new PpmTolerance(5), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters);//min number of fragments cannot be 0
+            var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3);//, new Bspline(2, 150)
+
+            string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
+            string umpireFile = @"E:\DIA\DIA-Umpire data\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
+            string humanDb = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
+
+            var features = new List<string> { "Correlation", "ApexRtDelta"};
+            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, humanDb, false, ModelType.LogisticRegression, features, 15, null, null, 0.2, 0.5, AnalysisType.MLbased, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.MzPeak) ;
+            searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
+        }
     }
 }

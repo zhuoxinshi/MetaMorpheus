@@ -74,6 +74,7 @@ namespace EngineLayer
         public double TotalIonCurrent { get; }
         public int ScanPrecursorCharge { get; }
         public double ScanPrecursorMonoisotopicPeakMz { get; }
+        public double ScanPrecursorHighestIsotopeMz { get; set; }
         public double PrecursorScanIntensity { get; }
         public int PrecursorScanEnvelopePeakCount { get; }
         public double PrecursorFractionalIntensity { get; }

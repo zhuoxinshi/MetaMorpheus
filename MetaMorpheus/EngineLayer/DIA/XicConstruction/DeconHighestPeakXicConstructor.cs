@@ -19,12 +19,12 @@ namespace EngineLayer.DIA.XicConstruction
             DeconParameters = deconParameters;
         }
 
-        public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, MzRange isolationRange = null)
+        public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null)
         {
             var mzPeakIndexingEngine = PeakIndexingEngine.InitializeIndexingEngine(scans);
+            var allMzXics = mzPeakIndexingEngine.GetAllXics(PeakFindingTolerance, MaxMissedScansAllowed, MaxPeakHalfWidth, MinNumberOfPeaks, out matchedPeaks);
             if (PeakXicDictionary == null)
             {
-                var allMzXics = mzPeakIndexingEngine.GetAllXics(PeakFindingTolerance, MaxMissedScansAllowed, MaxPeakHalfWidth, MinNumberOfPeaks, out var matchedPeaks);
                 PeakXicDictionary = matchedPeaks;
             }
             var foundedXics = new HashSet<ExtractedIonChromatogram>();
