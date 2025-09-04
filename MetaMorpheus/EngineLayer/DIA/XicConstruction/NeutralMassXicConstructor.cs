@@ -21,9 +21,10 @@ namespace EngineLayer.DIA
             MinCharge = minCharge;
         }
 
-        public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null)
+        public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, out object indexingEngine, MzRange isolationRange = null)
         {
             var neutralMassIndexingEngine = new MassIndexingEngine();
+            indexingEngine = neutralMassIndexingEngine;
             if (neutralMassIndexingEngine.IndexPeaks(scans, DeconParameters, isolationRange, MinMass, MinCharge))
             {
                 return neutralMassIndexingEngine.GetAllXics(PeakFindingTolerance, MaxMissedScansAllowed, MaxPeakHalfWidth, MinNumberOfPeaks, out matchedPeaks);

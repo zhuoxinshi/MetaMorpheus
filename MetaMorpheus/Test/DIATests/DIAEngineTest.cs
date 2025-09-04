@@ -63,7 +63,7 @@ namespace Test.DIATests
 
             var deconParameters = new ClassicDeconvolutionParameters(1, 20, 4, 3);
             var massXicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, deconParameters);
-            var massXics = massXicConstructor.GetAllXics(fakeScans, out var matchedPeaks);
+            var massXics = massXicConstructor.GetAllXics(fakeScans, out var matchedPeaks, out var indexingEngine);
 
             //Two different masses should give 2 XICs in the neutral mass space and each XIC contains 5 peaks
             Assert.That(massXics.Count, Is.EqualTo(2));
@@ -76,7 +76,7 @@ namespace Test.DIATests
 
             //Test Xic construction with mz peak indexing with the same fake scans
             var mzPeakXicConstructor = new MzPeakXicConstructor(new PpmTolerance(5), 2, 1, 3);
-            var mzXics = mzPeakXicConstructor.GetAllXics(fakeScans, out var matched);
+            var mzXics = mzPeakXicConstructor.GetAllXics(fakeScans, out matchedPeaks, out indexingEngine);
             //There are six peaks in each scan of fakeScans, which should give 10 XICs and each XIC contains 5 peaks
             Assert.That(mzXics.Count, Is.EqualTo(preDist1.Masses.Count() + preDist2.Masses.Count()));
             foreach(var xic in mzXics)
@@ -93,7 +93,7 @@ namespace Test.DIATests
 
             //Test excetion handling in XicConstructor
             var emptyScans = new MsDataScan[0];
-            var ex = Assert.Throws<MetaMorpheusException>(() => massXicConstructor.GetAllXics(emptyScans, out var matchedPeaks));
+            var ex = Assert.Throws<MetaMorpheusException>(() => massXicConstructor.GetAllXics(emptyScans, out var matchedPeaks, out var indexingEngine));
             Assert.That(ex.Message, Is.EqualTo("XIC construction failed."));
         }
 
@@ -105,7 +105,7 @@ namespace Test.DIATests
             var fakeScans1 = GetSimpleFakeScans("PEPTIDE", intensityMultipliers, 1e6, 1.0, 1, out IsotopicDistribution preDist1);
             var xicLinearSpline = new XicLinearSpline(0.05);
             var mzPeakXicConstructor = new MzPeakXicConstructor(new PpmTolerance(5), 2, 1, 3, xicLinearSpline);
-            var mzXics = mzPeakXicConstructor.GetAllXicsWithXicSpline(fakeScans1, out var matchedPeaks);
+            var mzXics = mzPeakXicConstructor.GetAllXicsWithXicSpline(fakeScans1,out var matchedPeaks, out var indexingEngine);
             //GetAllXicsAndXicSpline should return all Xics in a given set of scans and set XYData for each XIC if XicSplineEngine is defined in the XicConstructor
             foreach (var xic in mzXics)
             {
@@ -126,7 +126,7 @@ namespace Test.DIATests
             //construct all ms1 xics using mass indexing
             var deconParameters = new ClassicDeconvolutionParameters(1, 20, 4, 3);
             var massXicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, deconParameters);
-            var ms1Xics = massXicConstructor.GetAllXics(fakeMs1Scans, out var matchedPeaks);
+            var ms1Xics = massXicConstructor.GetAllXics(fakeMs1Scans, out var matchedPeaks, out var indexingEngine);
 
             //Create MS2 scans with two sets of fragments each aligning perfectly with one of the precursors in MS1 scans
             var fakeaMs2Scans1 = GetSimpleFakeScans("PEP", intensityMultipliers, 1e6, 1.0, 2, out IsotopicDistribution fragDist1);
@@ -135,7 +135,7 @@ namespace Test.DIATests
 
             //construct all ms2 xics using mz peak indexing
             var mzPeakXicConstructor = new MzPeakXicConstructor(new PpmTolerance(5), 2, 1, 3);
-            var ms2Xics = mzPeakXicConstructor.GetAllXics(fakeMs2Scans, out matchedPeaks);
+            var ms2Xics = mzPeakXicConstructor.GetAllXics(fakeMs2Scans, out matchedPeaks, out indexingEngine);
 
             //create a XicGroupingEngine to find all precursor-fragment groups in the MS1 and MS2 scans
             var xicGroupingEngine = new XicGroupingEngine(0.1f, 0.5, 0.5);
@@ -161,11 +161,11 @@ namespace Test.DIATests
 
             var deconParameters = new ClassicDeconvolutionParameters(1, 20, 4, 3);
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, deconParameters);
-            var ms1Xics = ms1XicConstructor.GetAllXics(fakeaMs1Scans, out var matchedPeaks);
+            var ms1Xics = ms1XicConstructor.GetAllXics(fakeaMs1Scans, out var matchedPeaks, out var indexingEngine);
 
             //Test with PseudoMs2ConstructionType.MzPeak when we use mzPeak indexing on Ms2 scans
             var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(5), 2, 1, 3);
-            var ms2Xics = ms2XicConstructor.GetAllXics(fakeaMs2Scans, out matchedPeaks);
+            var ms2Xics = ms2XicConstructor.GetAllXics(fakeaMs2Scans, out matchedPeaks, out indexingEngine);
             var xicGroupingEngine = new XicGroupingEngine(0.1f, 0.5, 0.5);
             var allGroups = xicGroupingEngine.PrecursorFragmentGrouping(ms1Xics, ms2Xics);
             var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(allGroups[0], PseudoMs2ConstructionType.MzPeak, new CommonParameters(), "test");
@@ -181,7 +181,7 @@ namespace Test.DIATests
             Assert.That(pseudoScan.ExperimentalFragments.First().MonoisotopicMass, Is.EqualTo(fragDist.Masses.First()).Within(0.001));
 
             //Test with PseudoMs2ConstructionType.Mass when we use mass indexing on Ms2 scans
-            ms2Xics = ms1XicConstructor.GetAllXics(fakeaMs2Scans, out matchedPeaks);
+            ms2Xics = ms1XicConstructor.GetAllXics(fakeaMs2Scans, out matchedPeaks, out indexingEngine);
             allGroups = xicGroupingEngine.PrecursorFragmentGrouping(ms1Xics, ms2Xics);
             pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(allGroups[0], PseudoMs2ConstructionType.Mass, new CommonParameters(), "test");
 

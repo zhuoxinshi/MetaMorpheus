@@ -9,7 +9,6 @@ using System.Data.Entity.Validation;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ThermoFisher.CommonCore.Data.Business;
 
 namespace EngineLayer.DIA
 {
@@ -34,11 +33,12 @@ namespace EngineLayer.DIA
             XicSplineEngine = xicSpline;
         }
 
-        public abstract List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null);
+        public abstract List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, out object indexingEngine, MzRange isolationRange = null) ;
 
-        public List<ExtractedIonChromatogram> GetAllXicsWithXicSpline(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, MzRange isolationRange = null,  int? numberOfThreads = null)
+        public List<ExtractedIonChromatogram> GetAllXicsWithXicSpline(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, out object indexingEngine, MzRange isolationRange = null,  int? numberOfThreads = null)
         {
-            var allXics = GetAllXics(scans, out matchedPeaks, isolationRange);
+            var allXics = GetAllXics(scans, out matchedPeaks, out indexingEngine, isolationRange);
+
             if (XicSplineEngine != null)
             {
                 Parallel.ForEach(Partitioner.Create(0, allXics.Count), new ParallelOptions { MaxDegreeOfParallelism = numberOfThreads.HasValue ? numberOfThreads.Value : Environment.ProcessorCount - 2 },

@@ -29,7 +29,7 @@ namespace EngineLayer.DIA
         public float FragmentRank { get; set; }
         public float PrecursorRank { get; set; }
 
-        public PfPairTrainingSample(ExtractedIonChromatogram precursor, ExtractedIonChromatogram fragment, SpectralMatch psm = null)
+        public PfPairTrainingSample(ExtractedIonChromatogram precursor, ExtractedIonChromatogram fragment, bool label = false, SpectralMatch psm = null)
         {
             Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursor, fragment);
             ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
@@ -37,6 +37,7 @@ namespace EngineLayer.DIA
             FragmentIntensity = (float)fragment.ApexPeak.Intensity;
             SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
             PsmScore = psm != null ? (float)psm.Score : 0;
+            Label = label; // default label is false, should be set to true for positive samples
         }
 
         public PfPairTrainingSample(PrecursorFragmentPair pfPair)
