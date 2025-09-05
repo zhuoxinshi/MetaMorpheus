@@ -72,14 +72,15 @@ namespace EngineLayer.DIA
                     model = pipeline.Fit(trainData);
                     break;
                 case ModelType.FastTree:
-                    var pipeline2 = mlContext.Transforms.Concatenate("Features", MlDIAparams.Features.ToArray()).Append(mlContext.BinaryClassification.Trainers.FastTree(
-                                              labelColumnName: "Label",
-                                                                    featureColumnName: "Features"));
+                    var pipeline2 = mlContext.Transforms.Concatenate("Features", MlDIAparams.Features.ToArray()).Append(mlContext.BinaryClassification.Trainers.FastTree(labelColumnName: "Label", featureColumnName: "Features"));
                     model = pipeline2.Fit(trainData);
                     break;
                 default:
                     throw new NotImplementedException($"Model type {MlDIAparams.ModelType} not implemented.");
             }
+
+            var predictions = model.Transform(testData);
+            var metrics = mlContext.BinaryClassification.Evaluate(predictions);
             return model;
         }
 

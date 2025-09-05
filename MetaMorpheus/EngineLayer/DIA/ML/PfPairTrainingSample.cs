@@ -35,7 +35,7 @@ namespace EngineLayer.DIA
             ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
             Overlap = (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursor, fragment);
             FragmentIntensity = (float)fragment.ApexPeak.Intensity;
-            SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
+            //SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
             PsmScore = psm != null ? (float)psm.Score : 0;
             Label = label; // default label is false, should be set to true for positive samples
         }

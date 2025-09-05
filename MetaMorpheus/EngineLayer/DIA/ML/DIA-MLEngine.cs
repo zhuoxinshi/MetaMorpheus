@@ -38,19 +38,24 @@ namespace EngineLayer.DIA
             var allMs2Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
             var ms1PeakEngines = new Dictionary<object, object>();
             var ms2PeakEngines = new Dictionary<object, object>();
-            var peakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
+            var ms1PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
+            var ms2PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
             foreach (var ms2Group in DIAScanWindowMap)
             {
                 allMs1Xics[ms2Group.Key] = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1, new MzRange(ms2Group.Key.min, ms2Group.Key.max));
                 ms1PeakEngines[ms2Group.Key] = indexingEngine1;
                 allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out var matchedPeaks2, out var indexingEngine2);
                 ms2PeakEngines[ms2Group.Key] = indexingEngine2;
-
-                var allKeys = matchedPeaks1.Select(p => p.Key).Concat(matchedPeaks2.Select(p => p.Key));
-                var duplicateKeys = allKeys
-                    .GroupBy(k => k)
-                    .Where(g => g.Count() > 1)
-                    .Select(g => g.Key).ToList();
+                foreach (var kvp in matchedPeaks1)
+                {
+                    if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
+                        ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
+                }
+                foreach (var kvp in matchedPeaks2)
+                {
+                    if (!ms2PeakXicDictionary.ContainsKey(kvp.Key))
+                        ms2PeakXicDictionary.Add(kvp.Key, kvp.Value);
+                }
             }
 
             //train model
@@ -59,7 +64,7 @@ namespace EngineLayer.DIA
             switch (MlDIAparams.PseudoSearchType)
             {
                 case (PseudoSearchScanType.DirectSearch):
-                    modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, peakXicDictionary, DIAScanWindowMap);
+                    modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, DIAScanWindowMap);
                     model = modelTrainingEngine.TrainModel();
                     break;
                 case (PseudoSearchScanType.AllOverlap):

@@ -18,15 +18,17 @@ namespace EngineLayer.DIA
         public MsDataScan[] Ms2Scans { get; set; }
         public Dictionary<object, object> AllMs1PeakIndexingEngines { get; set; }
         public Dictionary<object, object> AllMs2PeakIndexingEngines { get; set; }
-        public Dictionary<IIndexedPeak, ExtractedIonChromatogram> AllPeakXicDictionary { get; set; }
+        public Dictionary<IIndexedPeak, ExtractedIonChromatogram> Ms1PeakXicDictionary { get; set; }
+        public Dictionary<IIndexedPeak, ExtractedIonChromatogram> Ms2PeakXicDictionary { get; set; }
         public Dictionary<int, object> ScanNumberWindowMap { get; set; }
-        public DDASearchModelTrainingEngine(MLbasedDIAparameters mlDIAparams, CommonParameters commonParameters, MsDataScan[] ms1Scans, MsDataScan[] ms2Scans, Dictionary<object, object> allMs1PeakIndexingEngines, Dictionary<object, object> allMs2PeakIndexingEngines, Dictionary<IIndexedPeak, ExtractedIonChromatogram> allPeakXicDictionary, Dictionary<(double min, double max), List<MsDataScan>> diaScanWindowMap) : base(mlDIAparams, commonParameters)
+        public DDASearchModelTrainingEngine(MLbasedDIAparameters mlDIAparams, CommonParameters commonParameters, MsDataScan[] ms1Scans, MsDataScan[] ms2Scans, Dictionary<object, object> allMs1PeakIndexingEngines, Dictionary<object, object> allMs2PeakIndexingEngines, Dictionary<IIndexedPeak, ExtractedIonChromatogram> ms1PeakXicDictionary, Dictionary<IIndexedPeak, ExtractedIonChromatogram> ms2PeakXicDictionary, Dictionary<(double min, double max), List<MsDataScan>> diaScanWindowMap) : base(mlDIAparams, commonParameters)
         {
             Ms1Scans = ms1Scans;
             Ms2Scans = ms2Scans;
             AllMs1PeakIndexingEngines = allMs1PeakIndexingEngines;
             AllMs2PeakIndexingEngines = allMs2PeakIndexingEngines;
-            AllPeakXicDictionary = allPeakXicDictionary;
+            Ms1PeakXicDictionary = ms1PeakXicDictionary;
+            Ms2PeakXicDictionary = ms2PeakXicDictionary;
             ScanNumberWindowMap = new Dictionary<int, object>();
             foreach (var kvp in diaScanWindowMap)
             {
@@ -51,7 +53,7 @@ namespace EngineLayer.DIA
             foreach (var psm in groupedPsms)
             {
                 var samples = GetTrainingSamplesFromDDASearchPsm(psm, PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass));
-                allSamples.AddRange(samples);
+                if (samples.Count() > 0) allSamples.AddRange(samples);
             }
             return allSamples;
         }
@@ -60,18 +62,18 @@ namespace EngineLayer.DIA
         {
             var allSamples = new List<PfPairTrainingSample>();
             var key = ScanNumberWindowMap[psm.ScanNumber];
-            var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as IndexingEngine<IIndexedPeak>;
-            var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as IndexingEngine<IIndexedPeak>;
+            var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as PeakIndexingEngine;
+            var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
 
             //find precursor xic
             int numberOfScansPerCycle = 3;
             int zeroBasedPrecursorScanIndex = (psm.PrecursorScanNumber.Value - 1) / numberOfScansPerCycle;
             int zeroBasedMs2ScanIndex = (psm.ScanNumber - 1) / numberOfScansPerCycle;
-            var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psm.ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
-            if (precursorPeak != null && AllPeakXicDictionary.ContainsKey(precursorPeak))
+            var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psm.ScanPrecursorHighestIsotopeMz, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
+            if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
             {
-                var precursorXic = AllPeakXicDictionary[precursorPeak];
-                if (precursorXic == null) return null;
+                var precursorXic = Ms1PeakXicDictionary[precursorPeak];
+                if (precursorXic == null) return allSamples;
 
                 //find all fragment xics
                 //create training samples with positive and negative labels
@@ -87,9 +89,10 @@ namespace EngineLayer.DIA
                         foreach (var peak in targetMass.Peaks)
                         {
                             var fragmentPeak = ms2PeakIndexingEngine.GetIndexedPeak(peak.mz, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                            if (fragmentPeak != null && AllPeakXicDictionary.ContainsKey(fragmentPeak))
+                            if (fragmentPeak != null && Ms2PeakXicDictionary.ContainsKey(fragmentPeak))
                             {
-                                var fragmentXic = AllPeakXicDictionary[fragmentPeak];
+                                var fragmentXic = Ms2PeakXicDictionary[fragmentPeak];
+                                if (fragmentXic == null) continue;
                                 var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true);
                                 allSamples.Add(newSample);
                                 visitedXics.Add(fragmentXic);
@@ -101,10 +104,10 @@ namespace EngineLayer.DIA
                 foreach (var mz in ms2WithPrecursor.TheScan.MassSpectrum.XArray)
                 {
                     var peak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                    if (peak != null && AllPeakXicDictionary.ContainsKey(peak))
+                    if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
                     {
-                        var fragmentXic = AllPeakXicDictionary[peak];
-                        if (!visitedXics.Contains(fragmentXic))
+                        var fragmentXic = Ms2PeakXicDictionary[peak];
+                        if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
                         {
                             var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false);
                             allSamples.Add(newSample);
@@ -122,7 +125,7 @@ namespace EngineLayer.DIA
             Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },
                 (partitionRange, loopState) =>
                 {
-                    var precursors = new List<(double MonoPeakMz, int Charge)>();
+                    var precursors = new List<(double MonoPeakMz, int Charge, double HighestIsotopeMz)>();
 
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
@@ -137,7 +140,8 @@ namespace EngineLayer.DIA
                                     precursorScan.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
                             {
                                 double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
-                                precursors.Add((monoPeakMz, envelope.Charge));
+                                var highestMz = envelope.Peaks.MaxBy(p => p.intensity).mz;
+                                precursors.Add((monoPeakMz, envelope.Charge, highestMz));
                             }
                         }
                         scansWithPrecursors[i] = new List<Ms2ScanWithSpecificMass>();
@@ -152,7 +156,7 @@ namespace EngineLayer.DIA
                         {
                             // assign precursor for this MS2 scan
                             var scan = new Ms2ScanWithSpecificMass(ms2scan, precursor.MonoPeakMz,
-                                precursor.Charge, null, commonParameters, neutralExperimentalFragments);
+                                precursor.Charge, null, commonParameters, neutralExperimentalFragments, precursorHighestIsotopeMz: precursor.HighestIsotopeMz);
                             scansWithPrecursors[i].Add(scan);
                         }
                     }
