@@ -111,6 +111,7 @@ namespace Test.DIATests
             var features = new List<string> { "Correlation", "ApexRtDelta"};
             searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, humanDb, false, ModelType.FastTree, features, 15, null, null, 0.2, 0.5, AnalysisType.MLbased, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.MzPeak) ;
             searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
+
         }
     }
 }
