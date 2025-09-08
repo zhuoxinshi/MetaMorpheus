@@ -59,24 +59,32 @@ namespace EngineLayer.DIA
             }
 
             //train model
+            var mlContext = new MLContext();
             ITransformer model = null;
             ModelTrainingEngine modelTrainingEngine = null;
-            switch (MlDIAparams.PseudoSearchType)
+            if (MlDIAparams.ExistingModelPath != null)
             {
-                case (PseudoSearchScanType.DirectSearch):
-                    modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, DIAScanWindowMap);
-                    model = modelTrainingEngine.TrainModel();
-                    break;
-                case (PseudoSearchScanType.AllOverlap):
-                    modelTrainingEngine = new PfPairModelTrainingEngine(MlDIAparams, CommonParameters, allMs1Xics, allMs2Xics);
-                    model = modelTrainingEngine.TrainModel();
-                    break;
-                default:
-                    throw new NotImplementedException();
+                model = mlContext.Model.Load(MlDIAparams.ExistingModelPath, out var modelInputSchema);
             }
-
+            else
+            {
+                switch (MlDIAparams.PseudoSearchType)
+                {
+                    case (PseudoSearchScanType.DirectSearch):
+                        modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, DIAScanWindowMap);
+                        model = modelTrainingEngine.TrainModel();
+                        break;
+                    case (PseudoSearchScanType.AllOverlap):
+                        modelTrainingEngine = new PfPairModelTrainingEngine(MlDIAparams, CommonParameters, allMs1Xics, allMs2Xics);
+                        model = modelTrainingEngine.TrainModel();
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+            
             //ml based pf grouping
-            var groupingEngine = new MLgroupingEngine(model, MlDIAparams.PredictionScoreThreshold);
+            var groupingEngine = new MLgroupingEngine(model, MlDIAparams.PredictionScoreThreshold, MlDIAparams.ApexRtTolerance);
             var allPfGroups = new List<PrecursorFragmentsGroup>();
             foreach (var ms2Group in DIAScanWindowMap)
             {

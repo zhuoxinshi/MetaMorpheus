@@ -93,7 +93,7 @@ namespace EngineLayer.DIA
                             {
                                 var fragmentXic = Ms2PeakXicDictionary[fragmentPeak];
                                 if (fragmentXic == null) continue;
-                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true);
+                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true, psm);
                                 allSamples.Add(newSample);
                                 visitedXics.Add(fragmentXic);
                             }
@@ -109,7 +109,7 @@ namespace EngineLayer.DIA
                         var fragmentXic = Ms2PeakXicDictionary[peak];
                         if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
                         {
-                            var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false);
+                            var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
                             allSamples.Add(newSample);
                             visitedXics.Add(fragmentXic);
                         }

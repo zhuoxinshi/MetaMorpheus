@@ -18,9 +18,12 @@ namespace EngineLayer.DIA
         public string ExistingSampleFilePath { get; set; }
         public string OutputFolder { get; set; }
         public double TestFraction { get; set; }
+        public double ApexRtTolerance { get; set; } 
         public double PredictionScoreThreshold { get; set; } 
         public int TargetSampleCount { get; set; } 
-        public MLbasedDIAparameters(PseudoSearchScanType pseudoSearchScanType, string proteinDb, bool searchDecoys, ModelType trainingModel, List<string> features, double psmScoreCutOff, string existingModelPath, string existingSampleFilePath, double testFraction, double predictionScoreThreshold, AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false) : base(analysisType, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, pseudoMs2ConstructionType, combineFragments)
+        public bool WriteModel { get; set; } 
+        public bool WriteTrainingSamples { get; set; }
+        public MLbasedDIAparameters(PseudoSearchScanType pseudoSearchScanType, string proteinDb, bool searchDecoys, ModelType trainingModel, List<string> features, double psmScoreCutOff, string existingModelPath, string existingSampleFilePath, string outFolder, double testFraction, double apexRtTolerance, double predictionScoreThreshold, AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false, bool writeModel = false, bool writeTrainingSamples = false) : base(analysisType, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, pseudoMs2ConstructionType, combineFragments)
         {
             PseudoSearchType = pseudoSearchScanType;
             ProteinDb = proteinDb;
@@ -30,8 +33,12 @@ namespace EngineLayer.DIA
             PsmScoreCutOff = psmScoreCutOff;
             ExistingModelPath = existingModelPath;
             ExistingSampleFilePath = existingSampleFilePath;
+            ApexRtTolerance = apexRtTolerance;
             TestFraction = testFraction;
             PredictionScoreThreshold = predictionScoreThreshold;
+            OutputFolder = outFolder;
+            WriteModel = writeModel;
+            WriteTrainingSamples = writeTrainingSamples;
         }
     }
 }

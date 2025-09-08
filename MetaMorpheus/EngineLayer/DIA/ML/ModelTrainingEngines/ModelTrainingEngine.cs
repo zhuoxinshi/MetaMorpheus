@@ -54,6 +54,13 @@ namespace EngineLayer.DIA
         
         public ITransformer ModelTraining(IEnumerable<PfPairTrainingSample> trainingSamples)
         {
+            if (MlDIAparams.WriteTrainingSamples)
+            {
+                var path = Path.Combine(MlDIAparams.OutputFolder, "TrainingSamples.tsv");
+                var sampleFile = new PfPairTrainingSampleFile { Results = trainingSamples.ToList()};
+                sampleFile.WriteResults(path);
+            }
+
             var mlContext = new MLContext();
 
             //balance training data
@@ -81,6 +88,12 @@ namespace EngineLayer.DIA
 
             var predictions = model.Transform(testData);
             var metrics = mlContext.BinaryClassification.Evaluate(predictions);
+
+            if (MlDIAparams.WriteModel)
+            {
+                var modelPath = Path.Combine(MlDIAparams.OutputFolder, "MLmodel.zip");
+                mlContext.Model.Save(model, data.Schema, modelPath);
+            }
             return model;
         }
 

@@ -12,6 +12,7 @@ using CsvHelper.Configuration;
 using CsvHelper;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace EngineLayer.DIA
 {
@@ -35,7 +36,7 @@ namespace EngineLayer.DIA
             ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
             Overlap = (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursor, fragment);
             FragmentIntensity = (float)fragment.ApexPeak.Intensity;
-            //SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
+            SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
             PsmScore = psm != null ? (float)psm.Score : 0;
             Label = label; // default label is false, should be set to true for positive samples
         }
@@ -75,7 +76,7 @@ namespace EngineLayer.DIA
         {
             using var csv = new CsvWriter(new StreamWriter(File.Create(outputPath)), CsvConfiguration);
 
-            csv.WriteHeader<PfPairTrainingSampleFile>();
+            csv.WriteHeader<PfPairTrainingSample>();
             foreach (var result in Results)
             {
                 csv.NextRecord();

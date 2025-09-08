@@ -95,7 +95,7 @@ namespace Test.DIATests
             string tomlFile = @"E:\Aneuploidy\searchToml_commonFixedVariable_noTrim_writeLib\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_try1_randomForest";
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_try1_randomForest_0.75";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -109,9 +109,44 @@ namespace Test.DIATests
             string humanDb = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
 
             var features = new List<string> { "Correlation", "ApexRtDelta"};
-            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, humanDb, false, ModelType.FastTree, features, 15, null, null, 0.2, 0.5, AnalysisType.MLbased, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.MzPeak) ;
+            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, humanDb, false, ModelType.FastTree, features, 15, null, null, outputFolder, 0.2, 0.3, predictionScoreThreshold: 0.6, AnalysisType.MLbased, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.MzPeak, writeModel: true, writeTrainingSamples: true);
             searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
 
+        }
+
+        [Test]
+        public static void TestISD()
+        {
+            var path = @"E:\ISD Project\ISD_250906\09-06-25_65min_4pro_ISD60-80-100_preFilter700-900-1100.raw";
+            var fileList = new List<string> { path, };
+            var outputFolder = @"E:\ISD Project\TestSearch\DIAupdate\ISD_4pro_combineFragments_xic_1";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_variableOnly, MetaMorpheusTask.tomlConfig);
+
+            //DIA parameters
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 8000, minCharge: 5, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 1, 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.5, 15, 1);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.5, 15, 10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
+
+            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            gptmdTask.CommonParameters = searchTask.CommonParameters;
+
+            var taskList = new List<(string, MetaMorpheusTask)> {  ("search", searchTask) }; //("GPTMD", gptmdTask)
+            string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+
+            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
+            engine.Run();
         }
     }
 }

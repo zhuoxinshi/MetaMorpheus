@@ -17,10 +17,11 @@ namespace EngineLayer.DIA
         public double ApexRTTolerance { get; set; } 
         public double ProbabilityThreshold { get; set; }
 
-        public MLgroupingEngine(ITransformer model, double scoreThreshold)
+        public MLgroupingEngine(ITransformer model, double scoreThreshold, double apexRtTolerance)
         {
             Model = model;
             ProbabilityThreshold = scoreThreshold;
+            ApexRTTolerance = apexRtTolerance;
         }
 
         public override List<PrecursorFragmentsGroup> PrecursorFragmentGrouping(List<ExtractedIonChromatogram> precursors, IEnumerable<ExtractedIonChromatogram> fragments)
@@ -30,7 +31,7 @@ namespace EngineLayer.DIA
 
             var mlContext = new MLContext();
             var predictionEngine = mlContext.Model.CreatePredictionEngine<PfPairTrainingSample, PFpairPrediction>(Model);
-            Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = MaxThreadsForGrouping },
+            Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = 15 },
                 (partitionRange, loopState) =>
                 {
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)

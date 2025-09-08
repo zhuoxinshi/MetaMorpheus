@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using MassSpectrometry;
+using MathNet.Numerics.Interpolation;
 using MzLibUtil;
+using ThermoFisher.CommonCore.Data.Business;
 
 
 namespace EngineLayer.DIA
@@ -59,6 +62,10 @@ namespace EngineLayer.DIA
                 return 0;
             }
 
+            if (xic1.NormalizedPeakIntensities.IsNullOrEmpty())
+                SetXicNormalizedPeakIntensities(xic1);
+            if (xic2.NormalizedPeakIntensities.IsNullOrEmpty())
+                SetXicNormalizedPeakIntensities(xic2);
             var overlapStart = Math.Max(xic1.StartScanIndex, xic2.StartScanIndex);
             var overlapEnd = Math.Min(xic1.EndScanIndex, xic2.EndScanIndex);
             var maxLength = overlapEnd - overlapStart + 1;
@@ -67,23 +74,58 @@ namespace EngineLayer.DIA
             var scanCycles1 = xic1.Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
             var scanCycles2 = xic2.Peaks.Select(p => p.ZeroBasedScanIndex).ToArray();
             var index1 = Array.BinarySearch(scanCycles1, overlapStart);
+            if (index1 < 0) index1 = ~index1;
             var index2 = Array.BinarySearch(scanCycles2, overlapStart);
+            if (index2 < 0) index2 = ~index2;
 
             for (int i = 0; i < maxLength - 1; i++)
             {
-                double diff0 = xic1.NormalizedPeakIntensities[index1 + i] - xic2.NormalizedPeakIntensities[index2 + i];
-                double diff1 = xic1.NormalizedPeakIntensities[index1 + i + 1] - xic2.NormalizedPeakIntensities[index2 + i + 1];
-
-                overlapArea.Add((overlapStart + i, Math.Min(xic1.NormalizedPeakIntensities[index1 + i], xic2.NormalizedPeakIntensities[index2 + i])));
-                if (diff0 * diff1 < 0)
+                try
                 {
-                    double slope = xic1.NormalizedPeakIntensities[index1 + i + 1] - xic1.NormalizedPeakIntensities[index1 + i];
-                    double y = xic1.NormalizedPeakIntensities[index1 + i] + slope * Math.Abs(diff0 / (diff1 - diff0));
-                    overlapArea.Add((overlapStart + i + Math.Abs(diff0 / (diff1 - diff0)), y));
+                    double diff0 = xic1.NormalizedPeakIntensities[index1 + i] - xic2.NormalizedPeakIntensities[index2 + i];
+                    double diff1 = xic1.NormalizedPeakIntensities[index1 + i + 1] - xic2.NormalizedPeakIntensities[index2 + i + 1];
+
+                    overlapArea.Add((overlapStart + i, Math.Min(xic1.NormalizedPeakIntensities[index1 + i], xic2.NormalizedPeakIntensities[index2 + i])));
+                    if (diff0 * diff1 < 0)
+                    {
+                        double slope = xic1.NormalizedPeakIntensities[index1 + i + 1] - xic1.NormalizedPeakIntensities[index1 + i];
+                        double y = xic1.NormalizedPeakIntensities[index1 + i] + slope * Math.Abs(diff0 / (diff1 - diff0));
+                        overlapArea.Add((overlapStart + i + Math.Abs(diff0 / (diff1 - diff0)), y));
+                    }
+                } catch(Exception e)
+                {
+                    int debug = 0;
                 }
+                
             }
             double overlapAUC = CalculateNormalizedArea(overlapArea);
             return overlapAUC;
+        }
+
+        private static void SetXicNormalizedPeakIntensities(ExtractedIonChromatogram xic)
+        {
+            var cycleArray = xic.Peaks.Select(p => (double)p.ZeroBasedScanIndex).ToArray();
+            var intensityArray = xic.Peaks.Select(p => (double)p.Intensity).ToArray();
+            var linearSpline = LinearSpline.InterpolateSorted(cycleArray, intensityArray);
+
+            int maxLength = xic.EndScanIndex - xic.StartScanIndex + 1;
+            var linearSplinePeaks = new double[maxLength];
+            for (int i = 0; i < maxLength; i++)
+            {
+                int j = 0;
+                if (xic.Peaks[j].ZeroBasedScanIndex == xic.StartScanIndex + i)
+                {
+                    linearSplinePeaks[i] = xic.Peaks[i].Intensity;
+                    j++;
+                }
+                else
+                {
+                    linearSplinePeaks[i] =  linearSpline.Interpolate((double)(xic.StartScanIndex + i));
+                }
+            }
+            //normalize
+            double sum = linearSplinePeaks.Sum();
+            xic.NormalizedPeakIntensities = linearSplinePeaks.Select(p => p/sum).ToArray();
         }
 
         public static double CalculateNormalizedArea(List<(double, double)> data)
