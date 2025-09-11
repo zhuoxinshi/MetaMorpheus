@@ -201,6 +201,7 @@ namespace EngineLayer
 
         public bool UseMostAbundantPrecursorIntensity { get; set; }
         public DIAparameters DIAparameters { get; set; }
+        
 
         public CommonParameters Clone()
         {

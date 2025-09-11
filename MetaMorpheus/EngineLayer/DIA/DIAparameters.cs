@@ -15,6 +15,7 @@ namespace EngineLayer.DIA
         public PfGroupingEngine PfGroupingEngine { get; set; }
         public PseudoMs2ConstructionType PseudoMs2ConstructionType { get; set; }
         public bool CombineFragments { get; set; } 
+        public Dictionary<string, Ms2ScanWithSpecificMass[]> PseudoScans { get; set; }
 
         public DIAparameters(AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false)
         {

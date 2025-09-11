@@ -43,6 +43,14 @@ namespace EngineLayer.DIA
             sb.AppendLine($"DeconvolutionParameters: {DeconParameters}");
             sb.AppendLine($"MinMass: {MinMass}");
             sb.AppendLine($"MinCharge: {MinCharge}");
+            if (XicSplineEngine != null)
+            {
+                sb.AppendLine($"XicSpline: {XicSplineEngine.ToString()}");
+            }
+            else
+            {
+                sb.AppendLine($"XicSpline: None");
+            }
             return base.ToString();
         }
     }

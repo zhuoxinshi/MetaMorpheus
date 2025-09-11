@@ -392,7 +392,8 @@ namespace TaskLayer
 
         public static IEnumerable<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
-            if (commonParameters.DIAparameters != null)
+            if (commonParameters.DIAparameters.PseudoScans == null) commonParameters.DIAparameters.PseudoScans = new Dictionary<string, Ms2ScanWithSpecificMass[]>();
+            if (commonParameters.DIAparameters != null && !commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
             {
                 switch (commonParameters.DIAparameters.AnalysisType)
                 {
@@ -403,12 +404,16 @@ namespace TaskLayer
                     case (AnalysisType.ISD):
                         var isdEngine = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
                         isdEngine.Run();
+                        commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath] = isdEngine.PseudoMs2Scans.ToArray();
                         return isdEngine.PseudoMs2Scans;
                     case (AnalysisType.MLbased):
                         var mlEngine = new DIA_MLEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
                         mlEngine.Run();
                         return mlEngine.PseudoMs2Scans;
                 }
+            } else if (commonParameters.DIAparameters != null && commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
+            {
+                return commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath];
             }
             var scansWithPrecursors = _GetMs2Scans(myMSDataFile, fullFilePath, commonParameters);
 
@@ -600,7 +605,7 @@ namespace TaskLayer
             StartingSingleTask(displayName);
 
             var tomlFileName = Path.Combine(Directory.GetParent(output_folder).ToString(), "Task Settings", displayName + "config.toml");
-            Toml.WriteFile(this, tomlFileName, tomlConfig);
+            //Toml.WriteFile(this, tomlFileName, tomlConfig);
             FinishedWritingFile(tomlFileName, new List<string> { displayName });
 
             FileSpecificParameters = new List<(string FileName, CommonParameters Parameters)>();
@@ -679,6 +684,8 @@ namespace TaskLayer
             {
                 file.WriteLine("The data analysis was performed using MetaMorpheus version " + GlobalVariables.MetaMorpheusVersion + ", available at " + "https://github.com/smith-chem-wisc/MetaMorpheus.");
 		        file.WriteLine();
+                file.WriteLine(CommonParameters.DIAparameters.ToString());
+                file.WriteLine();
                 file.Write(ProseCreatedWhileRunning.ToString());
                 file.WriteLine(SystemInfo.SystemProse().Replace(Environment.NewLine, "") + " ");
 		        file.WriteLine();
