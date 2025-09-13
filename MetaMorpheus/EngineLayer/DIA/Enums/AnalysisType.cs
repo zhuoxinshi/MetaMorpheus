@@ -10,6 +10,7 @@ namespace EngineLayer.DIA
     {
         ISD,
         DIA,
-        MLbased,
+        MLbased_bottomUp,
+        MLbased_topDown
     }
 }

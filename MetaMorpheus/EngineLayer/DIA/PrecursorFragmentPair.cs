@@ -24,13 +24,15 @@ namespace EngineLayer.DIA
         public double? Overlap { get; set; }
         public int? PrecursorRank { get; set; }
         public int? FragmentRank { get; set; }
+        public float? PredictionScore { get; set; }
 
-        public PrecursorFragmentPair(ExtractedIonChromatogram precursorXic, ExtractedIonChromatogram fragmentXic, double? correlation = null, double? overlap = null)
+        public PrecursorFragmentPair(ExtractedIonChromatogram precursorXic, ExtractedIonChromatogram fragmentXic, double? correlation = null, double? overlap = null, float? predictionScore = null)
         {
             PrecursorXic = precursorXic;
             FragmentXic = fragmentXic;
             Correlation = correlation;
             Overlap = overlap;
+            PredictionScore = predictionScore;
         }
 
         public static void SetPrecursorRankForPfPairs(IEnumerable<PrecursorFragmentPair> allPfPairs)

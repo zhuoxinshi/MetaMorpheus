@@ -243,7 +243,7 @@ namespace EngineLayer.DIA
             var charge = pfGroup.PrecursorXic.Peaks.First() is IndexedMass im ? im.Charge : 1;
             var monoMz = pfGroup.PrecursorXic.Peaks.First() is IndexedMass im2 ? im2.M.ToMz(charge) : pfGroup.PrecursorXic.AveragedMassOrMz.ToMz(charge);
             Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge, dataFilePath,
-                commonParameters, neutralExperimentalFragments);
+                commonParameters, neutralExperimentalFragments, pfGroup.PrecursorXic.ApexPeak.Intensity);
 
             return scanWithprecursor;
         }

@@ -1,7 +1,4 @@
-﻿using MassSpectrometry;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MzLibUtil;
@@ -15,14 +12,17 @@ using Omics.Modifications;
 using System.IO;
 using UsefulProteomicsDatabases;
 using CsvHelper.Configuration.Attributes;
+using MassSpectrometry;
+using System.Collections.Generic;
+using System;
 
 namespace EngineLayer.DIA
 {
-    public class DIA_MLEngine : DIAEngine
+    public class ISD_MLEngine : DIAEngine
     {
         private readonly MsDataFile DataFile;
         public MLbasedDIAparameters MlDIAparams => (MLbasedDIAparameters)DIAparams;
-        public DIA_MLEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
+        public ISD_MLEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) : base(DIAparameters, dataFile, commonParameters, fileSpecificParameters, nestedIds)
         {
             DIAparams = DIAparameters;
             DataFile = dataFile;
@@ -31,26 +31,29 @@ namespace EngineLayer.DIA
         protected override MetaMorpheusEngineResults RunSpecific()
         {
             //read in scans
-            var ms1Scans = DataFile.GetMS1Scans().ToArray();
-            var ms2Scans = DataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
-            var scanWindowMap = ConstructMs2Groups(ms2Scans);
+            var allScans = DataFile.GetAllScansList().ToArray();
+            var isdVoltageMap = ISDEngine.ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
+            ISDEngine.ReLabelIsdScans(isdVoltageMap, allScans);
+            var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+
             var allMs1Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
             var allMs2Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
             var ms1PeakEngines = new Dictionary<object, object>();
             var ms2PeakEngines = new Dictionary<object, object>();
             var ms1PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
             var ms2PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
-            foreach (var ms2Group in scanWindowMap)
+            var ms1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1);
+            foreach (var kvp in matchedPeaks1)
             {
-                allMs1Xics[ms2Group.Key] = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1, new MzRange(ms2Group.Key.min, ms2Group.Key.max));
+                if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
+                    ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
+            }
+            foreach (var ms2Group in isdVoltageMap)
+            {
+                allMs1Xics[ms2Group.Key] = ms1Xics;
                 ms1PeakEngines[ms2Group.Key] = indexingEngine1;
                 allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out var matchedPeaks2, out var indexingEngine2);
                 ms2PeakEngines[ms2Group.Key] = indexingEngine2;
-                foreach (var kvp in matchedPeaks1)
-                {
-                    if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
-                        ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
-                }
                 foreach (var kvp in matchedPeaks2)
                 {
                     if (!ms2PeakXicDictionary.ContainsKey(kvp.Key))
@@ -71,7 +74,7 @@ namespace EngineLayer.DIA
                 switch (MlDIAparams.PseudoSearchType)
                 {
                     case (PseudoSearchScanType.DirectSearch):
-                        modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, scanWindowMap);
+                        modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, null, isdVoltageMap);
                         model = modelTrainingEngine.TrainModel();
                         break;
                     case (PseudoSearchScanType.AllOverlap):
@@ -82,16 +85,24 @@ namespace EngineLayer.DIA
                         throw new NotImplementedException();
                 }
             }
-            
+
             //ml based pf grouping
             var groupingEngine = new MLgroupingEngine(model, MlDIAparams.PredictionScoreThreshold, MlDIAparams.ApexRtTolerance);
             var allPfGroups = new List<PrecursorFragmentsGroup>();
-            foreach (var ms2Group in scanWindowMap)
+            if (MlDIAparams.CombineFragments)
             {
-                var pfGroups = groupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group.Key], allMs2Xics[ms2Group.Key]);
-                allPfGroups.AddRange(pfGroups);
+                var allFragments = allMs2Xics.Values.SelectMany(x => x).ToList();
+                allPfGroups = groupingEngine.PrecursorFragmentGrouping(ms1Xics, allFragments);
             }
-
+            else
+            {
+                foreach (var ms2Group in isdVoltageMap)
+                {
+                    var pfGroups = groupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group.Key], allMs2Xics[ms2Group.Key]);
+                    allPfGroups.AddRange(pfGroups);
+                }
+            }
+            
             //make pseudo ms2 scans
             int oneBasedNumber = 1;
             PseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();

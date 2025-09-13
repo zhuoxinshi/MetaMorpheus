@@ -16,8 +16,9 @@ namespace EngineLayer.DIA
         public PseudoMs2ConstructionType PseudoMs2ConstructionType { get; set; }
         public bool CombineFragments { get; set; } 
         public Dictionary<string, Ms2ScanWithSpecificMass[]> PseudoScans { get; set; }
+        public bool WritePseudoScans { get; set; } 
 
-        public DIAparameters(AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false)
+        public DIAparameters(AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false, bool writePseudoScans = false)
         {
             AnalysisType = analysisType;
             Ms1XicConstructor = ms1XicConstructor;
@@ -25,6 +26,7 @@ namespace EngineLayer.DIA
             PfGroupingEngine = pfGroupingEngine;
             PseudoMs2ConstructionType = pseudoMs2ConstructionType;
             CombineFragments = combineFragments;
+            WritePseudoScans = writePseudoScans;
         }
 
         public override string ToString()
@@ -34,7 +36,7 @@ namespace EngineLayer.DIA
             sb.AppendLine($"AnalysisType: {AnalysisType}");
             sb.AppendLine($"{Ms1XicConstructor.ToString()}");
             sb.AppendLine($"{Ms2XicConstructor.ToString()}");
-            sb.AppendLine($"{PfGroupingEngine.ToString()}");
+            if (PfGroupingEngine != null) sb.AppendLine($"{PfGroupingEngine.ToString()}");
             sb.AppendLine($"PseudoMs2ConstructionType: {PseudoMs2ConstructionType}");
             sb.AppendLine($"CombineFragments: {CombineFragments}");
             return sb.ToString();

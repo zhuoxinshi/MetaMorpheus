@@ -406,10 +406,15 @@ namespace TaskLayer
                         isdEngine.Run();
                         commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath] = isdEngine.PseudoMs2Scans.ToArray();
                         return isdEngine.PseudoMs2Scans;
-                    case (AnalysisType.MLbased):
+                    case (AnalysisType.MLbased_bottomUp):
                         var mlEngine = new DIA_MLEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
                         mlEngine.Run();
                         return mlEngine.PseudoMs2Scans;
+                    case (AnalysisType.MLbased_topDown):
+                        var mlEngine2 = new ISD_MLEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                        mlEngine2.Run();
+                        commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath] = mlEngine2.PseudoMs2Scans.ToArray();
+                        return mlEngine2.PseudoMs2Scans;
                 }
             } else if (commonParameters.DIAparameters != null && commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
             {

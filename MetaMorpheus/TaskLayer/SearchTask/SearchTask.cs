@@ -19,6 +19,7 @@ using Omics.Digestion;
 using Omics.Modifications;
 using Omics;
 using Readers;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -404,6 +405,12 @@ namespace TaskLayer
                     }
 
                     ReportProgress(new ProgressEventArgs(100, "Done with search!", thisId));
+                }
+                //write out pseudoScans
+                if (CommonParameters.DIAparameters.WritePseudoScans)
+                {
+                    var outPath = Path.Combine(OutputFolder, "PseudoScans.msalign");
+                    DIAEngine.WriteMsAlignFile(outPath, arrayOfMs2ScansSortedByMass);
                 }
 
                 //look for internal fragments

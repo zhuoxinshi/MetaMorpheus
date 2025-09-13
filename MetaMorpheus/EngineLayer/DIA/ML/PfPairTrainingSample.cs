@@ -22,6 +22,7 @@ namespace EngineLayer.DIA
         public float ApexRtDelta { get; set; }   // e.g., RT diff
         public float Overlap { get; set; }      // e.g., XIC overlap
         public float FragmentIntensity { get; set; } // e.g., fragment intensity
+        public float FragmentIntensityLog { get; set; }
         public float NormalizedIntensityRank { get; set; } // e.g., normalized intensity rank
         public float PsmScore { get; set; }
         public float SharedXIC { get; set; }
@@ -32,10 +33,11 @@ namespace EngineLayer.DIA
 
         public PfPairTrainingSample(ExtractedIonChromatogram precursor, ExtractedIonChromatogram fragment, bool label = false, SpectralMatch psm = null)
         {
-            Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursor, fragment);
+            Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(precursor, fragment, 150);
             ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
             Overlap = (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursor, fragment);
             FragmentIntensity = (float)fragment.ApexPeak.Intensity;
+            FragmentIntensityLog = (float)Math.Log(fragment.ApexPeak.Intensity + 1);
             SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(precursor, fragment);
             PsmScore = psm != null ? (float)psm.Score : 0;
             Label = label; // default label is false, should be set to true for positive samples
@@ -47,7 +49,8 @@ namespace EngineLayer.DIA
             ApexRtDelta = (float)Math.Abs(pfPair.PrecursorXic.ApexRT - pfPair.FragmentXic.ApexRT);
             Overlap = pfPair.Overlap.HasValue ? (float)pfPair.Overlap : (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(pfPair.PrecursorXic, pfPair.FragmentXic);
             FragmentIntensity = (float)pfPair.FragmentXic.ApexPeak.Intensity;
-            //SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(pfPair.PrecursorXic, pfPair.FragmentXic);
+            FragmentIntensityLog = (float)Math.Log(pfPair.FragmentXic.ApexPeak.Intensity + 1);
+            SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(pfPair.PrecursorXic, pfPair.FragmentXic);
             FragmentRank = (float)pfPair.FragmentRank;
             PrecursorRank = (float)pfPair.PrecursorRank;
         }

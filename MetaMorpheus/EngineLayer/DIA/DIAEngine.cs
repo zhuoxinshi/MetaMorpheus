@@ -12,6 +12,7 @@ using System.Collections.Concurrent;
 using EngineLayer.Util;
 using Omics;
 using FlashLFQ;
+using System.IO;
 
 namespace EngineLayer.DIA
 {
@@ -84,6 +85,39 @@ namespace EngineLayer.DIA
                 }
             }
             return DIAScanWindowMap;
+        }
+
+        public static void WriteMsAlignFile(string filePath, IEnumerable<Ms2ScanWithSpecificMass> ms2ScansWithMass)
+        {
+            using (var writer = new StreamWriter(filePath))
+            {
+                foreach (var scan in ms2ScansWithMass)
+                {
+                    // Write scan entry header
+                    writer.WriteLine("BEGIN IONS");
+                    writer.WriteLine("FRACTION_ID=0");
+                    writer.WriteLine($"SCANS={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"RETENTION_TIME={scan.RetentionTime * 60}"); // Convert minutes to seconds
+                    writer.WriteLine($"LEVEL={scan.TheScan.MsnOrder}");
+                    if (scan.TheScan.DissociationType != null)
+                        writer.WriteLine($"ACTIVATION={scan.TheScan.DissociationType}");
+                    if (scan.OneBasedPrecursorScanNumber != null)
+                        writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedPrecursorScanNumber}");
+                    writer.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz}");
+                    writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
+                    writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");
+                    writer.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity}");
+
+                    // Write peaks: monoMass, intensity, charge 
+                    for (int i = 0; i < scan.ExperimentalFragments.Length; i++)
+                    {
+                        writer.WriteLine($"{scan.ExperimentalFragments[i].MonoisotopicMass}\t{scan.ExperimentalFragments[i].TotalIntensity}\t{scan.ExperimentalFragments[i].Charge}");
+                    }
+
+                    writer.WriteLine("END IONS");
+                    writer.WriteLine();
+                }
+            }
         }
     }
 }

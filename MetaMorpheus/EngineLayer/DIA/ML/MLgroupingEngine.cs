@@ -55,12 +55,16 @@ namespace EngineLayer.DIA
                 var prediction = predictionEngine.Predict(pfPairSample);
                 if (prediction.Probability >= ProbabilityThreshold)
                 {
-                    var pfPair = new PrecursorFragmentPair(precursor, fragment);
+                    var pfPair = new PrecursorFragmentPair(precursor, fragment, predictionScore: prediction.Score);
                     pfPairs.Add(pfPair);
                 }
             }
             if (pfPairs.Count > 0)
             {
+                if (pfPairs.Count > 200)
+                {
+                    pfPairs = pfPairs.OrderByDescending(p => p.PredictionScore).Take(200).ToList();
+                }
                 var pfGroup = new PrecursorFragmentsGroup(precursor, pfPairs);
                 return pfGroup;
             }

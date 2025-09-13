@@ -1,4 +1,5 @@
-﻿using System;
+﻿using pepXML.Generated;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -39,6 +40,28 @@ namespace EngineLayer.DIA
             OutputFolder = outFolder;
             WriteModel = writeModel;
             WriteTrainingSamples = writeTrainingSamples;
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("DIAparameters:");
+            sb.AppendLine($"AnalysisType: {AnalysisType}");
+            sb.AppendLine($"{Ms1XicConstructor.ToString()}");
+            sb.AppendLine($"{Ms2XicConstructor.ToString()}");
+            sb.AppendLine($"PseudoSearchType: {PseudoSearchType}");
+            sb.AppendLine($"SearchDecoys: {SearchDecoys}");
+            sb.AppendLine($"ModelType: {ModelType}");
+            sb.AppendLine($"Features: {string.Join(", ", Features)}");
+            sb.AppendLine($"PsmScoreCutOff: {PsmScoreCutOff}");
+            if (!string.IsNullOrEmpty(ExistingModelPath)) sb.AppendLine($"ExistingModelPath: {ExistingModelPath}");
+            if (!string.IsNullOrEmpty(ExistingSampleFilePath)) sb.AppendLine($"ExistingSampleFilePath: {ExistingSampleFilePath}");
+            sb.AppendLine($"ApexRtTolerance: {ApexRtTolerance}");
+            sb.AppendLine($"TestFraction: {TestFraction}");
+            sb.AppendLine($"PredictionScoreThreshold: {PredictionScoreThreshold}");
+            sb.AppendLine($"PseudoMs2ConstructionType: {PseudoMs2ConstructionType}");
+            sb.AppendLine($"CombineFragments: {CombineFragments}");
+            return sb.ToString();
         }
     }
 }
