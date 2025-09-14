@@ -102,7 +102,7 @@ namespace Test.DIATests
             searchTask.SearchParameters.WriteSpectralLibrary = true;
 
             string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_try1_randomForest_0.75";
-            string outFolder2 = @"E:\ISD Project\TestSearch\ISD090625\YC_preFilter\ml\try15";
+            string outFolder2 = @"E:\ISD Project\TestSearch\ISD090625\YC_preFilter\ml\try18";
             if (!Directory.Exists(outFolder2))
             {
                 Directory.CreateDirectory(outFolder2);
@@ -125,7 +125,7 @@ namespace Test.DIATests
             var features = new List<string> { "Correlation", "SharedXIC", "FragmentIntensity"};
             string modelPath = @"E:\ISD Project\TestSearch\ISD090625\YC_preFilter\ml_try\MLmodel.zip";
             string trainingSamplePath = @"E:\ISD Project\TestSearch\ISD090625\YC_preFilter\ml_try9\TrainingSamples.tsv";
-            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, yeast_xml, false, ModelType.FastTree, features, 10, existingModelPath: null, existingSampleFilePath: null, outFolder2, 0.2, apexRtTolerance: 0.3, predictionScoreThreshold: 0.5, AnalysisType.MLbased_topDown, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.Mass, writeModel: true, writeTrainingSamples: true, combineFragments: true);
+            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, yeast_xml, false, ModelType.FastTree, features, 10, existingModelPath: modelPath, existingSampleFilePath: null, outFolder2, 0.2, apexRtTolerance: 0.5, predictionScoreThreshold: 0.4, AnalysisType.MLbased_topDown, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.Mass, writeModel: true, writeTrainingSamples: true, combineFragments: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);

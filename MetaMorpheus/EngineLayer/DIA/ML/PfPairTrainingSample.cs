@@ -33,7 +33,7 @@ namespace EngineLayer.DIA
 
         public PfPairTrainingSample(ExtractedIonChromatogram precursor, ExtractedIonChromatogram fragment, bool label = false, SpectralMatch psm = null)
         {
-            Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(precursor, fragment, 150);
+            Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursor, fragment);
             ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
             Overlap = (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursor, fragment);
             FragmentIntensity = (float)fragment.ApexPeak.Intensity;
