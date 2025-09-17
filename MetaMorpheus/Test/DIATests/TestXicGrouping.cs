@@ -62,13 +62,13 @@ namespace Test.DIATests
 
             //XICs with spline
             var cubicSpline = new XicCubicSpline();
-            cubicSpline.SetXicSplineXYData(xic1, true);
-            cubicSpline.SetXicSplineXYData(xic2, true);
+            cubicSpline.SetXicSplineXYData(xic1);
+            cubicSpline.SetXicSplineXYData(xic2);
             corr = PrecursorFragmentsGroup.CalculateXicCorrelationXYData(xic1, xic2);
             Assert.That(corr, Is.EqualTo(1.0).Within(1e-6));
             var linearSpline = new XicLinearSpline();
-            linearSpline.SetXicSplineXYData(xic1, true);
-            linearSpline.SetXicSplineXYData(xic2, true);
+            linearSpline.SetXicSplineXYData(xic1);
+            linearSpline.SetXicSplineXYData(xic2);
             corr = PrecursorFragmentsGroup.CalculateXicCorrelationXYData(xic1, xic2);
             Assert.That(corr, Is.EqualTo(1.0).Within(1e-6));
         }
@@ -318,10 +318,10 @@ namespace Test.DIATests
 
             //XICs with spline
             var bSpline = new Bspline(2, 150);
-            bSpline.SetXicSplineXYData(xic1, true);
-            bSpline.SetXicSplineXYData(xic2, true);
-            bSpline.SetXicSplineXYData(xic3, true);
-            bSpline.SetXicSplineXYData(xic4, true);
+            bSpline.SetXicSplineXYData(xic1);
+            bSpline.SetXicSplineXYData(xic2);
+            bSpline.SetXicSplineXYData(xic3);
+            bSpline.SetXicSplineXYData(xic4);
             corr = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(xic1, xic2, 150);
             var corr2 = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(xic1, xic3, 150);
             var corr3 = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(xic1, xic4, 150);

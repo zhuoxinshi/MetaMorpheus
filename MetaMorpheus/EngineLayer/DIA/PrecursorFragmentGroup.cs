@@ -2,6 +2,7 @@
 using MassSpectrometry;
 using MathNet.Numerics.Statistics;
 using MzLibUtil;
+using Plotly.NET;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -256,6 +257,19 @@ namespace EngineLayer.DIA
             {
                 PFpairs[i].FragmentRank = i + 1;
             }
+        }
+
+        public GenericChart Visualize()
+        {
+            var plots = new List<GenericChart>();
+            var precursorPlot = PrecursorXic.VisualizeGeneral("xyData");
+            foreach(var frag in PFpairs.Select(p => p.FragmentXic))
+            {
+                var plot = frag.VisualizeGeneral("xyData");
+                plots.Add(plot);
+            }
+            var combinedPlot = Chart.Combine(plots);
+            return combinedPlot;
         }
     }
 }

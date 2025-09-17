@@ -9,6 +9,7 @@ using System.Data.Entity.Validation;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Plotly.NET;
 
 namespace EngineLayer.DIA
 {
@@ -48,6 +49,7 @@ namespace EngineLayer.DIA
                     {
                         var xic = allXics[i];
                         XicSplineEngine.SetXicSplineXYData(xic);
+                        //xic.VisualizeGeneral("combined").Show();
                     }
                 });
             }

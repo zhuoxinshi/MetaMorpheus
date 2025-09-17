@@ -36,6 +36,8 @@ namespace EngineLayer.DIA
             sb.AppendLine($"AnalysisType: {AnalysisType}");
             sb.AppendLine($"{Ms1XicConstructor.ToString()}");
             sb.AppendLine($"{Ms2XicConstructor.ToString()}");
+            sb.AppendLine($"{Ms1XicConstructor.XicSplineEngine?.ToString()}");
+            sb.AppendLine($"{Ms2XicConstructor.XicSplineEngine?.ToString()}");
             if (PfGroupingEngine != null) sb.AppendLine($"{PfGroupingEngine.ToString()}");
             sb.AppendLine($"PseudoMs2ConstructionType: {PseudoMs2ConstructionType}");
             sb.AppendLine($"CombineFragments: {CombineFragments}");
