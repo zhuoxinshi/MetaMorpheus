@@ -14,7 +14,6 @@ using Readers;
 using MathNet.Numerics.Interpolation;
 using System.Drawing.Imaging;
 using Nett;
-using EngineLayer.DIA.XicConstruction;
 
 namespace Test.DIATests
 {
@@ -139,11 +138,12 @@ namespace Test.DIATests
         [Test]
         public static void TestISD()
         {
-            var path1 = @"E:\ISD Project\ISD_250906\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
-            var path2 = @"E:\ISD Project\ISD_250906\09-11-25_YE_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
-            var path3 = @"E:\ISD Project\ISD_250906\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep3.raw";
-            var fileList1 = new List<string> { path1  };
-            var outputFolder = @"E:\ISD Project\TestSearch\ISD090625\YD_preFilter\trySpline\try4";
+            var path1 = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
+            var path2 = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_seq.raw";
+            var path3 = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep2.raw";
+            var path4 = @"E:\ISD Project\ISD_250906\09-18-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
+            var fileList1 = new List<string> { path4  };
+            var outputFolder = @"E:\ISD Project\TestSearch\ISD090625\0918YC\preFilter\1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -156,11 +156,11 @@ namespace Test.DIATests
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
 
             //DIA parameters
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 5, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 5000, minCharge: 5, new GaussianFitSpline(true, scanIndexBased:true));
-            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 5, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new GaussianFitSpline(true, scanIndexBased: true));
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.5, 15, 1);
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 5, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 5000, minCharge: 4, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 5, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.2f, 0.3, 0.5, 15, 1);
             var xicGroupingEngine = new XicGroupingEngine(0.5f, 0.5, 0.5, 15, 10);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
@@ -173,7 +173,7 @@ namespace Test.DIATests
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
             engine.Run();
 
-            var path4 = @"E:\ISD Project\ISD_250906\09-09-25_YC_81min_ISD60-80-100_sub400-1100_300-100mz_rep1.raw";
+            var path7 = @"E:\ISD Project\ISD_250906\09-09-25_YC_81min_ISD60-80-100_sub400-1100_300-100mz_rep1.raw";
             var path5 = @"E:\ISD Project\ISD_250906\09-09-25_YC_81min_ISD60-80-100_sub400-1100_300-100mz_rep2.raw";
             var path6 = @"E:\ISD Project\ISD_250906\09-09-25_YC_81min_ISD60-80-100_sub400-1100_300-100mz_rep3.raw";
             var fileList2 = new List<string> { path5};
