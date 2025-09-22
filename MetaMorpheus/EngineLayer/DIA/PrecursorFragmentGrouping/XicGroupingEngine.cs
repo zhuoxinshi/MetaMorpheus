@@ -61,6 +61,15 @@ namespace EngineLayer.DIA
             //Remove groups with insufficient fragment pairs after filtering
             pfGroupsList.RemoveAll(g => g.PFpairs.Count < MinFragmentCountForPfGroup);
 
+            ////try
+            //if (FragmentRankThreshold.HasValue)
+            //{
+            //    foreach (var group in pfGroupsList)
+            //    {
+            //        group.PFpairs = group.PFpairs.OrderByDescending(p => p.FragmentXic.ApexPeak.Intensity).Take(FragmentRankThreshold.Value).ToList();
+            //    }
+            //}
+            
             return pfGroupsList;
         }
 
