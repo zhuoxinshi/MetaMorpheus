@@ -14,6 +14,7 @@ using Readers;
 using MathNet.Numerics.Interpolation;
 using System.Drawing.Imaging;
 using Nett;
+using Plotly.NET;
 
 namespace Test.DIATests
 {
@@ -147,9 +148,9 @@ namespace Test.DIATests
             var path7 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1.raw";
             var path8 = @"E:\ISD Project\ISD_250906\09-20-25_YD_105min_gradient5_ISD60-80-100_preFilter800-1000-1200.raw";
             var path9 = @"E:\ISD Project\ISD_250128\01-31-25_td-ISD_PEPPI-YD_140min_gradient4_ISD60-80-100_micro4.raw";
-            var path10 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected-calib-averaged.mzML";
-            var fileList1 = new List<string> { path10 };
-            var outputFolder = @"E:\ISD Project\TestSearch\ISD090625\0919YD\preFilter\cali2";
+            var path10 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1_averaged_labelCorrected.mzML";
+            var fileList1 = new List<string> { path2 };
+            var outputFolder = @"E:\ISD Project\TestSearch\ISD090625\0917YB\seq\3";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -162,10 +163,10 @@ namespace Test.DIATests
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
 
             //DIA parameters
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 6000, minCharge: 5, new Bspline(2, 150));
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 4000, minCharge: 4, new Bspline(2, 150));
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.6, 15, 1, fragmentRankThreshold: 500);
-            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.3, 0.5, 15, 10);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.5, 15, 1, fragmentRankThreshold: 200);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.3, 0.75, 15, 10);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
@@ -210,6 +211,55 @@ namespace Test.DIATests
 
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
             engine.Run();
+        }
+
+        [Test]
+        public static void CheckXic()
+        {
+            var path = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected.mzML";
+            var fileList1 = new List<string> { path };
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+
+            var myFileManager = new MyFileManager(true);
+            var myMsDataFile = myFileManager.LoadFile(path, searchTask.CommonParameters);
+
+            //DIA parameters
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 4000, minCharge: 4, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.5, 15, 1, fragmentRankThreshold: 200);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.3, 0.75, 15, 10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
+
+            var ms1Scans = myMsDataFile.GetMS1Scans().ToArray();
+            var ms2Scans = myMsDataFile.GetAllScansList().Where(s => s.ScanFilter.Contains("sid=60")).ToArray();
+            var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1);
+            var allMs2Xics = ms2XicConstructor.GetAllXicsWithXicSpline(ms2Scans, out var matchedPeaks2, out var indexingEngine2);
+            var massIndexingEngine1 = indexingEngine1 as MassIndexingEngine;
+            var massIndexingEngine2 = indexingEngine2 as MassIndexingEngine;
+            var precursor = massIndexingEngine1.GetIndexedPeak(10357.556, 222, new PpmTolerance(20), 19);
+            var precursorXic = matchedPeaks1[precursor];
+            var plot = precursorXic.VisualizeGeneral("combined");
+            var fragment = massIndexingEngine2.GetIndexedPeak(682.37.ToMass(5), 222, new PpmTolerance(20), 5);
+            var fragmentXic = matchedPeaks2[fragment];
+            var plot1 = matchedPeaks2[fragment].VisualizeGeneral("combined");
+            var corr = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(precursorXic, fragmentXic, 150);
+            var corr2 = PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursorXic, fragmentXic);
+            var fragment2 = massIndexingEngine2.GetIndexedPeak(568.81.ToMass(6), 222, new PpmTolerance(20), 6);
+            var fragmentXic2 = matchedPeaks2[fragment2];
+            var plot2 = fragmentXic2.VisualizeGeneral("combined");
+            int stop3 = 3;
+            corr = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(precursorXic, fragmentXic2, 150);
+            corr2 = PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursorXic, fragmentXic2);
+            int stop4 = 4;
+            var fragment3 = massIndexingEngine2.GetIndexedPeak(723.41.ToMass(8), 217, new PpmTolerance(20), 8);
+            var fragmentXic3 = matchedPeaks2[fragment3];
+            int stop5 = 5;
+            fragmentXic2 = matchedPeaks2[fragment2];
+            corr = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(precursorXic, fragmentXic2, 150);
+            corr2 = PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursorXic, fragmentXic2);
         }
     }
 }

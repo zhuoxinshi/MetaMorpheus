@@ -93,7 +93,7 @@ namespace EngineLayer.DIA
             var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
 
             //find precursor xic
-            int numberOfScansPerCycle = 3;
+            int numberOfScansPerCycle = ScanNumberWindowMap.Values.Distinct().Count() + 1;
             int zeroBasedPrecursorScanIndex = (psm.PrecursorScanNumber.Value - 1) / numberOfScansPerCycle;
             int zeroBasedMs2ScanIndex = (psm.ScanNumber - 1) / numberOfScansPerCycle;
             var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psm.ScanPrecursorHighestIsotopeMz, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
@@ -268,7 +268,7 @@ namespace EngineLayer.DIA
             return allSamples;
         }
 
-        private List<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataScan[] ms1Scans, MsDataScan[] ms2Scans, CommonParameters commonParameters)
+        public static List<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataScan[] ms1Scans, MsDataScan[] ms2Scans, CommonParameters commonParameters)
         {
             List<Ms2ScanWithSpecificMass>[] scansWithPrecursors = new List<Ms2ScanWithSpecificMass>[ms2Scans.Length];
             Parallel.ForEach(Partitioner.Create(0, ms2Scans.Length), new ParallelOptions { MaxDegreeOfParallelism = commonParameters.MaxThreadsToUsePerFile },

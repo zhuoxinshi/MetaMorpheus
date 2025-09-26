@@ -156,7 +156,8 @@ namespace EngineLayer
 
         public static BioPolymerNotchFragmentIonComparer BioPolymerNotchFragmentIonComparer = new();
 
-        protected List<SpectralMatchHypothesis> _BestMatchingBioPolymersWithSetMods;
+        //changed from protected to public
+        public List<SpectralMatchHypothesis> _BestMatchingBioPolymersWithSetMods;
 
         public IEnumerable<SpectralMatchHypothesis> BestMatchingBioPolymersWithSetMods
         {
