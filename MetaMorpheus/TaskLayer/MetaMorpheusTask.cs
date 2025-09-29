@@ -415,6 +415,10 @@ namespace TaskLayer
                         mlEngine2.Run();
                         commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath] = mlEngine2.PseudoMs2Scans.ToArray();
                         return mlEngine2.PseudoMs2Scans;
+                    case (AnalysisType.ISD_PSM):
+                        var isdPsmEngine = new ISDEngine_PSM(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                        isdPsmEngine.Run();
+                        break;
                 }
             } else if (commonParameters.DIAparameters != null && commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
             {

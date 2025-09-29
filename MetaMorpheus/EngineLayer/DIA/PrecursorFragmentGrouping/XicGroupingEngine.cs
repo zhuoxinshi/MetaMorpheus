@@ -94,7 +94,7 @@ namespace EngineLayer.DIA
                     }
                 }
             }
-            if (pfPairs.Count > minFragmentCountForGrouping)
+            if (pfPairs.Count >= minFragmentCountForGrouping)
             {
                 var pfGroup = new PrecursorFragmentsGroup(precursorXic, pfPairs);
                 return pfGroup;

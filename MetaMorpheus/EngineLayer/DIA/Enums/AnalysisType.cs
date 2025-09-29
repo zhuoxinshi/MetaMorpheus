@@ -11,6 +11,7 @@ namespace EngineLayer.DIA
         ISD,
         DIA,
         MLbased_bottomUp,
-        MLbased_topDown
+        MLbased_topDown,
+        ISD_PSM
     }
 }

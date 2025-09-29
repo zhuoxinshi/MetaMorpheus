@@ -12,7 +12,7 @@ namespace EngineLayer.DIA
     public class UmpirePfGroupingEngine : XicGroupingEngine
     {
         public int NoPointPerInterval { get; set; }
-        public UmpirePfGroupingEngine(int noPointPerInterval, float apexRTTolerance, double overlapThreshold, double correlationThreshold, int maxThreadsForGrouping = 1, int minFragmentCountForGrouping = 0, int? precursorRankThreshold = null, int? fragmentRankThreshold = null)
+        public UmpirePfGroupingEngine(int noPointPerInterval, float apexRTTolerance, double overlapThreshold, double correlationThreshold, int maxThreadsForGrouping = 1, int minFragmentCountForGrouping = 1, int? precursorRankThreshold = null, int? fragmentRankThreshold = null)
             : base(apexRTTolerance, overlapThreshold, correlationThreshold, maxThreadsForGrouping, minFragmentCountForGrouping, precursorRankThreshold, fragmentRankThreshold)
         {
             NoPointPerInterval = noPointPerInterval;
@@ -34,7 +34,7 @@ namespace EngineLayer.DIA
                     }
                 }
             }
-            if (pfPairs.Count > MinFragmentCountForPfGroup)
+            if (pfPairs.Count >= MinFragmentCountForPfGroup)
             {
                 var pfGroup = new PrecursorFragmentsGroup(precursorXic, pfPairs);
                 return pfGroup;
