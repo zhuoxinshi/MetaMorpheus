@@ -139,18 +139,18 @@ namespace Test.DIATests
         [Test]
         public static void TestISD()
         {
-            var path1 = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
-            var path2 = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_seq.raw";
-            var path3 = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep2.raw";
-            var path4 = @"E:\ISD Project\ISD_250906\09-18-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
-            var path5 = @"E:\ISD Project\ISD_250906\09-18-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep2.raw";
+            var path1 = @"E:\ISD Project\ISD_250906\09-08-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
+            var path2 = @"E:\ISD Project\ISD_250906\09-08-25_YB_81min_ISD60-80-100_sub400-1100_300-100mz.raw";
+            var path3 = @"E:\ISD Project\ISD_250906\09-08-25_YB_81min_ISD100_preFilter1100.raw";
+            var path4 = @"E:\ISD Project\ISD_250906\09-09-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
+            var path5 = @"E:\ISD Project\ISD_250906\09-10-25_YD_81min_ISD60-80-100_sub400-1100_300-100mz.raw";
             var path6 = @"E:\ISD Project\ISD_250906\09-18-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep3.raw";
             var path7 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1.raw";
             var path8 = @"E:\ISD Project\ISD_250906\09-20-25_YD_105min_gradient5_ISD60-80-100_preFilter800-1000-1200.raw";
             var path9 = @"E:\ISD Project\ISD_250128\01-28-25_td-ISD_PEPPI-YD_105min_ISD60-80-100_120k_micro1.raw";
             var path10 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1_averaged_labelCorrected.mzML";
-            var fileList1 = new List<string> { path7 };
-            var outputFolder = @"E:\ISD Project\TestSearch\ISD090625\0919YD\preFilter\gptmd";
+            var fileList1 = new List<string> { path1, path2, path3 };
+            var outputFolder = @"E:\ISD Project\TestSearch\ISD090625\0908YB\compare\2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -159,21 +159,21 @@ namespace Test.DIATests
             string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
             string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
             string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task Settings\Task1-SearchTaskconfig.toml";
-            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_FixedOnly, MetaMorpheusTask.tomlConfig);
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
             //searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
 
             //DIA parameters
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 6000, minCharge: 5, new Bspline(2, 150));
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 5000, minCharge: 5, new Bspline(2, 150));
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.75, 15, 1, fragmentRankThreshold: 200);
-            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.3, 0.7, 15, 1, fragmentRankThreshold: 200);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0, 0.7, 15, 1, fragmentRankThreshold: 500);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0, 0.7, 15, 1, fragmentRankThreshold: 500);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("GPTMD", gptmdTask), ("search", searchTask) }; //("GPTMD", gptmdTask)
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
             string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
             string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
 
