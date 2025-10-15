@@ -11,6 +11,7 @@ using System.IO;
 using Chemistry;
 using Readers;
 using MathNet.Numerics.Interpolation;
+using EngineLayer.DIA.XicConstruction;
 
 namespace Test.DIATests
 {
@@ -120,6 +121,28 @@ namespace Test.DIATests
             var emptyScans = new MsDataScan[0];
             var ex = Assert.Throws<MetaMorpheusException>(() => massXicConstructor.GetAllXics(emptyScans));
             Assert.That(ex.Message, Is.EqualTo("XIC construction failed."));
+        }
+
+        [Test]
+        public static void TestHighestIsotopeXic()
+        {
+            //Two sets of fake scans with two different masses
+            double[] intensityMultipliers = { 1, 2, 3, 2, 1 };
+            var fakeScans1 = GetSimpleFakeScans("PEPTIDE", intensityMultipliers, 1e6, 1.0, 1, out IsotopicDistribution preDist1, charge:2);
+            var fakeScans2 = GetSimpleFakeScans("PEPTIDEP", intensityMultipliers, 1e6, 1.0 + 0.5, 1, out IsotopicDistribution preDist2, charge:2);
+            var fakeScans = fakeScans1.Concat(fakeScans2).ToArray();
+
+            var deconParameters = new ClassicDeconvolutionParameters(1, 20, 4, 3);
+            var highestPeakXicConstructor = new HighestIsotopePeakXicConstructor(new PpmTolerance(20), 2, 1, 3, deconParameters);
+            var xics = highestPeakXicConstructor.GetAllXics(fakeScans);
+
+            //This should give two XICs, each with a mass that matches with preDist1 and preDist2
+            Assert.That(xics.Count, Is.EqualTo(2));
+            //make sure the apex peak is replaced with a indexedMass which contains the mass and charge info of the precursor
+            //because the deconvoluted masses are sorted by the intensity of the highest isotope peak, it should be the apex peak
+            //which got replaced by an indexedMass
+            Assert.That(xics.Any(xic => Math.Abs(xic.ApexPeak.M - preDist1.Masses.First()) < 0.001));
+            Assert.That(xics.Any(xic => Math.Abs(xic.ApexPeak.M - preDist2.Masses.First()) < 0.001));
         }
 
         [Test]
