@@ -507,5 +507,55 @@ namespace Test
 
             Assert.That((int)score, Is.EqualTo(0));
         }
+
+        [Test]
+        public static void Read()
+        {
+            var filePath = @"E:\Islets\test\10-12-25_islet3456_TMT_140min_SPS-MS3_testrun.raw";
+            var dataFile = MsDataFileReader.GetDataFile(filePath);
+            var ms3Scans = dataFile.GetAllScansList().Where(s => s.ScanFilter.Contains("ms3") && (s.RetentionTime > 10 && s.RetentionTime < 135)).ToList();
+
+            var tolerance = new PpmTolerance(20);
+            int roundTo = 5;
+            var diagnosticIons = GlobalVariables.AllModsKnown
+                .First(m => m.ModificationType == "Multiplex Label" && m.IdWithMotif.Contains("TMT18")).DiagnosticIons
+                .First().Value.Select(p => Math.Round(p.ToMz(1), roundTo)).ToList();
+
+            var channelIntensityDict = new Dictionary<double, List<double>>();
+            foreach (var scan in ms3Scans)
+            {
+                var possibleMatches = scan.MassSpectrum.XArray.Where(p => p > 126 && p <= diagnosticIons.Max() + tolerance.GetMaximumValue(diagnosticIons.Max()))
+                    .ToList();
+                for (int j = 0; j < diagnosticIons.Count; j++)
+                {
+                    var roundedMz = Math.Round(diagnosticIons[j], 3);
+                    var foundPeaks = possibleMatches.Where(p => tolerance.Within(p, diagnosticIons[j])).ToList();
+                    if (foundPeaks.Count > 0)
+                    {
+                        var indices = foundPeaks.Select(p => Array.IndexOf(scan.MassSpectrum.XArray, p)).ToList();
+                        var highestPeakIndex = indices.MaxBy(i => scan.MassSpectrum.YArray[i]);
+                        if (channelIntensityDict.ContainsKey(roundedMz))
+                        {
+                            channelIntensityDict[roundedMz].Add(scan.MassSpectrum.YArray[highestPeakIndex]);
+                        }
+                        else
+                        {
+                            channelIntensityDict[roundedMz] = new List<double> { scan.MassSpectrum.YArray[highestPeakIndex] };
+                        }
+                    }
+                }
+            }
+
+            var channelIntensitySum = channelIntensityDict.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Sum());
+            var outPath = @"E:\Islets\test\reporterIons.tsv";
+            using (StreamWriter sw = new StreamWriter(outPath))
+            {
+                sw.WriteLine("Channel\tIntensity");
+                foreach (var kvp in channelIntensityDict)
+                {
+                    sw.WriteLine($"{kvp.Key}\t{kvp.Value}");
+                }
+            }   
+        }
     }
 }
