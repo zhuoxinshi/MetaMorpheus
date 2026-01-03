@@ -407,7 +407,7 @@ namespace TaskLayer
                     ReportProgress(new ProgressEventArgs(100, "Done with search!", thisId));
                 }
                 //write out pseudoScans
-                if (CommonParameters.DIAparameters.WritePseudoScans)
+                if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.WritePseudoScans)
                 {
                     var outPath = Path.Combine(OutputFolder, "PseudoScans.msalign");
                     DIAEngine.WriteMsAlignFile(outPath, arrayOfMs2ScansSortedByMass);

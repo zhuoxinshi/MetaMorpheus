@@ -49,7 +49,13 @@ namespace EngineLayer.DIA
                     allPfGroups.AddRange(pfGroups);
                 }
             }
-            
+
+            //filtering fragments
+            //foreach (var pfGroup in allPfGroups)
+            //{
+            //    pfGroup.PFpairs = pfGroup.PFpairs.OrderByDescending(pf => pf.FragmentXic.ApexPeak.Intensity).Take(200).ToList();
+            //}
+
             //Convert pfGroups to pseudo MS2 scans
             PseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
             int pfGroupIndex = 1;

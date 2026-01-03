@@ -23,9 +23,9 @@ namespace Test.DIATests
         [Test]
         public static void SearchCE()
         {
-            var filePath1 = @"E:\CE\250730_CE\08-19-25_CE_ammon-acet_PEPPI-YB_500nL-pHjunction_ISD60-80_preFilter700-900-1100.raw";
+            var filePath1 = @"E:\CE\251016\10-17-25_CE_ammon-acet_PEPPI-YBC_500nL-pHjunction_ISD60-80_preFilter700-900-1100_rep2.raw";
             var fileList = new List<string> { filePath1};
-            var outputFolder = @"E:\ISD Project\TestSearch\DIAupdate\test1_ISD";
+            var outputFolder = @"E:\CE\251016\ISD_search\preFilter_rep2\try1";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -36,13 +36,13 @@ namespace Test.DIATests
 
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 4000, 4, new XicLinearSpline(0.05, numberOfPeaksToAdd: 1));
-            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new XicLinearSpline(0.05, numberOfPeaksToAdd: 1));
-            var pfGroupingEngine = new XicGroupingEngine(0.15f, 0.2, 0.5, 10, 10);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.Mass);
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 0.25, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 4000, 4, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 0.25, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            var pfGroupingEngine = new UmpirePfGroupingEngine(150, 0.1f, 0.2, 0.5, 10, 10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
 
             //match all charge fragment ions
-            searchTask.SearchParameters.WriteSpectralLibrary = true;
+            //searchTask.SearchParameters.WriteSpectralLibrary = true;
 
             //Use IsoDec
             //task.CommonParameters.PrecursorDeconvolutionParameters = new IsoDecDeconvolutionParameters(reportMultipleMonoisos: false);
@@ -71,23 +71,29 @@ namespace Test.DIATests
 
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\umpire_try_0.2f_10-200_mass";
-            if (!Directory.Exists(outputFolder))
+
+            string baseFolder = @"E:\DIA\SearchResults\UmpireData\search1";
+            string outputFolder = baseFolder;
+            while (Directory.Exists(outputFolder))
             {
-                Directory.CreateDirectory(outputFolder);
+                // Append a short GUID to make the folder name unique
+                string uniqueSuffix = "_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                outputFolder = baseFolder + uniqueSuffix;
             }
+            Directory.CreateDirectory(outputFolder);
+
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(10), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 0, 1, new Bspline(2, 150));
             //var ms1XicConstructor = new DeconHighestPeakXicConstructor(new PpmTolerance(5), 1, 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, new Bspline(2, 150));//min number of fragments cannot be 0
             var ms2XicConstructor = new MzPeakXicConstructor(new PpmTolerance(20), 1, 0.5, 3, new Bspline(2, 150));
             //var xicGroupingEngine = new XicGroupingEngine(0.2f, 0.2, 0.5, 10, 0, precursorRankThreshold: 10, fragmentRankThreshold: 200);
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.2f, 0.2, 0.7, 10, 1, 10, 200);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.2f, 0.2, 0.5, 10, 1, 20, 200);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.DIA, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.MzPeak);
 
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
-            string umpireFile = @"E:\DIA\DIA-Umpire data\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
+            string umpireFile = @"E:\DIA\PublishedData\DIA-Umpiredata\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
             string benchmarkDb = @"E:\REF_EColi_K12_UPS1_combined.fasta";
-            string humanDb = @"E:\ISD Project\Claire's human data\Human_9606.fasta";
-            searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { DIAfile }, "test");
+            string humanDb = @"E:\Databases\Human_9606.fasta";
+            searchTask.RunTask(outputFolder, new List<DbForTask> { new DbForTask(humanDb, false) }, new List<string> { umpireFile }, "test");
         }
 
         [Test]
@@ -291,6 +297,34 @@ namespace Test.DIATests
             fragmentXic2 = matchedPeaks2[fragment2];
             corr = PrecursorFragmentsGroup.CalculateXicCorrXYData_Umpire(precursorXic, fragmentXic2, 150);
             corr2 = PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursorXic, fragmentXic2);
+        }
+
+        [Test]
+        public static void TestFWDIA()
+        {
+            var filePath1 = @"E:\ISD Project\FW-DIA\20230727_RPLC_ribosomal_protein_CV20-70V_scan-time_5s_S1_filtered.mzML";
+            var fileList = new List<string> { filePath1 };
+            var outputFolder = @"E:\ISD Project\FW-DIA\ISD_search\try1";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            string tomlFile_Variableonly = @"E:\ISD Project\FW-DIA\DDA\Task Settings\Task1-SearchTaskconfig.toml";
+
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_Variableonly, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 2, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 1000, 3, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 2, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            var pfGroupingEngine = new XicGroupingEngine(1f, 0, 0, 10, 1);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
+
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+
+            string ecoli_fasta = @"E:\ISD Project\FW-DIA\uniprotkb_taxonomy_id_469008_2025_04_24.fasta";
+
+            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(ecoli_fasta, false) }, outputFolder);
+            engine.Run();
         }
     }
 }

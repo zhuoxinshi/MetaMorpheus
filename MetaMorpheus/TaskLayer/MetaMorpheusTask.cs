@@ -235,6 +235,7 @@ namespace TaskLayer
                                 foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
                                     precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
                                 {
+                                    if (envelope.Charge <= 4) continue;
                                     double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
                                     int peakCount = envelope.Peaks.Count();
                                     double intensity = 1;

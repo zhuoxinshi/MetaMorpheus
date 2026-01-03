@@ -194,6 +194,9 @@ namespace EngineLayer.ClassicSearch
                 psm.ResolveAllAmbiguities();
             }
 
+            //debug
+            var psms = SpectralMatches.Where(b => b != null).ToList();
+
             return new MetaMorpheusEngineResults(this);
         }
 
