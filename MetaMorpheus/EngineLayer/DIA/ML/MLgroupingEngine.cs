@@ -63,7 +63,7 @@ namespace EngineLayer.DIA
             {
                 if (pfPairs.Count > 200)
                 {
-                    pfPairs = pfPairs.OrderByDescending(p => p.PredictionScore).Take(200).ToList();
+                    pfPairs = pfPairs.OrderByDescending(p => p.PredictionScore).Take(500).ToList();
                 }
                 var pfGroup = new PrecursorFragmentsGroup(precursor, pfPairs);
                 return pfGroup;

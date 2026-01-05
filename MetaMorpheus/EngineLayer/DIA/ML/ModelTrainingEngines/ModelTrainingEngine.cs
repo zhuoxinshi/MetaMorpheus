@@ -42,7 +42,7 @@ namespace EngineLayer.DIA
             {
                 var sampleFile = new PfPairTrainingSampleFile(MlDIAparams.ExistingSampleFilePath);
                 sampleFile.LoadResults();
-                trainingSamples = sampleFile.Results.ToList();
+                trainingSamples = sampleFile.Results.Where(s => s.PsmScore >= MlDIAparams.PsmScoreCutOff).ToList();
             }
             else
             {
@@ -96,7 +96,6 @@ namespace EngineLayer.DIA
                 mlContext.Model.Save(model, data.Schema, modelPath);
             }
 
-
             return model;
         }
 
@@ -117,6 +116,7 @@ namespace EngineLayer.DIA
         {
             var positives = allPairFeatures.Where(p => p.Label == true);
             var negatives = allPairFeatures.Where(p => p.Label == false);
+            if (positives.Count() == negatives.Count()) return allPairFeatures;
 
             //debug
             int posCount = positives.Count();

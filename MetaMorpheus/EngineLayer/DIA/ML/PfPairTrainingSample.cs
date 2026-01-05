@@ -33,7 +33,7 @@ namespace EngineLayer.DIA
 
         public PfPairTrainingSample(ExtractedIonChromatogram precursor, ExtractedIonChromatogram fragment, bool label = false, SpectralMatch psm = null)
         {
-            Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrelationXYData(precursor, fragment);
+            Correlation = (float)PrecursorFragmentsGroup.CalculateXicCorrelation(precursor, fragment);
             ApexRtDelta = (float)Math.Abs(precursor.ApexRT - fragment.ApexRT);
             Overlap = (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursor, fragment);
             FragmentIntensity = (float)fragment.ApexPeak.Intensity;
@@ -45,7 +45,7 @@ namespace EngineLayer.DIA
 
         public PfPairTrainingSample(PrecursorFragmentPair pfPair)
         {
-            Correlation = pfPair.Correlation.HasValue? (float)pfPair.Correlation : (float)PrecursorFragmentsGroup.CalculateXicCorrelationXYData(pfPair.PrecursorXic, pfPair.FragmentXic);
+            Correlation = pfPair.Correlation.HasValue? (float)pfPair.Correlation : (float)PrecursorFragmentsGroup.CalculateXicCorrelation(pfPair.PrecursorXic, pfPair.FragmentXic);
             ApexRtDelta = (float)Math.Abs(pfPair.PrecursorXic.ApexRT - pfPair.FragmentXic.ApexRT);
             Overlap = pfPair.Overlap.HasValue ? (float)pfPair.Overlap : (float)PrecursorFragmentsGroup.CalculateXicOverlapRatio(pfPair.PrecursorXic, pfPair.FragmentXic);
             FragmentIntensity = (float)pfPair.FragmentXic.ApexPeak.Intensity;
@@ -53,6 +53,30 @@ namespace EngineLayer.DIA
             SharedXIC = (float)PrecursorFragmentPair.CalculateSharedXIC(pfPair.PrecursorXic, pfPair.FragmentXic);
             FragmentRank = (float)pfPair.FragmentRank;
             PrecursorRank = (float)pfPair.PrecursorRank;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is not PfPairTrainingSample other)
+                return false;
+
+            return Correlation == other.Correlation
+                && ApexRtDelta == other.ApexRtDelta
+                && Overlap == other.Overlap
+                && FragmentIntensity == other.FragmentIntensity
+                && Label == other.Label;
+        }
+
+        public override int GetHashCode()
+        {
+            // Combine hash codes of all properties used in Equals
+            return HashCode.Combine(
+                Correlation,
+                ApexRtDelta,
+                Overlap,
+                FragmentIntensity,
+                Label
+            );
         }
 
         public PfPairTrainingSample() { }

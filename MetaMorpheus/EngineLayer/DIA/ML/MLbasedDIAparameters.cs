@@ -24,7 +24,8 @@ namespace EngineLayer.DIA
         public int TargetSampleCount { get; set; } 
         public bool WriteModel { get; set; } 
         public bool WriteTrainingSamples { get; set; }
-        public MLbasedDIAparameters(PseudoSearchScanType pseudoSearchScanType, string proteinDb, bool searchDecoys, ModelType trainingModel, List<string> features, double psmScoreCutOff, string existingModelPath, string existingSampleFilePath, string outFolder, double testFraction, double apexRtTolerance, double predictionScoreThreshold, AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false, bool writeModel = false, bool writeTrainingSamples = false) : base(analysisType, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, pseudoMs2ConstructionType, combineFragments)
+        public bool UseDecoySamples { get; set; }
+        public MLbasedDIAparameters(PseudoSearchScanType pseudoSearchScanType, string proteinDb, bool searchDecoys, ModelType trainingModel, List<string> features, double psmScoreCutOff, string existingModelPath, string existingSampleFilePath, string outFolder, double testFraction, double apexRtTolerance, double predictionScoreThreshold, AnalysisType analysisType, XicConstructor ms1XicConstructor, XicConstructor ms2XicConstructor, PfGroupingEngine pfGroupingEngine, PseudoMs2ConstructionType pseudoMs2ConstructionType, bool combineFragments = false, bool writeModel = false, bool writeTrainingSamples = false, bool useDecoySamples = false) : base(analysisType, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, pseudoMs2ConstructionType, combineFragments)
         {
             PseudoSearchType = pseudoSearchScanType;
             ProteinDb = proteinDb;
@@ -40,6 +41,7 @@ namespace EngineLayer.DIA
             OutputFolder = outFolder;
             WriteModel = writeModel;
             WriteTrainingSamples = writeTrainingSamples;
+            UseDecoySamples = useDecoySamples;
         }
 
         public override string ToString()

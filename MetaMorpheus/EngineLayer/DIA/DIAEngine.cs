@@ -24,43 +24,35 @@ namespace EngineLayer.DIA
     {
         private readonly MsDataFile DataFile;
         public DIAparameters DIAparams { get; set; } 
-        public List<Ms2ScanWithSpecificMass> PseudoMs2Scans { get; set; } 
+        public IEnumerable<Ms2ScanWithSpecificMass> PseudoMs2Scans { get; set; }
+        public int OneBasedScanNumber { get; set; }
         protected override MetaMorpheusEngineResults RunSpecific()
+        {
+            PseudoMs2Scans = GetPseudoMs2Scans();
+            return new MetaMorpheusEngineResults(this);
+        }
+
+        public virtual IEnumerable<Ms2ScanWithSpecificMass> GetPseudoMs2Scans()
         {
             //read in scans
             var ms1Scans = DataFile.GetMS1Scans().ToArray();
             var ms2Scans = DataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
             var DIAScanWindowMap = ConstructMs2Groups(ms2Scans);
 
-            //Get all MS1 and MS2 XICs
-            var allMs1Xics = new Dictionary<(double min, double max), List<ExtractedIonChromatogram>>();
-            var allMs2Xics = new Dictionary<(double min, double max), List<ExtractedIonChromatogram>>();
-            foreach (var ms2Group in DIAScanWindowMap)
+            foreach (var kvp in DIAScanWindowMap)
             {
-                allMs1Xics[ms2Group.Key] = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine, new MzRange(ms2Group.Key.min, ms2Group.Key.max));
-                allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out matchedPeaks, out indexingEngine);
-            }
+                var ms1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine, new MzRange(kvp.Key.min, kvp.Key.max));
+                var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(kvp.Value.ToArray(), out matchedPeaks, out indexingEngine);
+                var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(ms1Xics, ms2Xics);
 
-            //Precursor-fragment Grouping
-            var allPfGroups = new List<PrecursorFragmentsGroup>();
-            foreach (var ms2Group in DIAScanWindowMap.Keys)
-            {
-                var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group], allMs2Xics[ms2Group]);
-                allPfGroups.AddRange(pfGroups);
+                foreach (var pfGroup in pfGroups)
+                {
+                    OneBasedScanNumber++;
+                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
+                    yield return pseudoScan;
+                }
             }
-
-            //Convert pfGroups to pseudo MS2 scans
-            PseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
-            var group = allPfGroups.Any(g => g == null || g.PFpairs == null);
-            int pfGroupIndex = 1;
-            foreach (var pfGroup in allPfGroups)
-            {
-                pfGroup.PFgroupIndex = pfGroupIndex;
-                var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
-                PseudoMs2Scans.Add(pseudoScan);
-                pfGroupIndex++;
-            }
-            return new MetaMorpheusEngineResults(this);
         }
 
         public DIAEngine(DIAparameters DIAparameters, MsDataFile dataFile, CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds) :base(commonParameters, fileSpecificParameters, nestedIds)

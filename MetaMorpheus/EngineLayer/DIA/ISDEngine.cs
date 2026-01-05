@@ -57,15 +57,16 @@ namespace EngineLayer.DIA
             //}
 
             //Convert pfGroups to pseudo MS2 scans
-            PseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
+            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
             int pfGroupIndex = 1;
             foreach (var pfGroup in allPfGroups)
             {
                 pfGroup.PFgroupIndex = pfGroupIndex;
                 var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
-                PseudoMs2Scans.Add(pseudoScan);
+                pseudoScans.Add(pseudoScan);
                 pfGroupIndex++;
             }
+            PseudoMs2Scans = pseudoScans;
 
             return new MetaMorpheusEngineResults(this);
         }

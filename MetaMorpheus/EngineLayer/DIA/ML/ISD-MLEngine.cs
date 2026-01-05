@@ -105,14 +105,15 @@ namespace EngineLayer.DIA
             
             //make pseudo ms2 scans
             int oneBasedNumber = 1;
-            PseudoMs2Scans = new List<Ms2ScanWithSpecificMass>();
+            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
             foreach (var group in allPfGroups)
             {
                 group.PFgroupIndex = oneBasedNumber;
                 var scan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(group, MlDIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
-                PseudoMs2Scans.Add(scan);
+                pseudoScans.Add(scan);
                 oneBasedNumber++;
             }
+            PseudoMs2Scans = pseudoScans;
 
             return new MetaMorpheusEngineResults(this);
         }
