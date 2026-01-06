@@ -112,7 +112,7 @@ namespace Test.DIATests
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
             //searchTask.SearchParameters.WriteSpectralLibrary = true;
 
-            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_try2_balancePerGroup";
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_useDecoySamples";
             string outFolder2 = @"E:\ISD Project\TestSearch\ISD090625\0918YC\preFilter\ml\try1";
             if (!Directory.Exists(outputFolder))
             {
@@ -135,8 +135,8 @@ namespace Test.DIATests
 
             var features = new List<string> { "Correlation", "SharedXIC", "ApexRtDelta"};
             string modelPath = @"E:\ISD Project\TestSearch\ISD090625\YC_preFilter\ml_try\MLmodel.zip";
-            string trainingSamplePath = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_try2\TrainingSamples.tsv";
-            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, humanDb, searchDecoys: true, ModelType.FastTree, features, 15, existingModelPath: null, existingSampleFilePath: trainingSamplePath, outputFolder, 0.2, apexRtTolerance: 0.3, predictionScoreThreshold: 0.7, AnalysisType.MLbased_bottomUp, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.MzPeak, writeModel: true, writeTrainingSamples: false, combineFragments: true, useDecoySamples: true);
+            string trainingSamplePath = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_useDecoySamples\TrainingSamples.tsv";
+            searchTask.CommonParameters.DIAparameters = new MLbasedDIAparameters(PseudoSearchScanType.DirectSearch, humanDb, searchDecoys: true, ModelType.FastTree, features, 5, existingModelPath: null, existingSampleFilePath: null, outputFolder, 0.2, apexRtTolerance: 0.3, predictionScoreThreshold: 0.7, AnalysisType.MLbased_bottomUp, ms1XicConstructor, ms2XicConstructor, null, PseudoMs2ConstructionType.MzPeak, writeModel: true, writeTrainingSamples: true, combineFragments: true, useDecoySamples: true);
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
