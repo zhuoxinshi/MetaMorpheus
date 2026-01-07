@@ -107,7 +107,7 @@ namespace EngineLayer.DIA
 
             var decoyType = MlDIAparams.SearchDecoys ? DecoyType.Reverse : DecoyType.None;
             var proteins = LoadProteinDb(MlDIAparams.ProteinDb, true, decoyType, null, false, out var um, out int count, CommonParameters);
-            var newClassicSearchEngine = new ClassicSearchEngine(fileSpecificPsms, pseudoSearchScans, variableModifications, fixedModifications, null, null, null, proteins, new DotMassDiffAcceptor("1mm", new List<double> { 0, 1.0029 }, CommonParameters.PrecursorMassTolerance), CommonParameters, null, null, null, true);
+            var newClassicSearchEngine = new ClassicSearchEngine(fileSpecificPsms, pseudoSearchScans, variableModifications, fixedModifications, null, null, null, proteins, new DotMassDiffAcceptor("1mm", new List<double> { 0, 1.0029 }, CommonParameters.PrecursorMassTolerance), CommonParameters, null, null, null, writeSpectralLibrary: true);
             var result = newClassicSearchEngine.Run();
             return fileSpecificPsms.Where(p => p != null).ToArray();
         }

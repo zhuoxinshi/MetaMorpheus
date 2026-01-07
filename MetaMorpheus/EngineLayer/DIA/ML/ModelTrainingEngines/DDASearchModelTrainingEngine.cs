@@ -62,35 +62,24 @@ namespace EngineLayer.DIA
         public override IEnumerable<PfPairTrainingSample> GetTrainingSamples()
         {
             GeneratePseudoSearchScans();
-            if (MlDIAparams.UseDecoySamples == false)
-            {
-                Psms = RunClassicSearch(PseudoSearchMs2Scans).Where(p => p.IsDecoy == false && p.Score >= MlDIAparams.PsmScoreCutOff).ToArray();
+            Psms = RunClassicSearch(PseudoSearchMs2Scans);
 
-                if (MlDIAparams.AnalysisType == AnalysisType.MLbased_bottomUp)
-                {
-                    var allSamples = GetAllTrainingSamples_bottomUp();
-                    return allSamples;
-                }
-                else if (MlDIAparams.AnalysisType == AnalysisType.MLbased_topDown)
-                {
-                }
-            } 
-            else
+            if (MlDIAparams.AnalysisType == AnalysisType.MLbased_bottomUp)
             {
-                Psms = RunClassicSearch(PseudoSearchMs2Scans).ToArray();
                 var allSamples = GetAllTrainingSamples_bottomUp();
                 return allSamples;
             }
-            
-            //write get decoy samples
-
+            else if (MlDIAparams.AnalysisType == AnalysisType.MLbased_topDown)
+            {
+            }
             return null;
         }
 
         public IEnumerable<PfPairTrainingSample> GetAllTrainingSamples_bottomUp()
         {
             var allSamples = new List<PfPairTrainingSample>();
-            var groupedPsms = Psms.GroupBy(p => new { p.FullSequence, p.ScanPrecursorCharge }).Select(g => g.OrderByDescending(p => p.PrecursorScanIntensity));
+            var filteredPsms = Psms.Where(p => (p.IsDecoy == false && p.Score >= MlDIAparams.PsmScoreCutOff) || p.IsDecoy);
+            var groupedPsms = filteredPsms.GroupBy(p => new { p.FullSequence, p.ScanPrecursorCharge }).Select(g => g.OrderByDescending(p => p.PrecursorScanIntensity));
 
             foreach (var group in groupedPsms)
             {
@@ -172,7 +161,7 @@ namespace EngineLayer.DIA
             {
                 int zeroBasedScanIndex = (psm.ScanNumber - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
                 var key = ScanNumberWindowMap[psm.ScanNumber];
-                var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as IndexingEngine<IIndexedPeak>;
+                var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
                 var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
 
                 var posPeakMzs = new List<double>();
@@ -185,12 +174,16 @@ namespace EngineLayer.DIA
 
                     foreach (var mz in targetMass.Peaks.Select(p => p.mz))
                     {
-                        var fragmentXic = FindXicGivenM(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance, ms2PeakIndexingEngine, Ms2PeakXicDictionary, null);
-                        if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+                        var indexedPeak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+                        if (indexedPeak != null && Ms2PeakXicDictionary.ContainsKey(indexedPeak))
                         {
-                            var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, label, psm);
-                            visitedXics.Add(fragmentXic);
-                            yield return newSample;
+                            var fragmentXic = Ms2PeakXicDictionary[indexedPeak];
+                            if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+                            {
+                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, label, psm);
+                                visitedXics.Add(fragmentXic);
+                                yield return newSample;
+                            }
                         }
                     }
                 }

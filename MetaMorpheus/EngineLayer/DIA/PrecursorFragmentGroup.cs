@@ -45,7 +45,7 @@ namespace EngineLayer.DIA
 
             if (end - start + 1 < 3) // Ideally we need at least 3 points to calculate correlation
             {
-                return double.NaN;
+                return -1;
             }
             var y1 = new float[end - start + 1];
             var y2 = new float[end - start + 1];
@@ -171,7 +171,7 @@ namespace EngineLayer.DIA
             int numPoints = Math.Min(validxy1.Length, validxy2.Length);
             if (numPoints < 3)
             {
-                return double.NaN;
+                return -1;
             }
             var xy = validxy1.Take(numPoints).Zip(validxy2.Take(numPoints), (a, b) => (a.Item2, b.Item2)).ToArray();
             var y1 = xy.Select(p => p.Item1).ToArray();
