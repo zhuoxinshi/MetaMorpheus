@@ -112,7 +112,7 @@ namespace Test.DIATests
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
             //searchTask.SearchParameters.WriteSpectralLibrary = true;
 
-            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\umpire_useDecoySamples\targetPsm10";
+            string outputFolder = @"E:\DIA\TestSearch\bottomUp_update\oldData\ML\wholeFile_useDecoySamples\targetPsm10";
             string outFolder2 = @"E:\ISD Project\TestSearch\ISD090625\0918YC\preFilter\ml\try1";
             if (!Directory.Exists(outputFolder))
             {
@@ -126,7 +126,7 @@ namespace Test.DIATests
             //var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));
 
             string DIAfile = @"E:\DIA\FragPipe\DIA\CPTAC_CCRCC_W_JHU_20190112_LUMOS_C3L-00418_NAT.mzML";
-            string umpireFile = @"E:\DIA\DIA-Umpire data\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
+            string umpireFile = @"E:\DIA\PublishedData\DIA-Umpiredata\18300_REP2_500ng_HumanLysate_SWATH_1.mzML";
             var path1 = @"E:\ISD Project\ISD_250906\09-18-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
             var path3 = @"E:\ISD Project\ISD_250906\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep3.raw";
 
@@ -142,7 +142,7 @@ namespace Test.DIATests
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
             var taskList = new List<(string, MetaMorpheusTask)> {  ("search", searchTask) }; //("GPTMD", gptmdTask)
-            var engine = new EverythingRunnerEngine(taskList, new List<string> { DIAfile }, new List<DbForTask> { new DbForTask(humanDb, false) }, outputFolder);
+            var engine = new EverythingRunnerEngine(taskList, new List<string> { umpireFile }, new List<DbForTask> { new DbForTask(humanDb, false) }, outputFolder);
             engine.Run();
         }
 
