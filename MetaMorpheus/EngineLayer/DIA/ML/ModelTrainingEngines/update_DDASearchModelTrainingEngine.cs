@@ -18,42 +18,71 @@ namespace EngineLayer.DIA
     {
         public MsDataScan[] Ms1Scans { get; set; }
         public MsDataScan[] Ms2Scans { get; set; }
-        public Dictionary<object, object> AllMs1PeakIndexingEngines { get; set; }
-        public Dictionary<object, object> AllMs2PeakIndexingEngines { get; set; }
-        public Dictionary<IIndexedPeak, ExtractedIonChromatogram> Ms1PeakXicDictionary { get; set; }
-        public Dictionary<IIndexedPeak, ExtractedIonChromatogram> Ms2PeakXicDictionary { get; set; }
-        public Dictionary<int, object> ScanNumberWindowMap { get; set; }
+        public Dictionary<(double min, double max), List<MsDataScan>> DiaScanWindowMap { get; set; }
         public DDASearchModelTrainingEngine(MLbasedDIAparameters mlDIAparams, CommonParameters commonParameters, MsDataScan[] ms1Scans, MsDataScan[] ms2Scans, Dictionary<(double min, double max), List<MsDataScan>> diaScanWindowMap = null) : base(mlDIAparams, commonParameters)
         {
             Ms1Scans = ms1Scans;
             Ms2Scans = ms2Scans;
-            ScanNumberWindowMap = new Dictionary<int, object>();
-            if (diaScanWindowMap != null)
-            {
-                foreach (var kvp in diaScanWindowMap)
-                {
-                    foreach (var scan in kvp.Value)
-                    {
-                        ScanNumberWindowMap[scan.OneBasedScanNumber] = kvp.Key;
-                    }
-                }
-            }
+            DiaScanWindowMap = diaScanWindowMap;
         }
 
         public override IEnumerable<PfPairTrainingSample> GetTrainingSamples()
         {
-            GeneratePseudoSearchScans();
-            Psms = RunClassicSearch(PseudoSearchMs2Scans);
+            foreach(var kvp in DiaScanWindowMap)
+            {
+                var pseudoSearchMs2Scans = GetMs2Scans(Ms1Scans, kvp.Value.ToArray(), CommonParameters).ToArray();
+                var psms = RunClassicSearch(pseudoSearchMs2Scans);
+                var filteredPsms = psms.Where(p => (p.IsDecoy == false && p.Score >= MlDIAparams.PsmScoreCutOff) || p.IsDecoy);
+                var groupedPsms = filteredPsms.GroupBy(p => new { p.FullSequence, p.ScanPrecursorCharge }).Select(g => g.OrderByDescending(p => p.PrecursorScanIntensity));
 
-            if (MlDIAparams.AnalysisType == AnalysisType.MLbased_bottomUp)
-            {
-                var allSamples = GetAllTrainingSamples_bottomUp();
-                return allSamples;
+                var ms1Xics = MlDIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(Ms1Scans, out var matchedPeaksMs1, out var indexingEngine1, new MzRange(kvp.Key.min, kvp.Key.max));
+                var ms2Xics = MlDIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(kvp.Value.ToArray(), out var matchedPeaksMs2, out var indexingEngine2);
+                var ms1PeakIndexingEngine = indexingEngine1 as MassIndexingEngine;
+                var ms2PeakIndexingEngine = indexingEngine2 as PeakIndexingEngine;
+
+                foreach (var group in groupedPsms)
+                {
+                    var visitedXics = new HashSet<ExtractedIonChromatogram>();
+                    bool label = group.First().IsDecoy ? false : true;
+                    int zeroBasedPrecursorScanIndex = (group.First().PrecursorScanNumber.Value - 1) / (DiaScanWindowMap.Values.Distinct().Count() + 1);
+                    var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(group.First().ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance, group.First().ScanPrecursorCharge);
+
+                    if (precursorPeak != null && matchedPeaksMs1.ContainsKey(precursorPeak))
+                    {
+                        var precursorXic = matchedPeaksMs1[precursorPeak];
+                        if (precursorXic != null)
+                        {
+                            foreach(var psm in group)
+                            {
+                                int zeroBasedScanIndex = (group.First().ScanNumber - 1) / (DiaScanWindowMap.Values.Distinct().Count() + 1);
+                                var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
+                                foreach (var ion in psm.MatchedFragmentIons)
+                                {
+                                    double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+                                    double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+                                    var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
+                                    var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
+
+                                    foreach (var mz in targetMass.Peaks.Select(p => p.mz))
+                                    {
+                                        var indexedPeak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+                                        if (indexedPeak != null && matchedPeaksMs2.ContainsKey(indexedPeak))
+                                        {
+                                            var fragmentXic = matchedPeaksMs2[indexedPeak];
+                                            if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+                                            {
+                                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, label, psm);
+                                                visitedXics.Add(fragmentXic);
+                                                yield return newSample;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            else if (MlDIAparams.AnalysisType == AnalysisType.MLbased_topDown)
-            {
-            }
-            return null;
         }
 
         public override void GeneratePseudoSearchScans()
@@ -61,242 +90,245 @@ namespace EngineLayer.DIA
             PseudoSearchMs2Scans = GetMs2Scans(Ms1Scans, Ms2Scans, CommonParameters).ToArray();
         }
 
-        public IEnumerable<PfPairTrainingSample> GetAllTrainingSamples_bottomUp()
-        {
-            var allSamples = new List<PfPairTrainingSample>();
-            var filteredPsms = Psms.Where(p => (p.IsDecoy == false && p.Score >= MlDIAparams.PsmScoreCutOff) || p.IsDecoy);
-            var groupedPsms = filteredPsms.GroupBy(p => new { p.FullSequence, p.ScanPrecursorCharge }).Select(g => g.OrderByDescending(p => p.PrecursorScanIntensity));
+        //public IEnumerable<PfPairTrainingSample> bu_GetTrainingSamplesFromOnePsmGroup_useDecoySamples(ExtractedIonChromatogram precursorXic, IEnumerable<SpectralMatch> psmGroup, bool label)
+        //{
+        //    var visitedXics = new HashSet<ExtractedIonChromatogram>();
 
-            foreach (var group in groupedPsms)
-            {
-                int zeroBasedPrecursorScanIndex = (group.First().PrecursorScanNumber.Value - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
-                var key = ScanNumberWindowMap[group.First().ScanNumber];
-                var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as MassIndexingEngine;
-                var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(group.First().ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance, group.First().ScanPrecursorCharge);
+        //    foreach (var psm in psmGroup)
+        //    {
+        //        int zeroBasedScanIndex = (psm.ScanNumber - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
+        //        var key = ScanNumberWindowMap[psm.ScanNumber];
+        //        var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
+        //        var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
 
-                if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
-                {
-                    var precursorXic = Ms1PeakXicDictionary[precursorPeak];
-                    if (precursorXic != null)
-                    {
-                        bool label = group.First().IsDecoy ? false : true;
-                        var samplesFromThisPsmGroup = bu_GetTrainingSamplesFromOnePsmGroup_useDecoySamples(precursorXic, group, label);
-                        allSamples.AddRange(samplesFromThisPsmGroup);
-                    }
-                }
-            }
-            return allSamples;
-        }
+        //        var posPeakMzs = new List<double>();
+        //        foreach (var ion in psm.MatchedFragmentIons)
+        //        {
+        //            double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //            double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //            var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
+        //            var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
 
-        private IEnumerable<PfPairTrainingSample> bu_GetTrainingSamplesFromOnePsmGroup(ExtractedIonChromatogram precursorXic, IEnumerable<SpectralMatch> psmGroup)
-        {
-            var samplesFromThisPsmGroup = new List<PfPairTrainingSample>();
-            var visitedXics = new HashSet<ExtractedIonChromatogram>();
+        //            foreach (var mz in targetMass.Peaks.Select(p => p.mz))
+        //            {
+        //                var indexedPeak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+        //                if (indexedPeak != null && Ms2PeakXicDictionary.ContainsKey(indexedPeak))
+        //                {
+        //                    var fragmentXic = Ms2PeakXicDictionary[indexedPeak];
+        //                    if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+        //                    {
+        //                        var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, label, psm);
+        //                        visitedXics.Add(fragmentXic);
+        //                        yield return newSample;
+        //                    }
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
 
-            foreach (var psm in psmGroup)
-            {
-                int zeroBasedScanIndex = (psm.ScanNumber - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
-                var key = ScanNumberWindowMap[psm.ScanNumber];
-                var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
-                var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
+        //public IEnumerable<PfPairTrainingSample> GetAllTrainingSamples_bottomUp()
+        //{
+        //    var allSamples = new List<PfPairTrainingSample>();
+        //    var filteredPsms = Psms.Where(p => (p.IsDecoy == false && p.Score >= MlDIAparams.PsmScoreCutOff) || p.IsDecoy);
+        //    var groupedPsms = filteredPsms.GroupBy(p => new { p.FullSequence, p.ScanPrecursorCharge }).Select(g => g.OrderByDescending(p => p.PrecursorScanIntensity));
 
-                var posPeakMzs = new List<double>();
-                foreach (var ion in psm.MatchedFragmentIons)
-                {
-                    double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                    double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                    var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
-                    var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
-                    posPeakMzs.AddRange(targetMass?.Peaks.Select(p => Math.Round(p.mz, 3)) ?? Array.Empty<double>());
-                }
+        //    foreach (var group in groupedPsms)
+        //    {
+        //        int zeroBasedPrecursorScanIndex = (group.First().PrecursorScanNumber.Value - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
+        //        var key = ScanNumberWindowMap[group.First().ScanNumber];
+        //        var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as MassIndexingEngine;
+        //        var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(group.First().ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance, group.First().ScanPrecursorCharge);
 
-                foreach (var mz in ms2WithPrecursor.TheScan.MassSpectrum.XArray)
-                {
-                    var peak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                    if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
-                    {
-                        var fragmentXic = Ms2PeakXicDictionary[peak];
-                        if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
-                        {
-                            var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
-                            if (posPeakMzs.Contains(Math.Round(mz, 3)))
-                                newSample.Label = true;
-                            samplesFromThisPsmGroup.Add(newSample);
-                            visitedXics.Add(fragmentXic);
-                        }
-                    }
-                }
-            }
-            if (MlDIAparams.Features.Contains("FragmentRank"))
-            {
-                samplesFromThisPsmGroup.Sort((a, b) => b.Correlation.CompareTo(a.Correlation));
-                for (int i = 0; i < samplesFromThisPsmGroup.Count; i++)
-                {
-                    samplesFromThisPsmGroup[i].FragmentRank = i + 1;
-                }
-            }
-            //samplesFromThisPsmGroup = BalanceTrainingData(samplesFromThisPsmGroup).ToList();
-            return samplesFromThisPsmGroup;
-        }
+        //        if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
+        //        {
+        //            var precursorXic = Ms1PeakXicDictionary[precursorPeak];
+        //            if (precursorXic != null)
+        //            {
+        //                bool label = group.First().IsDecoy ? false : true;
+        //                var samplesFromThisPsmGroup = bu_GetTrainingSamplesFromOnePsmGroup_useDecoySamples(precursorXic, group, label);
+        //                allSamples.AddRange(samplesFromThisPsmGroup);
+        //            }
+        //        }
+        //    }
+        //    return allSamples;
+        //}
 
-        public IEnumerable<PfPairTrainingSample> bu_GetTrainingSamplesFromOnePsmGroup_useDecoySamples(ExtractedIonChromatogram precursorXic, IEnumerable<SpectralMatch> psmGroup, bool label)
-        {
-            var visitedXics = new HashSet<ExtractedIonChromatogram>();
 
-            foreach (var psm in psmGroup)
-            {
-                int zeroBasedScanIndex = (psm.ScanNumber - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
-                var key = ScanNumberWindowMap[psm.ScanNumber];
-                var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
-                var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
+        //private IEnumerable<PfPairTrainingSample> bu_GetTrainingSamplesFromOnePsmGroup(ExtractedIonChromatogram precursorXic, IEnumerable<SpectralMatch> psmGroup)
+        //{
+        //    var samplesFromThisPsmGroup = new List<PfPairTrainingSample>();
+        //    var visitedXics = new HashSet<ExtractedIonChromatogram>();
 
-                var posPeakMzs = new List<double>();
-                foreach (var ion in psm.MatchedFragmentIons)
-                {
-                    double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                    double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                    var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
-                    var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
+        //    foreach (var psm in psmGroup)
+        //    {
+        //        int zeroBasedScanIndex = (psm.ScanNumber - 1) / (ScanNumberWindowMap.Values.Distinct().Count() + 1);
+        //        var key = ScanNumberWindowMap[psm.ScanNumber];
+        //        var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as PeakIndexingEngine;
+        //        var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
 
-                    foreach (var mz in targetMass.Peaks.Select(p => p.mz))
-                    {
-                        var indexedPeak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                        if (indexedPeak != null && Ms2PeakXicDictionary.ContainsKey(indexedPeak))
-                        {
-                            var fragmentXic = Ms2PeakXicDictionary[indexedPeak];
-                            if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
-                            {
-                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, label, psm);
-                                visitedXics.Add(fragmentXic);
-                                yield return newSample;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //        var posPeakMzs = new List<double>();
+        //        foreach (var ion in psm.MatchedFragmentIons)
+        //        {
+        //            double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //            double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //            var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
+        //            var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
+        //            posPeakMzs.AddRange(targetMass?.Peaks.Select(p => Math.Round(p.mz, 3)) ?? Array.Empty<double>());
+        //        }
 
-        public IEnumerable<PfPairTrainingSample> GetTrainingSamplesFromDDASearchPsm_topDown(SpectralMatch psm, Ms2ScanWithSpecificMass ms2WithPrecursor)
-        {
-            var allSamples = new List<PfPairTrainingSample>();
-            var key = ScanNumberWindowMap[psm.ScanNumber];
-            var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as MassIndexingEngine;
-            var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as MassIndexingEngine;
+        //        foreach (var mz in ms2WithPrecursor.TheScan.MassSpectrum.XArray)
+        //        {
+        //            var peak = ms2PeakIndexingEngine.GetIndexedPeak(mz, zeroBasedScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+        //            if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
+        //            {
+        //                var fragmentXic = Ms2PeakXicDictionary[peak];
+        //                if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+        //                {
+        //                    var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
+        //                    if (posPeakMzs.Contains(Math.Round(mz, 3)))
+        //                        newSample.Label = true;
+        //                    samplesFromThisPsmGroup.Add(newSample);
+        //                    visitedXics.Add(fragmentXic);
+        //                }
+        //            }
+        //        }
+        //    }
+        //    if (MlDIAparams.Features.Contains("FragmentRank"))
+        //    {
+        //        samplesFromThisPsmGroup.Sort((a, b) => b.Correlation.CompareTo(a.Correlation));
+        //        for (int i = 0; i < samplesFromThisPsmGroup.Count; i++)
+        //        {
+        //            samplesFromThisPsmGroup[i].FragmentRank = i + 1;
+        //        }
+        //    }
+        //    //samplesFromThisPsmGroup = BalanceTrainingData(samplesFromThisPsmGroup).ToList();
+        //    return samplesFromThisPsmGroup;
+        //}
 
-            //find precursor xic
-            int numberOfScansPerCycle = ScanNumberWindowMap.Values.Distinct().Count() + 1;
-            int zeroBasedPrecursorScanIndex = (psm.PrecursorScanNumber.Value - 1) / numberOfScansPerCycle;
-            int zeroBasedMs2ScanIndex = (psm.ScanNumber - 1) / numberOfScansPerCycle;
-            var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psm.ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
-            if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
-            {
-                var precursorXic = Ms1PeakXicDictionary[precursorPeak];
-                if (precursorXic == null) return allSamples;
 
-                //find all fragment xics
-                //create training samples with positive and negative labels
-                var visitedXics = new HashSet<ExtractedIonChromatogram>();
-                foreach (var ion in psm.MatchedFragmentIons)
-                {
-                    double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                    double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                    var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
-                    var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
-                    if (targetMass != null)
-                    {
-                        var fragmentPeak = ms2PeakIndexingEngine.GetIndexedPeak(targetMass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                        if (fragmentPeak != null && Ms2PeakXicDictionary.ContainsKey(fragmentPeak))
-                        {
-                            var fragmentXic = Ms2PeakXicDictionary[fragmentPeak];
-                            if (fragmentXic == null) continue;
-                            var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true, psm);
-                            allSamples.Add(newSample);
-                            visitedXics.Add(fragmentXic);
-                        }
-                    }
-                }
 
-                foreach (var mass in ms2WithPrecursor.ExperimentalFragments)
-                {
-                    var peak = ms2PeakIndexingEngine.GetIndexedPeak(mass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                    if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
-                    {
-                        var fragmentXic = Ms2PeakXicDictionary[peak];
-                        if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
-                        {
-                            var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
-                            allSamples.Add(newSample);
-                            visitedXics.Add(fragmentXic);
-                        }
-                    }
-                }
-            }
-            return allSamples;
-        }
+        //public IEnumerable<PfPairTrainingSample> GetTrainingSamplesFromDDASearchPsm_topDown(SpectralMatch psm, Ms2ScanWithSpecificMass ms2WithPrecursor)
+        //{
+        //    var allSamples = new List<PfPairTrainingSample>();
+        //    var key = ScanNumberWindowMap[psm.ScanNumber];
+        //    var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as MassIndexingEngine;
+        //    var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as MassIndexingEngine;
 
-        public IEnumerable<PfPairTrainingSample> GetTrainingSamplesFromDDASearchPsm_topDown(IEnumerable<SpectralMatch> psms)
-        {
-            var allSamples = new List<PfPairTrainingSample>();
-            var key = ScanNumberWindowMap[psms.First().ScanNumber];
-            var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as MassIndexingEngine;
-            var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as MassIndexingEngine;
+        //    //find precursor xic
+        //    int numberOfScansPerCycle = ScanNumberWindowMap.Values.Distinct().Count() + 1;
+        //    int zeroBasedPrecursorScanIndex = (psm.PrecursorScanNumber.Value - 1) / numberOfScansPerCycle;
+        //    int zeroBasedMs2ScanIndex = (psm.ScanNumber - 1) / numberOfScansPerCycle;
+        //    var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psm.ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
+        //    if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
+        //    {
+        //        var precursorXic = Ms1PeakXicDictionary[precursorPeak];
+        //        if (precursorXic == null) return allSamples;
 
-            //find precursor xic
-            int numberOfScansPerCycle = ScanNumberWindowMap.Values.Distinct().Count() + 1;
-            int zeroBasedPrecursorScanIndex = (psms.First().PrecursorScanNumber.Value - 1) / numberOfScansPerCycle;
-            int zeroBasedMs2ScanIndex = (psms.First().ScanNumber - 1) / numberOfScansPerCycle;
-            var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psms.First().ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
+        //        //find all fragment xics
+        //        //create training samples with positive and negative labels
+        //        var visitedXics = new HashSet<ExtractedIonChromatogram>();
+        //        foreach (var ion in psm.MatchedFragmentIons)
+        //        {
+        //            double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //            double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //            var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
+        //            var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
+        //            if (targetMass != null)
+        //            {
+        //                var fragmentPeak = ms2PeakIndexingEngine.GetIndexedPeak(targetMass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+        //                if (fragmentPeak != null && Ms2PeakXicDictionary.ContainsKey(fragmentPeak))
+        //                {
+        //                    var fragmentXic = Ms2PeakXicDictionary[fragmentPeak];
+        //                    if (fragmentXic == null) continue;
+        //                    var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true, psm);
+        //                    allSamples.Add(newSample);
+        //                    visitedXics.Add(fragmentXic);
+        //                }
+        //            }
+        //        }
 
-            //find all fragment xics
-            //create training samples with positive and negative labels
-            var visitedXics = new HashSet<ExtractedIonChromatogram>();
-            if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
-            {
-                var precursorXic = Ms1PeakXicDictionary[precursorPeak];
-                if (precursorXic == null) return allSamples;
+        //        foreach (var mass in ms2WithPrecursor.ExperimentalFragments)
+        //        {
+        //            var peak = ms2PeakIndexingEngine.GetIndexedPeak(mass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+        //            if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
+        //            {
+        //                var fragmentXic = Ms2PeakXicDictionary[peak];
+        //                if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+        //                {
+        //                    var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
+        //                    allSamples.Add(newSample);
+        //                    visitedXics.Add(fragmentXic);
+        //                }
+        //            }
+        //        }
+        //    }
+        //    return allSamples;
+        //}
 
-                foreach (var psm in psms)
-                {
-                    var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
-                    if (ms2WithPrecursor == null) continue;
-                    foreach (var ion in psm.MatchedFragmentIons)
-                    {
-                        double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                        double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
-                        var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
-                        var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
-                        if (targetMass != null)
-                        {
-                            var fragmentPeak = ms2PeakIndexingEngine.GetIndexedPeak(targetMass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                            if (fragmentPeak != null && Ms2PeakXicDictionary.ContainsKey(fragmentPeak))
-                            {
-                                var fragmentXic = Ms2PeakXicDictionary[fragmentPeak];
-                                if (fragmentXic == null || visitedXics.Contains(fragmentXic)) continue;
-                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true, psm);
-                                allSamples.Add(newSample);
-                                visitedXics.Add(fragmentXic);
-                            }
-                        }
-                    }
+        //public IEnumerable<PfPairTrainingSample> GetTrainingSamplesFromDDASearchPsm_topDown(IEnumerable<SpectralMatch> psms)
+        //{
+        //    var allSamples = new List<PfPairTrainingSample>();
+        //    var key = ScanNumberWindowMap[psms.First().ScanNumber];
+        //    var ms1PeakIndexingEngine = AllMs1PeakIndexingEngines[key] as MassIndexingEngine;
+        //    var ms2PeakIndexingEngine = AllMs2PeakIndexingEngines[key] as MassIndexingEngine;
 
-                    foreach (var mass in ms2WithPrecursor.ExperimentalFragments)
-                    {
-                        var peak = ms2PeakIndexingEngine.GetIndexedPeak(mass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
-                        if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
-                        {
-                            var fragmentXic = Ms2PeakXicDictionary[peak];
-                            if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
-                            {
-                                var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
-                                allSamples.Add(newSample);
-                                visitedXics.Add(fragmentXic);
-                            }
-                        }
-                    }
-                }
-            }
-            return allSamples;
-        }
+        //    //find precursor xic
+        //    int numberOfScansPerCycle = ScanNumberWindowMap.Values.Distinct().Count() + 1;
+        //    int zeroBasedPrecursorScanIndex = (psms.First().PrecursorScanNumber.Value - 1) / numberOfScansPerCycle;
+        //    int zeroBasedMs2ScanIndex = (psms.First().ScanNumber - 1) / numberOfScansPerCycle;
+        //    var precursorPeak = ms1PeakIndexingEngine.GetIndexedPeak(psms.First().ScanPrecursorMass, zeroBasedPrecursorScanIndex, MlDIAparams.Ms1XicConstructor.PeakFindingTolerance);
+
+        //    //find all fragment xics
+        //    //create training samples with positive and negative labels
+        //    var visitedXics = new HashSet<ExtractedIonChromatogram>();
+        //    if (precursorPeak != null && Ms1PeakXicDictionary.ContainsKey(precursorPeak))
+        //    {
+        //        var precursorXic = Ms1PeakXicDictionary[precursorPeak];
+        //        if (precursorXic == null) return allSamples;
+
+        //        foreach (var psm in psms)
+        //        {
+        //            var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
+        //            if (ms2WithPrecursor == null) continue;
+        //            foreach (var ion in psm.MatchedFragmentIons)
+        //            {
+        //                double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //                double maxMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMaximumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);
+        //                var masses = ms2WithPrecursor.GetClosestExperimentalIsotopicEnvelopeList(minMass, maxMass);
+        //                var targetMass = masses.FirstOrDefault(m => m.Charge == ion.Charge);
+        //                if (targetMass != null)
+        //                {
+        //                    var fragmentPeak = ms2PeakIndexingEngine.GetIndexedPeak(targetMass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+        //                    if (fragmentPeak != null && Ms2PeakXicDictionary.ContainsKey(fragmentPeak))
+        //                    {
+        //                        var fragmentXic = Ms2PeakXicDictionary[fragmentPeak];
+        //                        if (fragmentXic == null || visitedXics.Contains(fragmentXic)) continue;
+        //                        var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, true, psm);
+        //                        allSamples.Add(newSample);
+        //                        visitedXics.Add(fragmentXic);
+        //                    }
+        //                }
+        //            }
+
+        //            foreach (var mass in ms2WithPrecursor.ExperimentalFragments)
+        //            {
+        //                var peak = ms2PeakIndexingEngine.GetIndexedPeak(mass.MonoisotopicMass, zeroBasedMs2ScanIndex, MlDIAparams.Ms2XicConstructor.PeakFindingTolerance);
+        //                if (peak != null && Ms2PeakXicDictionary.ContainsKey(peak))
+        //                {
+        //                    var fragmentXic = Ms2PeakXicDictionary[peak];
+        //                    if (!visitedXics.Contains(fragmentXic) && fragmentXic != null)
+        //                    {
+        //                        var newSample = new PfPairTrainingSample(precursorXic, fragmentXic, false, psm);
+        //                        allSamples.Add(newSample);
+        //                        visitedXics.Add(fragmentXic);
+        //                    }
+        //                }
+        //            }
+        //        }
+        //    }
+        //    return allSamples;
+        //}
 
         public static List<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataScan[] ms1Scans, MsDataScan[] ms2Scans, CommonParameters commonParameters)
         {

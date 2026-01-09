@@ -43,14 +43,15 @@ namespace EngineLayer.DIA
                 var sampleFile = new PfPairTrainingSampleFile(MlDIAparams.ExistingSampleFilePath);
                 sampleFile.LoadResults();
                 trainingSamples = sampleFile.Results.Where(s => s.PsmScore >= MlDIAparams.PsmScoreCutOff).ToList();
+                return ModelTraining(trainingSamples);
             }
             else
             {
-                trainingSamples = GetTrainingSamples();
+                ModelTraining(GetTrainingSamples());
             }
 
-            var model = ModelTraining(trainingSamples);
-            return model;
+            //var model = ModelTraining(trainingSamples);
+            return null;
         }
         
         public ITransformer ModelTraining(IEnumerable<PfPairTrainingSample> trainingSamples)

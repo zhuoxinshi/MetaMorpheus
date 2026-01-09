@@ -71,7 +71,7 @@ namespace EngineLayer.DIA
                 switch (MlDIAparams.PseudoSearchType)
                 {
                     case (PseudoSearchScanType.DirectSearch):
-                        modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, scanWindowMap);
+                        modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, scanWindowMap);
                         model = modelTrainingEngine.TrainModel();
                         break;
                     case (PseudoSearchScanType.AllOverlap):
