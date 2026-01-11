@@ -42,16 +42,20 @@ namespace EngineLayer.DIA
             {
                 var sampleFile = new PfPairTrainingSampleFile(MlDIAparams.ExistingSampleFilePath);
                 sampleFile.LoadResults();
-                trainingSamples = sampleFile.Results.Where(s => s.PsmScore >= MlDIAparams.PsmScoreCutOff).ToList();
+                if (MlDIAparams.UseDecoySamples == false)
+                {
+                    trainingSamples = sampleFile.Results.Where(s => s.PsmScore >= MlDIAparams.PsmScoreCutOff).ToList();
+                }
+                else
+                {
+                    trainingSamples = sampleFile.Results.Where(s => (s.PsmScore >= MlDIAparams.PsmScoreCutOff && s.Label == true) || s.Label == false).ToList();
+                }
                 return ModelTraining(trainingSamples);
             }
             else
             {
-                ModelTraining(GetTrainingSamples());
+                return ModelTraining(GetTrainingSamples());
             }
-
-            //var model = ModelTraining(trainingSamples);
-            return null;
         }
         
         public ITransformer ModelTraining(IEnumerable<PfPairTrainingSample> trainingSamples)

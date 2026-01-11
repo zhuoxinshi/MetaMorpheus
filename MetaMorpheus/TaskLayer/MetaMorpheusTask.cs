@@ -393,7 +393,7 @@ namespace TaskLayer
 
         public static IEnumerable<Ms2ScanWithSpecificMass> GetMs2Scans(MsDataFile myMSDataFile, string fullFilePath, CommonParameters commonParameters)
         {
-            if (commonParameters.DIAparameters.PseudoScans == null) commonParameters.DIAparameters.PseudoScans = new Dictionary<string, Ms2ScanWithSpecificMass[]>();
+            if (commonParameters.DIAparameters != null && commonParameters.DIAparameters.PseudoScans == null) commonParameters.DIAparameters.PseudoScans = new Dictionary<string, Ms2ScanWithSpecificMass[]>();
             if (commonParameters.DIAparameters != null && !commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
             {
                 switch (commonParameters.DIAparameters.AnalysisType)

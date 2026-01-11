@@ -55,7 +55,7 @@ namespace EngineLayer.DIA
                             foreach(var psm in group)
                             {
                                 int zeroBasedScanIndex = (group.First().ScanNumber - 1) / (DiaScanWindowMap.Values.Distinct().Count() + 1);
-                                var ms2WithPrecursor = PseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
+                                var ms2WithPrecursor = pseudoSearchMs2Scans.FirstOrDefault(s => s.OneBasedScanNumber == psm.ScanNumber && psm.ScanPrecursorCharge == s.PrecursorCharge && psm.ScanPrecursorMass == s.PrecursorMass);
                                 foreach (var ion in psm.MatchedFragmentIons)
                                 {
                                     double minMass = MlDIAparams.Ms2XicConstructor.PeakFindingTolerance.GetMinimumValue(ion.NeutralTheoreticalProduct.MonoisotopicMass);

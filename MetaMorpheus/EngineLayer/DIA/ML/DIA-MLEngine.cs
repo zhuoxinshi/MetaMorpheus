@@ -15,6 +15,11 @@ using Omics.Modifications;
 using System.IO;
 using UsefulProteomicsDatabases;
 using CsvHelper.Configuration.Attributes;
+using FlashLFQ.IsoTracker;
+using NWaves.Features;
+using System.Data.Entity.Core.Metadata.Edm;
+using ThermoFisher.CommonCore.Data.Business;
+using ThermoFisher.CommonCore.Data.Interfaces;
 
 namespace EngineLayer.DIA
 {
@@ -33,30 +38,31 @@ namespace EngineLayer.DIA
             //read in scans
             var ms1Scans = DataFile.GetMS1Scans().ToArray();
             var ms2Scans = DataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
+
             var scanWindowMap = ConstructMs2Groups(ms2Scans);
-            var allMs1Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
-            var allMs2Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
-            var ms1PeakEngines = new Dictionary<object, object>();
-            var ms2PeakEngines = new Dictionary<object, object>();
-            var ms1PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
-            var ms2PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
-            foreach (var ms2Group in scanWindowMap)
-            {
-                allMs1Xics[ms2Group.Key] = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1, new MzRange(ms2Group.Key.min, ms2Group.Key.max));
-                ms1PeakEngines[ms2Group.Key] = indexingEngine1;
-                allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out var matchedPeaks2, out var indexingEngine2);
-                ms2PeakEngines[ms2Group.Key] = indexingEngine2;
-                foreach (var kvp in matchedPeaks1)
-                {
-                    if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
-                        ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
-                }
-                foreach (var kvp in matchedPeaks2)
-                {
-                    if (!ms2PeakXicDictionary.ContainsKey(kvp.Key))
-                        ms2PeakXicDictionary.Add(kvp.Key, kvp.Value);
-                }
-            }
+            //var allMs1Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
+            //var allMs2Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
+            //var ms1PeakEngines = new Dictionary<object, object>();
+            //var ms2PeakEngines = new Dictionary<object, object>();
+            //var ms1PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
+            //var ms2PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
+            //foreach (var ms2Group in scanWindowMap)
+            //{
+            //    allMs1Xics[ms2Group.Key] = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1, new MzRange(ms2Group.Key.min, ms2Group.Key.max));
+            //    ms1PeakEngines[ms2Group.Key] = indexingEngine1;
+            //    allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out var matchedPeaks2, out var indexingEngine2);
+            //    ms2PeakEngines[ms2Group.Key] = indexingEngine2;
+            //    foreach (var kvp in matchedPeaks1)
+            //    {
+            //        if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
+            //            ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
+            //    }
+            //    foreach (var kvp in matchedPeaks2)
+            //    {
+            //        if (!ms2PeakXicDictionary.ContainsKey(kvp.Key))
+            //            ms2PeakXicDictionary.Add(kvp.Key, kvp.Value);
+            //    }
+            //}
 
             //train model
             var mlContext = new MLContext();
@@ -74,10 +80,10 @@ namespace EngineLayer.DIA
                         modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, scanWindowMap);
                         model = modelTrainingEngine.TrainModel();
                         break;
-                    case (PseudoSearchScanType.AllOverlap):
-                        modelTrainingEngine = new PfPairModelTrainingEngine(MlDIAparams, CommonParameters, allMs1Xics, allMs2Xics);
-                        model = modelTrainingEngine.TrainModel();
-                        break;
+                    //case (PseudoSearchScanType.AllOverlap):
+                    //    modelTrainingEngine = new PfPairModelTrainingEngine(MlDIAparams, CommonParameters, allMs1Xics, allMs2Xics);
+                    //    model = modelTrainingEngine.TrainModel();
+                    //    break;
                     default:
                         throw new NotImplementedException();
                 }
@@ -86,11 +92,11 @@ namespace EngineLayer.DIA
             //ml based pf grouping
             var groupingEngine = new MLgroupingEngine(model, MlDIAparams.PredictionScoreThreshold, MlDIAparams.ApexRtTolerance);
             var allPfGroups = new List<PrecursorFragmentsGroup>();
-            foreach (var ms2Group in scanWindowMap)
-            {
-                var pfGroups = groupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group.Key], allMs2Xics[ms2Group.Key]);
-                allPfGroups.AddRange(pfGroups);
-            }
+            //foreach (var ms2Group in scanWindowMap)
+            //{
+            //    var pfGroups = groupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group.Key], allMs2Xics[ms2Group.Key]);
+            //    allPfGroups.AddRange(pfGroups);
+            //}
 
             //make pseudo ms2 scans
             int oneBasedNumber = 1;
@@ -105,6 +111,19 @@ namespace EngineLayer.DIA
             PseudoMs2Scans = pseudoScans;
 
             return new MetaMorpheusEngineResults(this);
+        }
+
+        public static MsDataScan GetTrimmedMs2Scans(MsDataScan originalScan, FilteringParams filteringParams)
+        {
+            var mzs = originalScan.MassSpectrum.XArray;
+            var intensities = originalScan.MassSpectrum.YArray;
+            WindowModeHelper.Run(ref intensities, ref mzs, filteringParams, originalScan.ScanWindowRange.Minimum, originalScan.ScanWindowRange.Maximum);
+
+            Array.Sort(mzs, intensities);
+            var spectrum = new MzSpectrum(mzs, intensities, false);
+            var trimmedScan = new MsDataScan(spectrum, originalScan.OneBasedScanNumber, originalScan.MsnOrder, originalScan.IsCentroid, originalScan.Polarity, originalScan.RetentionTime, originalScan.ScanWindowRange, originalScan.ScanFilter, originalScan.MzAnalyzer, originalScan.TotalIonCurrent, null, originalScan.NoiseData, originalScan.NativeId);
+
+            return trimmedScan;
         }
     }
 }

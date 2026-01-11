@@ -31,89 +31,89 @@ namespace EngineLayer.DIA
         protected override MetaMorpheusEngineResults RunSpecific()
         {
             //read in scans
-            var allScans = DataFile.GetAllScansList().ToArray();
-            var isdVoltageMap = ISDEngine.ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
-            ISDEngine.ReLabelIsdScans(isdVoltageMap, allScans);
-            var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            //var allScans = DataFile.GetAllScansList().ToArray();
+            //var isdVoltageMap = ISDEngine.ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
+            //ISDEngine.ReLabelIsdScans(isdVoltageMap, allScans);
+            //var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
 
-            var allMs1Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
-            var allMs2Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
-            var ms1PeakEngines = new Dictionary<object, object>();
-            var ms2PeakEngines = new Dictionary<object, object>();
-            var ms1PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
-            var ms2PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
-            var ms1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1);
-            foreach (var kvp in matchedPeaks1)
-            {
-                if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
-                    ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
-            }
-            foreach (var ms2Group in isdVoltageMap)
-            {
-                allMs1Xics[ms2Group.Key] = ms1Xics;
-                ms1PeakEngines[ms2Group.Key] = indexingEngine1;
-                allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out var matchedPeaks2, out var indexingEngine2);
-                ms2PeakEngines[ms2Group.Key] = indexingEngine2;
-                foreach (var kvp in matchedPeaks2)
-                {
-                    if (!ms2PeakXicDictionary.ContainsKey(kvp.Key))
-                        ms2PeakXicDictionary.Add(kvp.Key, kvp.Value);
-                }
-            }
+            //var allMs1Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
+            //var allMs2Xics = new Dictionary<object, List<ExtractedIonChromatogram>>();
+            //var ms1PeakEngines = new Dictionary<object, object>();
+            //var ms2PeakEngines = new Dictionary<object, object>();
+            //var ms1PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
+            //var ms2PeakXicDictionary = new Dictionary<IIndexedPeak, ExtractedIonChromatogram>();
+            //var ms1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks1, out var indexingEngine1);
+            //foreach (var kvp in matchedPeaks1)
+            //{
+            //    if (!ms1PeakXicDictionary.ContainsKey(kvp.Key))
+            //        ms1PeakXicDictionary.Add(kvp.Key, kvp.Value);
+            //}
+            //foreach (var ms2Group in isdVoltageMap)
+            //{
+            //    allMs1Xics[ms2Group.Key] = ms1Xics;
+            //    ms1PeakEngines[ms2Group.Key] = indexingEngine1;
+            //    allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out var matchedPeaks2, out var indexingEngine2);
+            //    ms2PeakEngines[ms2Group.Key] = indexingEngine2;
+            //    foreach (var kvp in matchedPeaks2)
+            //    {
+            //        if (!ms2PeakXicDictionary.ContainsKey(kvp.Key))
+            //            ms2PeakXicDictionary.Add(kvp.Key, kvp.Value);
+            //    }
+            //}
 
-            //train model
-            var mlContext = new MLContext();
-            ITransformer model = null;
-            ModelTrainingEngine modelTrainingEngine = null;
-            if (MlDIAparams.ExistingModelPath != null)
-            {
-                model = mlContext.Model.Load(MlDIAparams.ExistingModelPath, out var modelInputSchema);
-            }
-            else
-            {
-                switch (MlDIAparams.PseudoSearchType)
-                {
-                    case (PseudoSearchScanType.DirectSearch):
-                        modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, null, isdVoltageMap);
-                        model = modelTrainingEngine.TrainModel();
-                        break;
-                    case (PseudoSearchScanType.AllOverlap):
-                        modelTrainingEngine = new PfPairModelTrainingEngine(MlDIAparams, CommonParameters, allMs1Xics, allMs2Xics);
-                        model = modelTrainingEngine.TrainModel();
-                        break;
-                    default:
-                        throw new NotImplementedException();
-                }
-            }
+            ////train model
+            //var mlContext = new MLContext();
+            //ITransformer model = null;
+            //ModelTrainingEngine modelTrainingEngine = null;
+            //if (MlDIAparams.ExistingModelPath != null)
+            //{
+            //    model = mlContext.Model.Load(MlDIAparams.ExistingModelPath, out var modelInputSchema);
+            //}
+            //else
+            //{
+            //    switch (MlDIAparams.PseudoSearchType)
+            //    {
+            //        case (PseudoSearchScanType.DirectSearch):
+            //            modelTrainingEngine = new DDASearchModelTrainingEngine(MlDIAparams, CommonParameters, ms1Scans, ms2Scans, ms1PeakEngines, ms2PeakEngines, ms1PeakXicDictionary, ms2PeakXicDictionary, null, isdVoltageMap);
+            //            model = modelTrainingEngine.TrainModel();
+            //            break;
+            //        case (PseudoSearchScanType.AllOverlap):
+            //            modelTrainingEngine = new PfPairModelTrainingEngine(MlDIAparams, CommonParameters, allMs1Xics, allMs2Xics);
+            //            model = modelTrainingEngine.TrainModel();
+            //            break;
+            //        default:
+            //            throw new NotImplementedException();
+            //    }
+            //}
 
-            //ml based pf grouping
-            var groupingEngine = new MLgroupingEngine(model, MlDIAparams.PredictionScoreThreshold, MlDIAparams.ApexRtTolerance);
-            var allPfGroups = new List<PrecursorFragmentsGroup>();
-            if (MlDIAparams.CombineFragments)
-            {
-                var allFragments = allMs2Xics.Values.SelectMany(x => x).ToList();
-                allPfGroups = groupingEngine.PrecursorFragmentGrouping(ms1Xics, allFragments);
-            }
-            else
-            {
-                foreach (var ms2Group in isdVoltageMap)
-                {
-                    var pfGroups = groupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group.Key], allMs2Xics[ms2Group.Key]);
-                    allPfGroups.AddRange(pfGroups);
-                }
-            }
+            ////ml based pf grouping
+            //var groupingEngine = new MLgroupingEngine(model, MlDIAparams.PredictionScoreThreshold, MlDIAparams.ApexRtTolerance);
+            //var allPfGroups = new List<PrecursorFragmentsGroup>();
+            //if (MlDIAparams.CombineFragments)
+            //{
+            //    var allFragments = allMs2Xics.Values.SelectMany(x => x).ToList();
+            //    allPfGroups = groupingEngine.PrecursorFragmentGrouping(ms1Xics, allFragments);
+            //}
+            //else
+            //{
+            //    foreach (var ms2Group in isdVoltageMap)
+            //    {
+            //        var pfGroups = groupingEngine.PrecursorFragmentGrouping(allMs1Xics[ms2Group.Key], allMs2Xics[ms2Group.Key]);
+            //        allPfGroups.AddRange(pfGroups);
+            //    }
+            //}
             
-            //make pseudo ms2 scans
-            int oneBasedNumber = 1;
-            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
-            foreach (var group in allPfGroups)
-            {
-                group.PFgroupIndex = oneBasedNumber;
-                var scan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(group, MlDIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
-                pseudoScans.Add(scan);
-                oneBasedNumber++;
-            }
-            PseudoMs2Scans = pseudoScans;
+            ////make pseudo ms2 scans
+            //int oneBasedNumber = 1;
+            //var pseudoScans = new List<Ms2ScanWithSpecificMass>();
+            //foreach (var group in allPfGroups)
+            //{
+            //    group.PFgroupIndex = oneBasedNumber;
+            //    var scan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(group, MlDIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
+            //    pseudoScans.Add(scan);
+            //    oneBasedNumber++;
+            //}
+            //PseudoMs2Scans = pseudoScans;
 
             return new MetaMorpheusEngineResults(this);
         }
