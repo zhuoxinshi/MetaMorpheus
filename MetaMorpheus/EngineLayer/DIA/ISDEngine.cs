@@ -1,12 +1,15 @@
-﻿using Easy.Common.Extensions;
+﻿using Chemistry;
+using Easy.Common.Extensions;
 using MassSpectrometry;
 using MzLibUtil;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using ThermoFisher.CommonCore.Data.Business;
 using static Proteomics.RetentionTimePrediction.SSRCalc3;
 
 namespace EngineLayer.DIA
@@ -110,6 +113,25 @@ namespace EngineLayer.DIA
             ms1Scans = soretedMap.First().Value.ToArray();
             soretedMap.Remove(soretedMap.First().Key);
             return soretedMap;
+        }
+
+        public void GetMS2OnlyPseudoScans()
+        {
+            var allScans = DataFile.GetAllScansList().ToArray();
+            var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
+            ReLabelIsdScans(isdVoltageMap, allScans);
+            var ms2Scans = isdVoltageMap.Values.SelectMany(p => p).ToArray();
+
+            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
+            foreach(var scan in ms2Scans)
+            {
+                var neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(scan, CommonParameters);
+
+                var pseudoScan = new Ms2ScanWithSpecificMass(scan, 1,
+                                   1, null, CommonParameters, neutralExperimentalFragments, precursorHighestIsotopeMz: 1);
+                pseudoScans.Add(pseudoScan);
+            }
+            PseudoMs2Scans = pseudoScans;
         }
     }
 }

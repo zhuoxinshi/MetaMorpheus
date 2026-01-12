@@ -239,9 +239,9 @@ namespace TaskLayer
                                     double monoPeakMz = envelope.MonoisotopicMass.ToMz(envelope.Charge);
                                     int peakCount = envelope.Peaks.Count();
                                     double intensity = 1;
-                                    if (commonParameters.UseMostAbundantPrecursorIntensity) 
-                                    { 
-                                        intensity = envelope.Peaks.Max(p => p.intensity); 
+                                    if (commonParameters.UseMostAbundantPrecursorIntensity)
+                                    {
+                                        intensity = envelope.Peaks.Max(p => p.intensity);
                                     }
                                     else
                                     {
@@ -251,9 +251,7 @@ namespace TaskLayer
                                     var fractionalIntensity = envelope.TotalIntensity /
                                           (double)precursorSpectrum.MassSpectrum.YArray
                                           [
-                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)
-                                              ..
-                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
+                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
                                           ].Sum();
                                     precursors.Add((monoPeakMz, envelope.Charge, intensity, peakCount,
                                         fractionalIntensity));
@@ -419,6 +417,11 @@ namespace TaskLayer
                     case (AnalysisType.ISD_PSM):
                         var isdPsmEngine = new ISDEngine_PSM(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
                         isdPsmEngine.Run();
+                        break;
+                    case (AnalysisType.MS2Only):
+                        var isdEngine_ms2only = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
+                        isdEngine_ms2only.GetMS2OnlyPseudoScans();
+                        commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath] = isdEngine_ms2only.PseudoMs2Scans.ToArray();
                         break;
                 }
             } else if (commonParameters.DIAparameters != null && commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
@@ -694,7 +697,7 @@ namespace TaskLayer
             {
                 file.WriteLine("The data analysis was performed using MetaMorpheus version " + GlobalVariables.MetaMorpheusVersion + ", available at " + "https://github.com/smith-chem-wisc/MetaMorpheus.");
 		        file.WriteLine();
-                file.WriteLine(CommonParameters.DIAparameters.ToString());
+                file.WriteLine(CommonParameters.DIAparameters != null? CommonParameters.DIAparameters.ToString() : "noDIA");
                 file.WriteLine();
                 file.Write(ProseCreatedWhileRunning.ToString());
                 file.WriteLine(SystemInfo.SystemProse().Replace(Environment.NewLine, "") + " ");
