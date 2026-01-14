@@ -178,7 +178,7 @@ namespace Test.DIATests
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 4000, minCharge: 4, new Bspline(2, 150));
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
             var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
-            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.5, 15, 1, fragmentRankThreshold: 500);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
             searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.ChargeEnvelope, combineFragments: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
