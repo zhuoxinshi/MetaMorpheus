@@ -25,6 +25,7 @@ using Omics.BioPolymer;
 using Omics.Modifications;
 using Omics.SpectrumMatch;
 using Omics;
+using EngineLayer.DIA;
 
 namespace TaskLayer
 {
@@ -130,7 +131,38 @@ namespace TaskLayer
             }
 
             CompressIndividualFileResults();
+
+            //DIA related
+            if (CommonParameters.DIAparameters != null)
+            {
+                DiaAnalysis();
+            }
             return Parameters.SearchTaskResults;
+        }
+
+        public void DiaAnalysis()
+        {
+            var outFolder = Path.Combine(Parameters.OutputFolder, "DiaAnalysis");
+            if (!Directory.Exists(outFolder))
+            {
+                Directory.CreateDirectory(outFolder);
+            }
+            var psmsGroupedByFile = Parameters.AllSpectralMatches.GroupBy(p => p.FullFilePath);
+            foreach (var psmFileGroup in psmsGroupedByFile)
+            {
+                string strippedFileName = Path.GetFileNameWithoutExtension(psmFileGroup.Key);
+                var psmsForThisFile = psmFileGroup.ToList();
+                CalculatePsmAndPeptideFdr(psmsForThisFile, "PSM", false);
+                var filteredPsms = FilteredPsms.Filter(psmsForThisFile,
+                    CommonParameters,
+                    includeDecoys: false,
+                    includeContaminants: false,
+                    includeAmbiguous: true,
+                    includeHighQValuePsms: false);
+
+                var proteoformsFileOutPath = Path.Combine(outFolder, strippedFileName + "_ProteoformResults.tsv");
+                ProteoformResultFile.WriteProteoformResults(proteoformsFileOutPath, filteredPsms);
+            }
         }
 
         protected override MyTaskResults RunSpecific(string OutputFolder, List<DbForTask> dbFilenameList, List<string> currentRawFileList, string taskId, FileSpecificParameters[] fileSettingsList)

@@ -25,54 +25,48 @@ namespace EngineLayer.DIA
 
         protected override MetaMorpheusEngineResults RunSpecific()
         {
+            PseudoMs2Scans = GetPseudoMs2Scans();
+
+            if (DIAparams.CombineFragments)
+            {
+                var combinedScans = new List<Ms2ScanWithSpecificMass>();
+                var groupedPseudoScans = PseudoMs2Scans.GroupBy(s => new { s.PrecursorMass, s.PrecursorCharge, s.RetentionTime});
+                foreach(var group in groupedPseudoScans)
+                {
+                    var combinedFragments = group.SelectMany(s => s.ExperimentalFragments);
+                    var newScan = new Ms2ScanWithSpecificMass(group.FirstOrDefault().TheScan, group.FirstOrDefault().PrecursorMonoisotopicPeakMz, group.Key.PrecursorCharge, group.FirstOrDefault().FullFilePath, CommonParameters, combinedFragments.ToArray(), group.FirstOrDefault().PrecursorIntensity);
+                    combinedScans.Add(newScan);
+                }
+                PseudoMs2Scans = combinedScans;
+            }
+            return new MetaMorpheusEngineResults(this);
+        }
+
+        public override IEnumerable<Ms2ScanWithSpecificMass> GetPseudoMs2Scans()
+        {
             //read in scans and isd scan pre-process
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
             ReLabelIsdScans(isdVoltageMap, allScans);
 
             //Get all MS1 and MS2 XICs
-            var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans,out var matchedPeaks, out var indexingEngine);
-            var allMs2Xics = new Dictionary<double, List<ExtractedIonChromatogram>>();
+            var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
+
             foreach (var ms2Group in isdVoltageMap)
             {
-                allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out matchedPeaks, out indexingEngine);
-            }
+                var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out matchedPeaks, out indexingEngine);
+                var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
 
-            //Precursor-fragment Grouping
-            var allPfGroups = new List<PrecursorFragmentsGroup>();
-            if (DIAparams.CombineFragments)
-            {
-                allPfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, allMs2Xics.Values.SelectMany(p => p));
-            }
-            else
-            {
-                foreach (var ms2Group in isdVoltageMap.Keys)
+                foreach (var pfGroup in pfGroups)
                 {
-                    var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, allMs2Xics[ms2Group]);
-                    allPfGroups.AddRange(pfGroups);
+                    OneBasedScanNumber++;
+                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
+                    yield return pseudoScan;
                 }
             }
-
-            //filtering fragments
-            //foreach (var pfGroup in allPfGroups)
-            //{
-            //    pfGroup.PFpairs = pfGroup.PFpairs.OrderByDescending(pf => pf.FragmentXic.ApexPeak.Intensity).Take(200).ToList();
-            //}
-
-            //Convert pfGroups to pseudo MS2 scans
-            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
-            int pfGroupIndex = 1;
-            foreach (var pfGroup in allPfGroups)
-            {
-                pfGroup.PFgroupIndex = pfGroupIndex;
-                var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
-                pseudoScans.Add(pseudoScan);
-                pfGroupIndex++;
-            }
-            PseudoMs2Scans = pseudoScans;
-
-            return new MetaMorpheusEngineResults(this);
         }
+
 
         public static void ReLabelIsdScans(Dictionary<double, List<MsDataScan>> isdVoltageScanMap, MsDataScan[] ms1Scans)
         {

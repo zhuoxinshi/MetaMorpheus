@@ -15,6 +15,7 @@ using MathNet.Numerics.Interpolation;
 using System.Drawing.Imaging;
 using Nett;
 using Plotly.NET;
+using static iText.StyledXmlParser.Jsoup.Select.Evaluator;
 
 namespace Test.DIATests
 {
@@ -194,11 +195,13 @@ namespace Test.DIATests
         [Test]
         public static void TestISDStandard()
         {
-            var path1 = @"E:\ISD Project\ISD_250906\09-06-25_sigma_DDA_ISD60-80-100_preFilter800-1000-1200.raw";
+            var path1 = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\09-06-25_65min_4pro_ISD60-80-100_preFilter700-900-1100.raw";
+            var path2 = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\09-06-25_65min_4pro_ISD60-80-100_fullRange.raw";
+            var path3 = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\09-06-25_65min_4pro_ISD40-55-70-85-100_fullRange_mscan1.raw";
             var denoised_test = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\denoised_ms1\denoised_ms_edit_centroid.mzML";
             var original = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\06-09-24_mix_sample10_5uL_ISD.raw";
-            var fileList1 = new List<string> { denoised_test };
-            var outputFolder = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\SearchResults";
+            var fileList1 = new List<string> { path1, path2, path3};
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\sequenceCovTest3";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -210,16 +213,16 @@ namespace Test.DIATests
             //DIA parameters
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 3000, minCharge: 3, new Bspline(2, 150));
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.6, 15, 1, fragmentRankThreshold: 500);
-            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.3, 0.5, 15, 10);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.75, 15, 1, fragmentRankThreshold: 500);
+            var xicGroupingEngine = new XicGroupingEngine(0.5f, 0, 0, 15, 10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: false, writePseudoScans: false);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
             var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
-            string standard_xml = @"E:\ISD Project\idmapping_2025_09_17.xml";
+            string standard_xml = @"E:\ISD Project\Std_4pro.xml";
 
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
             engine.Run();
@@ -331,6 +334,52 @@ namespace Test.DIATests
 
             var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(ecoli_fasta, false) }, outputFolder);
             engine.Run();
+        }
+
+        [Test]
+        public static void MS2OnlySearch()
+        {
+            var filePath1 = @"E:\ISD Project\260113\large_3pro\BSA_01-14-26_3pro_60min_ITMS1_ISD60-80-100_filter.mzML";
+            var filePath2 = @"E:\ISD Project\260113\large_3pro\01-14-26_3pro_DDA_60min_ITMS1_3iso_HCD22-25-30_RT23.16-23.29.mzML";
+            var fileList = new List<string> { filePath1, filePath2 };
+            var outputFolder = @"E:\ISD Project\260113\large_3pro\BSA\ms2only";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            string tomlFile_Variableonly = @"E:\ISD Project\260113\large_3pro\2026-01-16-17-47-09\Task Settings\Task1-SearchTaskconfig.toml";
+
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_Variableonly, MetaMorpheusTask.tomlConfig);
+            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 2, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, 1000, 3, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, 2, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));
+            var pfGroupingEngine = new XicGroupingEngine(1f, 0, 0, 10, 1);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.MS2Only, ms1XicConstructor, ms2XicConstructor, pfGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true);
+
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask), ("Calibration", cali_task),
+
+            string large_2pro = @"E:\ISD Project\260113\idmapping_accession_P01012_OR_accession_2026_01_16.xml";
+
+            var engine = new EverythingRunnerEngine(taskList, fileList, new List<DbForTask> { new DbForTask(large_2pro, false) }, outputFolder);
+            engine.Run();
+        }
+
+        [Test]
+        public static void DDAsequence()
+        {
+            var psmPath = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\DDA\Task1-SearchTask\AllPSMs.psmtsv";
+            var psmTsvFile = new PsmFromTsvFile(psmPath);
+            var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
+
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\DDAsequenceAnalysis";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            var outPath = Path.Combine(outputFolder, "sequenceCov.tsv");
+            ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
         }
     }
 }

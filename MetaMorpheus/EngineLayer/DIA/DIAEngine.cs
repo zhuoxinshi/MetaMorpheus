@@ -88,13 +88,15 @@ namespace EngineLayer.DIA
                     // Write scan entry header
                     writer.WriteLine("BEGIN IONS");
                     writer.WriteLine("FRACTION_ID=0");
+                    writer.WriteLine($"FILE_NAME={scan.FullFilePath}");
+                    writer.WriteLine($"SPECTRUM_ID={scan.OneBasedScanNumber}");
                     writer.WriteLine($"SCANS={scan.OneBasedScanNumber}");
                     writer.WriteLine($"RETENTION_TIME={scan.RetentionTime * 60}"); // Convert minutes to seconds
-                    writer.WriteLine($"LEVEL={scan.TheScan.MsnOrder}");
+                    writer.WriteLine($"LEVEL=2");
+                    writer.WriteLine($"MS_ONE_ID={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedScanNumber}");
                     if (scan.TheScan.DissociationType != null)
                         writer.WriteLine($"ACTIVATION={scan.TheScan.DissociationType}");
-                    if (scan.OneBasedPrecursorScanNumber != null)
-                        writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedPrecursorScanNumber}");
                     writer.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz}");
                     writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
                     writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");

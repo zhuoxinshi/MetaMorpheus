@@ -422,7 +422,7 @@ namespace TaskLayer
                         var isdEngine_ms2only = new ISDEngine(commonParameters.DIAparameters, myMSDataFile, commonParameters, null, null);
                         isdEngine_ms2only.GetMS2OnlyPseudoScans();
                         commonParameters.DIAparameters.PseudoScans[myMSDataFile.FilePath] = isdEngine_ms2only.PseudoMs2Scans.ToArray();
-                        break;
+                        return isdEngine_ms2only.PseudoMs2Scans;
                 }
             } else if (commonParameters.DIAparameters != null && commonParameters.DIAparameters.PseudoScans.ContainsKey(myMSDataFile.FilePath))
             {

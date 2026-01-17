@@ -409,7 +409,7 @@ namespace TaskLayer
                 //write out pseudoScans
                 if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.WritePseudoScans)
                 {
-                    var outPath = Path.Combine(OutputFolder, "PseudoScans.msalign");
+                    var outPath = Path.Combine(OutputFolder, "PseudoScans_ms2.msalign");
                     DIAEngine.WriteMsAlignFile(outPath, arrayOfMs2ScansSortedByMass);
                 }
 
