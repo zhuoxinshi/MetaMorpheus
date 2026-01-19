@@ -108,7 +108,6 @@ namespace EngineLayer.DIA
                 {
                     Accession = group.First().Accession,
                     MonoMass = group.First().MonoisotopicMass,
-                    Modifications = group.First().,
                     BaseSequence = group.First().BaseSequence,
                     FullSequence = group.First().FullSequence,
                     UniqueFragmentCount = allUniqueFragCount,

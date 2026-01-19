@@ -381,5 +381,12 @@ namespace Test.DIATests
             var outPath = Path.Combine(outputFolder, "sequenceCov.tsv");
             ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
         }
+
+        [Test]
+        public static void TestMsalignReading()
+        {
+            var path = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_DDA\05-04-25_PEPPI-YB_81min_DDA_rep1_ms1.msalign";
+            var indexedMasses = TopfdResultReader.ReadMs1AlignFile(path);
+        }
     }
 }
