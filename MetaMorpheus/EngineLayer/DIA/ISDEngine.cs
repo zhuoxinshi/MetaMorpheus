@@ -2,6 +2,7 @@
 using Easy.Common.Extensions;
 using MassSpectrometry;
 using MzLibUtil;
+using Readers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -22,6 +23,57 @@ namespace EngineLayer.DIA
             DIAparams = DIAparameters;
             DataFile = dataFile;
         }
+
+        //protected override MetaMorpheusEngineResults RunSpecific()
+        //{
+        //    //read in scans and isd scan pre-process
+        //    var allScans = DataFile.GetAllScansList().ToArray();
+        //    var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
+        //    ReLabelIsdScans(isdVoltageMap, allScans);
+
+        //    //Get all MS1 and MS2 XICs
+        //    var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
+        //    var allMs2Xics = new Dictionary<double, List<ExtractedIonChromatogram>>();
+        //    foreach (var ms2Group in isdVoltageMap)
+        //    {
+        //        allMs2Xics[ms2Group.Key] = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out matchedPeaks, out indexingEngine);
+        //    }
+
+        //    //Precursor-fragment Grouping
+        //    var allPfGroups = new List<PrecursorFragmentsGroup>();
+        //    if (DIAparams.CombineFragments)
+        //    {
+        //        allPfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, allMs2Xics.Values.SelectMany(p => p));
+        //    }
+        //    else
+        //    {
+        //        foreach (var ms2Group in isdVoltageMap.Keys)
+        //        {
+        //            var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, allMs2Xics[ms2Group]);
+        //            allPfGroups.AddRange(pfGroups);
+        //        }
+        //    }
+
+        //    //filtering fragments
+        //    foreach (var pfGroup in allPfGroups)
+        //    {
+        //        pfGroup.PFpairs = pfGroup.PFpairs.OrderByDescending(pf => pf.FragmentXic.ApexPeak.Intensity).Take(200).ToList();
+        //    }
+
+        //    //Convert pfGroups to pseudo MS2 scans
+        //    var pseudoScans = new List<Ms2ScanWithSpecificMass>();
+        //    int pfGroupIndex = 1;
+        //    foreach (var pfGroup in allPfGroups)
+        //    {
+        //        pfGroup.PFgroupIndex = pfGroupIndex;
+        //        var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
+        //        pseudoScans.Add(pseudoScan);
+        //        pfGroupIndex++;
+        //    }
+        //    PseudoMs2Scans = pseudoScans;
+
+        //    return new MetaMorpheusEngineResults(this);
+        //}
 
         protected override MetaMorpheusEngineResults RunSpecific()
         {
@@ -47,7 +99,6 @@ namespace EngineLayer.DIA
             //read in scans and isd scan pre-process
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
-            ReLabelIsdScans(isdVoltageMap, allScans);
 
             //Get all MS1 and MS2 XICs
             var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
