@@ -263,8 +263,7 @@ namespace EngineLayer.DIA
                     neutralExperimentalFragments = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(newMs2Scan, commonParameters);
                     break;
                 case PseudoMs2ConstructionType.Mass:
-                    neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => new IsotopicEnvelope(1,
-                            new List<(double mz, double intensity)> { (1, 1) }, pf.FragmentXic.ApexPeak.M, pf.FragmentXic.Peaks.Cast<IndexedMass>().First().Charge, 1, 0)).ToArray();
+                    neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => new IsotopicEnvelope(pf.FragmentXic.ApexPeak.M, pf.FragmentXic.ApexPeak.Intensity, pf.FragmentXic.Peaks.Cast<IndexedMass>().First().Charge)).ToArray();
                     break;
                 case PseudoMs2ConstructionType.ChargeEnvelope:
                     neutralExperimentalFragments = pfGroup.PFpairs.Select(pf => new IsotopicEnvelope(1,

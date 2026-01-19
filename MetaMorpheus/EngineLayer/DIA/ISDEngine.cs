@@ -26,7 +26,7 @@ namespace EngineLayer.DIA
 
         protected override MetaMorpheusEngineResults RunSpecific()
         {
-            PseudoMs2Scans = GetPseudoMs2Scans();
+            PseudoMs2Scans = GetPseudoMs2Scans_deconResult();
 
             if (DIAparams.CombineFragments)
             {
@@ -69,18 +69,26 @@ namespace EngineLayer.DIA
 
         public IEnumerable<Ms2ScanWithSpecificMass> GetPseudoMs2Scans_deconResult()
         {
+            
             //read in scans and isd scan pre-process
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
 
-            //Get all MS1 and MS2 XICs
-            var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
+            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_ms1_ms1.msalign";
+            string isd60ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd60_ms1.msalign";
+            string isd80ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd80_ms1.msalign";
+            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd100_ms1.msalign";
 
-            foreach (var ms2Group in isdVoltageMap)
+            var ms1XicConstructor = new DeconResultXicConstructor(ms1ResultPath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, CommonParameters.PrecursorDeconvolutionParameters, 3000, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
+            var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
+            var isdFiles = new Dictionary<double, string> { { 60, isd60ResultPath }, { 80, isd80ResultPath }, { 100, isd100ResultPath } };
+
+            foreach (var kvp in isdFiles)
             {
-                var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(ms2Group.Value.ToArray(), out matchedPeaks, out indexingEngine);
-                var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
+                var ms2XicConstructor = new DeconResultXicConstructor(kvp.Value, new PpmToleranceWithNotch(20, 1, 1), 2, 0.5, 3, CommonParameters.ProductDeconvolutionParameters, 0, 1, DIAparams.Ms2XicConstructor.XicSplineEngine);
+                var ms2Xics = ms2XicConstructor.GetAllXicsWithXicSpline(isdVoltageMap[kvp.Key].ToArray(), out matchedPeaks, out indexingEngine);
 
+                var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
                 foreach (var pfGroup in pfGroups)
                 {
                     OneBasedScanNumber++;

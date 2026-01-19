@@ -158,12 +158,12 @@ namespace Test.DIATests
             var path6 = @"E:\ISD Project\ISD_250906\09-18-25_YC_81min_ISD60-80-100_preFilter700-900-1100_rep3.raw";
             var path7 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1.raw";
             var path8 = @"E:\ISD Project\ISD_250906\09-20-25_YD_105min_gradient5_ISD60-80-100_preFilter800-1000-1200.raw";
-            var path9 = @"E:\ISD Project\ISD_250128\01-28-25_td-ISD_PEPPI-YD_105min_ISD60-80-100_120k_micro1.raw";
+            var path9 = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
             var path10 = @"E:\ISD Project\ISD_250906\09-19-25_YD_81min_ISD60-80-100_preFilter800-1000-1200_rep1_averaged_labelCorrected.mzML";
             var path11 = @"E:\ISD Project\FW-DIA\TestMyData\Yeast\YD_preFilter\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
 
-            var fileList1 = new List<string> { path11 };
-            var outputFolder = @"E:\ISD Project\TestSearch\ChargeEnvelope\flashDeconv\test3_filter";
+            var fileList1 = new List<string> { path9 };
+            var outputFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\MM2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -180,7 +180,7 @@ namespace Test.DIATests
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
             var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
             var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.ChargeEnvelope, combineFragments: true);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true, writePseudoScans: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);

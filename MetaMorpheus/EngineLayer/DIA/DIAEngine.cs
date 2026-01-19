@@ -95,6 +95,8 @@ namespace EngineLayer.DIA
                     writer.WriteLine($"LEVEL=2");
                     writer.WriteLine($"MS_ONE_ID={scan.OneBasedScanNumber}");
                     writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"PRECURSOR_WINDOW_BEGIN={scan.RetentionTime}");
+                    writer.WriteLine($"PRECURSOR_WINDOW_END={scan.RetentionTime}");
                     if (scan.TheScan.DissociationType != null)
                         writer.WriteLine($"ACTIVATION={scan.TheScan.DissociationType}");
                     writer.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz}");

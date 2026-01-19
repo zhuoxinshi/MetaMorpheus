@@ -7,20 +7,21 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static Plotly.NET.StyleParam.Range;
 
 namespace EngineLayer.DIA
 {
-    public class DeconResultXicConstructor : XicConstructor
+    public class DeconResultXicConstructor : NeutralMassXicConstructor
     {
         private readonly string ResultPath;
-        public DeconResultXicConstructor(string resultPath, Tolerance peakFindingTolerance, int maxMissedScansAllowed, double maxPeakHalfWidth, int minNumberOfPeaks, XicSpline? xicSpline = null) : base(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks, xicSpline)
+        public DeconResultXicConstructor(string resultPath, Tolerance peakFindingTolerance, int maxMissedScansAllowed, double maxPeakHalfWidth, int minNumberOfPeaks, DeconvolutionParameters deconParameters, double minMass, int minCharge, XicSpline? xicSpline = null) : base(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks, deconParameters, minMass, minCharge, xicSpline)
         {
             ResultPath = resultPath;
         }
 
         public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, out Dictionary<IIndexedPeak, ExtractedIonChromatogram> matchedPeaks, out object indexingEngine, MzRange isolationRange = null)
         {
-            var indexedMasses = ReadMs1AlignFile(ResultPath);
+            var indexedMasses = ReadMs1AlignFile(ResultPath).Where(i => i.M >= MinMass && i.Charge >= MinCharge);
 
             var deconResultIndexingEngine = new DeconResultMassIndexingEngine();
             indexingEngine = deconResultIndexingEngine;
@@ -60,7 +61,7 @@ namespace EngineLayer.DIA
                     if (line.Contains("RETENTION_TIME"))
                     {
                         var splits = line.Split('=');
-                        rt = double.Parse(splits[1]);
+                        rt = double.Parse(splits[1]) / 60.0;
                     }
 
                     if (line.Contains("\t"))
