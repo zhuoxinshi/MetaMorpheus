@@ -385,10 +385,40 @@ namespace Test.DIATests
         }
 
         [Test]
-        public static void TestMsalignReading()
+        public static void TestDeconResultIndexing()
         {
-            var path = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_DDA\05-04-25_PEPPI-YB_81min_DDA_rep1_ms1.msalign";
-            var indexedMasses = TopfdResultReader.ReadMs1AlignFile(path);
+            var path1 = @"E:\ISD Project\ISD_250906\09-08-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
+
+            var fileList1 = new List<string> { path1 };
+            var outputFolder = @"E:\ISD Project\TestSearch\ChargeEnvelope\flashDeconv\test3_filter";
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_FixedOnly = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task4-SearchTaskconfig.toml";
+            string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            //searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
+
+            //DIA parameters
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 4000, minCharge: 4, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.ChargeEnvelope, combineFragments: true);
+
+            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            gptmdTask.CommonParameters = searchTask.CommonParameters;
+
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
+            string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
+
+            var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
+            engine.Run();
         }
     }
 }
