@@ -87,22 +87,24 @@ namespace EngineLayer.DIA
                 {
                     // Write scan entry header
                     writer.WriteLine("BEGIN IONS");
+                    writer.WriteLine($"ID={scan.OneBasedScanNumber}");
                     writer.WriteLine("FRACTION_ID=0");
                     writer.WriteLine($"FILE_NAME={scan.FullFilePath}");
                     writer.WriteLine($"SPECTRUM_ID={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"TITLE=Scan_{scan.OneBasedScanNumber}");
                     writer.WriteLine($"SCANS={scan.OneBasedScanNumber}");
-                    writer.WriteLine($"RETENTION_TIME={scan.RetentionTime * 60}"); // Convert minutes to seconds
+                    writer.WriteLine($"RETENTION_TIME={Math.Round(scan.RetentionTime, 2)}"); 
                     writer.WriteLine($"LEVEL=2");
                     writer.WriteLine($"MS_ONE_ID={scan.OneBasedScanNumber}");
                     writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedScanNumber}");
-                    writer.WriteLine($"PRECURSOR_WINDOW_BEGIN={scan.RetentionTime}");
-                    writer.WriteLine($"PRECURSOR_WINDOW_END={scan.RetentionTime}");
-                    if (scan.TheScan.DissociationType != null)
-                        writer.WriteLine($"ACTIVATION={scan.TheScan.DissociationType}");
+                    writer.WriteLine($"PRECURSOR_WINDOW_BEGIN={scan.PrecursorMonoisotopicPeakMz}");
+                    writer.WriteLine($"PRECURSOR_WINDOW_END={scan.PrecursorMonoisotopicPeakMz + 3}");
+                    writer.WriteLine($"ACTIVATION=HCD");
                     writer.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz}");
                     writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
                     writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");
                     writer.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity}");
+                    writer.WriteLine("PRECURSOR_FEATURE_ID=0");
 
                     // Write peaks: monoMass, intensity, charge 
                     for (int i = 0; i < scan.ExperimentalFragments.Length; i++)

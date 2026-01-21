@@ -74,14 +74,14 @@ namespace EngineLayer.DIA
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
 
-            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_ms1_ms1.msalign";
+            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\06-07-24_mix_sample2_5uL_ISD_ms1.msalign";
             string isd60ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd60_ms1.msalign";
             string isd80ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd80_ms1.msalign";
-            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd100_ms1.msalign";
+            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\06-07-24_mix_sample2_5uL_ISD_ms2.msalign";
 
             var ms1XicConstructor = new DeconResultXicConstructor(ms1ResultPath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, CommonParameters.PrecursorDeconvolutionParameters, 3000, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
             var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
-            var isdFiles = new Dictionary<double, string> { { 60, isd60ResultPath }, { 80, isd80ResultPath }, { 100, isd100ResultPath } };
+            var isdFiles = new Dictionary<double, string> {  { 100, isd100ResultPath } };
 
             foreach (var kvp in isdFiles)
             {
