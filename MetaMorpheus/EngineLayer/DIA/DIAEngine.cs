@@ -83,7 +83,7 @@ namespace EngineLayer.DIA
         {
             using (var writer = new StreamWriter(filePath))
             {
-                foreach (var scan in ms2ScansWithMass)
+                foreach (var scan in ms2ScansWithMass.Take(200))
                 {
                     // Write scan entry header
                     writer.WriteLine("BEGIN IONS");
@@ -104,7 +104,7 @@ namespace EngineLayer.DIA
                     writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
                     writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");
                     writer.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity}");
-                    writer.WriteLine("PRECURSOR_FEATURE_ID=0");
+                    writer.WriteLine($"PRECURSOR_FEATURE_ID=0");
 
                     // Write peaks: monoMass, intensity, charge 
                     for (int i = 0; i < scan.ExperimentalFragments.Length; i++)
