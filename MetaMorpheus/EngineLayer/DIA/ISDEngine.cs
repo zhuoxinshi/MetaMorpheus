@@ -69,7 +69,6 @@ namespace EngineLayer.DIA
 
         public IEnumerable<Ms2ScanWithSpecificMass> GetPseudoMs2Scans_deconResult()
         {
-            
             //read in scans and isd scan pre-process
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
@@ -87,6 +86,37 @@ namespace EngineLayer.DIA
             {
                 var ms2XicConstructor = new DeconResultXicConstructor(kvp.Value, new PpmToleranceWithNotch(20, 1, 1), 2, 0.5, 3, CommonParameters.ProductDeconvolutionParameters, 0, 1, DIAparams.Ms2XicConstructor.XicSplineEngine);
                 var ms2Xics = ms2XicConstructor.GetAllXicsWithXicSpline(isdVoltageMap[kvp.Key].ToArray(), out matchedPeaks, out indexingEngine);
+
+                var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
+                foreach (var pfGroup in pfGroups)
+                {
+                    OneBasedScanNumber++;
+                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
+                    yield return pseudoScan;
+                }
+            }
+        }
+
+        public IEnumerable<Ms2ScanWithSpecificMass> GetPseudoScans_flashDeconv()
+        {
+            //read in scans
+            var allScans = DataFile.GetAllScansList().ToArray();
+            var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
+
+            string flashMs1FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\FlashDeconvTestFiles\06-07-24_mix_sample2_5uL_ISD_ms1_ms1.tsv";
+            //string flash60FilePath = @"E:\ISD Project\FW-DIA\TestMyData\Yeast\YD_preFilter\FlashDeconvResults\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd60_ms1.tsv";
+            //string flash80FilePath = @"E:\ISD Project\FW-DIA\TestMyData\Yeast\YD_preFilter\FlashDeconvResults\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd80_ms1.tsv";
+            string flash100FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\FlashDeconvTestFiles\06-07-24_mix_sample2_5uL_ISD_isd100_ms1.tsv";
+
+            var ms1XicConstructor = new ChargeEnvelopeXicConstructor(flashMs1FilePath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
+            var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
+            var isdFiles = new Dictionary<double, string> {  { 100, flash100FilePath } };//{ 60, flash60FilePath }, { 80, flash80FilePath }, 
+
+            foreach (var kvp in isdFiles)
+            {
+                var ms2XicConstructor = new ChargeEnvelopeXicConstructor(kvp.Value, new PpmToleranceWithNotch(20, 1, 1), 2, 0.5, 3, DIAparams.Ms2XicConstructor.XicSplineEngine);
+                var ms2Xics= ms2XicConstructor.GetAllXicsWithXicSpline(isdVoltageMap[kvp.Key].ToArray(), out matchedPeaks, out indexingEngine);
 
                 var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
                 foreach (var pfGroup in pfGroups)

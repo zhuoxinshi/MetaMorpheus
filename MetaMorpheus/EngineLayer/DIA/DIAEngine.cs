@@ -81,9 +81,10 @@ namespace EngineLayer.DIA
 
         public static void WriteMsAlignFile(string filePath, IEnumerable<Ms2ScanWithSpecificMass> ms2ScansWithMass)
         {
+            var sortedScans = ms2ScansWithMass.OrderBy(s => s.OneBasedScanNumber);
             using (var writer = new StreamWriter(filePath))
             {
-                foreach (var scan in ms2ScansWithMass.Take(200))
+                foreach (var scan in sortedScans)
                 {
                     // Write scan entry header
                     writer.WriteLine("BEGIN IONS");
