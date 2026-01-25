@@ -25,7 +25,6 @@ namespace EngineLayer.DIA
         private readonly MsDataFile DataFile;
         public DIAparameters DIAparams { get; set; } 
         public IEnumerable<Ms2ScanWithSpecificMass> PseudoMs2Scans { get; set; }
-        public int OneBasedScanNumber { get; set; }
         protected override MetaMorpheusEngineResults RunSpecific()
         {
             PseudoMs2Scans = GetPseudoMs2Scans();
@@ -38,6 +37,7 @@ namespace EngineLayer.DIA
             var ms1Scans = DataFile.GetMS1Scans().ToArray();
             var ms2Scans = DataFile.GetAllScansList().Where(s => s.MsnOrder == 2).ToArray();
             var DIAScanWindowMap = ConstructMs2Groups(ms2Scans);
+            int oneBasedScanNumber = 0;
 
             foreach (var kvp in DIAScanWindowMap)
             {
@@ -47,8 +47,8 @@ namespace EngineLayer.DIA
 
                 foreach (var pfGroup in pfGroups)
                 {
-                    OneBasedScanNumber++;
-                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    pfGroup.PFgroupIndex = oneBasedScanNumber;
+                    oneBasedScanNumber++;
                     var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
                     yield return pseudoScan;
                 }

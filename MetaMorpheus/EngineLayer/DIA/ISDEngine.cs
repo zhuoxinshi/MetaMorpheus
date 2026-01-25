@@ -34,7 +34,7 @@ namespace EngineLayer.DIA
                 var groupedPseudoScans = PseudoMs2Scans.GroupBy(s => new { s.PrecursorMass, s.PrecursorCharge, s.RetentionTime});
                 foreach(var group in groupedPseudoScans)
                 {
-                    var combinedFragments = group.SelectMany(s => s.ExperimentalFragments);
+                    var combinedFragments = group.SelectMany(s => s.ExperimentalFragments).DistinctBy(f => f.MonoisotopicMass).OrderBy(f => f.MonoisotopicMass);
                     var newScan = new Ms2ScanWithSpecificMass(group.FirstOrDefault().TheScan, group.FirstOrDefault().PrecursorMonoisotopicPeakMz, group.Key.PrecursorCharge, group.FirstOrDefault().FullFilePath, CommonParameters, combinedFragments.ToArray(), group.FirstOrDefault().PrecursorIntensity);
                     combinedScans.Add(newScan);
                 }
@@ -51,6 +51,7 @@ namespace EngineLayer.DIA
 
             //Get all MS1 and MS2 XICs
             var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
+            int oneBasedScanNumber = 1;
 
             foreach (var ms2Group in isdVoltageMap)
             {
@@ -59,8 +60,8 @@ namespace EngineLayer.DIA
 
                 foreach (var pfGroup in pfGroups)
                 {
-                    OneBasedScanNumber++;
-                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    pfGroup.PFgroupIndex = oneBasedScanNumber;
+                    oneBasedScanNumber++;
                     var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
                     yield return pseudoScan;
                 }
@@ -73,25 +74,26 @@ namespace EngineLayer.DIA
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
 
-            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\06-07-24_mix_sample2_5uL_ISD_ms1.msalign";
+            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_ms1_ms1.msalign";
             string isd60ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd60_ms1.msalign";
             string isd80ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd80_ms1.msalign";
-            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\06-07-24_mix_sample2_5uL_ISD_ms2.msalign";
+            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd100_ms1.msalign";
 
-            var ms1XicConstructor = new DeconResultXicConstructor(ms1ResultPath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, CommonParameters.PrecursorDeconvolutionParameters, 3000, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
+            var ms1XicConstructor = new DeconResultXicConstructor(ms1ResultPath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 5, CommonParameters.PrecursorDeconvolutionParameters, 3000, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
             var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
-            var isdFiles = new Dictionary<double, string> {  { 100, isd100ResultPath } };
+            var isdFiles = new Dictionary<double, string> { { 60, isd60ResultPath }, { 80, isd80ResultPath }, { 100, isd100ResultPath } };
+            int oneBasedScanNumber = 1;
 
             foreach (var kvp in isdFiles)
             {
-                var ms2XicConstructor = new DeconResultXicConstructor(kvp.Value, new PpmToleranceWithNotch(20, 1, 1), 2, 0.5, 3, CommonParameters.ProductDeconvolutionParameters, 0, 1, DIAparams.Ms2XicConstructor.XicSplineEngine);
+                var ms2XicConstructor = new DeconResultXicConstructor(kvp.Value, new PpmToleranceWithNotch(20, 1, 1), 2, 0.5, 5, CommonParameters.ProductDeconvolutionParameters, 0, 1, DIAparams.Ms2XicConstructor.XicSplineEngine);
                 var ms2Xics = ms2XicConstructor.GetAllXicsWithXicSpline(isdVoltageMap[kvp.Key].ToArray(), out matchedPeaks, out indexingEngine);
 
                 var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
                 foreach (var pfGroup in pfGroups)
                 {
-                    OneBasedScanNumber++;
-                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    pfGroup.PFgroupIndex = oneBasedScanNumber;
+                    oneBasedScanNumber++;
                     var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
                     yield return pseudoScan;
                 }
@@ -112,6 +114,7 @@ namespace EngineLayer.DIA
             var ms1XicConstructor = new ChargeEnvelopeXicConstructor(flashMs1FilePath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
             var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
             var isdFiles = new Dictionary<double, string> {  { 100, flash100FilePath } };//{ 60, flash60FilePath }, { 80, flash80FilePath }, 
+            int oneBasedScanNumber = 1;
 
             foreach (var kvp in isdFiles)
             {
@@ -121,8 +124,8 @@ namespace EngineLayer.DIA
                 var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
                 foreach (var pfGroup in pfGroups)
                 {
-                    OneBasedScanNumber++;
-                    pfGroup.PFgroupIndex = OneBasedScanNumber;
+                    pfGroup.PFgroupIndex = oneBasedScanNumber;
+                    oneBasedScanNumber++;
                     var pseudoScan = PrecursorFragmentsGroup.GetPseudoMs2ScanFromPfGroup(pfGroup, DIAparams.PseudoMs2ConstructionType, CommonParameters, DataFile.FilePath);
                     yield return pseudoScan;
                 }
