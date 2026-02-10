@@ -6,6 +6,7 @@ using Readers;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -74,10 +75,10 @@ namespace EngineLayer.DIA
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
 
-            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_ms1_ms1.msalign";
-            string isd60ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd60_ms1.msalign";
-            string isd80ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd80_ms1.msalign";
-            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\id_05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_centroid_isd100_ms1.msalign";
+            string ms1ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_ms1_ms1.msalign";
+            string isd60ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd60_ms1.msalign";
+            string isd80ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd80_ms1.msalign";
+            string isd100ResultPath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd100_ms1.msalign";
 
             var ms1XicConstructor = new DeconResultXicConstructor(ms1ResultPath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 5, CommonParameters.PrecursorDeconvolutionParameters, 3000, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
             var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
@@ -106,10 +107,10 @@ namespace EngineLayer.DIA
             var allScans = DataFile.GetAllScansList().ToArray();
             var isdVoltageMap = ConstructIsdGroups(allScans, out MsDataScan[] ms1Scans);
 
-            string flashMs1FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\FlashDeconvTestFiles\06-07-24_mix_sample2_5uL_ISD_ms1_ms1.tsv";
-            //string flash60FilePath = @"E:\ISD Project\FW-DIA\TestMyData\Yeast\YD_preFilter\FlashDeconvResults\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd60_ms1.tsv";
-            //string flash80FilePath = @"E:\ISD Project\FW-DIA\TestMyData\Yeast\YD_preFilter\FlashDeconvResults\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd80_ms1.tsv";
-            string flash100FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\Std_5pro_ISD\FlashDeconvTestFiles\06-07-24_mix_sample2_5uL_ISD_isd100_ms1.tsv";
+            string flashMs1FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_ms1_ms1.msalign";
+            string flash60FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_isd60_rep1_ms1.msalign";
+            string flash80FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_isd80_rep1_ms1.msalign";
+            string flash100FilePath = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\09-10-25_YD_81min_ISD60-80-100_preFilter700-900-1100_rep1_isd100_ms1.msalign";
 
             var ms1XicConstructor = new ChargeEnvelopeXicConstructor(flashMs1FilePath, new PpmToleranceWithNotch(20, 2, 2), 2, 0.5, 3, DIAparams.Ms1XicConstructor.XicSplineEngine);
             var allMs1Xics = ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans, out var matchedPeaks, out var indexingEngine);
@@ -190,6 +191,47 @@ namespace EngineLayer.DIA
                 pseudoScans.Add(pseudoScan);
             }
             PseudoMs2Scans = pseudoScans;
+        }
+
+
+        public static void WriteMsAlignFile(string filePath, IEnumerable<Ms2ScanWithSpecificMass> ms2ScansWithMass)
+        {
+            var sortedScans = ms2ScansWithMass.OrderBy(s => s.OneBasedScanNumber);
+            using (var writer = new StreamWriter(filePath))
+            {
+                foreach (var scan in sortedScans)
+                {
+                    // Write scan entry header
+                    writer.WriteLine("BEGIN IONS");
+                    writer.WriteLine($"ID={scan.OneBasedScanNumber}");
+                    writer.WriteLine("FRACTION_ID=0");
+                    writer.WriteLine($"FILE_NAME={scan.FullFilePath}");
+                    writer.WriteLine($"SPECTRUM_ID={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"TITLE=Scan_{scan.OneBasedScanNumber}");
+                    writer.WriteLine($"SCANS={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"RETENTION_TIME={Math.Round(scan.RetentionTime, 2)}");
+                    writer.WriteLine($"LEVEL=2");
+                    writer.WriteLine($"MS_ONE_ID={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedScanNumber}");
+                    writer.WriteLine($"PRECURSOR_WINDOW_BEGIN={scan.PrecursorMonoisotopicPeakMz}");
+                    writer.WriteLine($"PRECURSOR_WINDOW_END={scan.PrecursorMonoisotopicPeakMz + 3}");
+                    writer.WriteLine($"ACTIVATION=HCD");
+                    writer.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz}");
+                    writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
+                    writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");
+                    writer.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity}");
+                    writer.WriteLine($"PRECURSOR_FEATURE_ID=0");
+
+                    // Write peaks: monoMass, intensity, charge 
+                    for (int i = 0; i < scan.ExperimentalFragments.Length; i++)
+                    {
+                        writer.WriteLine($"{scan.ExperimentalFragments[i].MonoisotopicMass}\t{scan.ExperimentalFragments[i].TotalIntensity}\t{scan.ExperimentalFragments[i].Charge}");
+                    }
+
+                    writer.WriteLine("END IONS");
+                    writer.WriteLine();
+                }
+            }
         }
     }
 }

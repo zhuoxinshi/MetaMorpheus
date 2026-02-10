@@ -78,45 +78,5 @@ namespace EngineLayer.DIA
             }
             return DIAScanWindowMap;
         }
-
-        public static void WriteMsAlignFile(string filePath, IEnumerable<Ms2ScanWithSpecificMass> ms2ScansWithMass)
-        {
-            var sortedScans = ms2ScansWithMass.OrderBy(s => s.OneBasedScanNumber);
-            using (var writer = new StreamWriter(filePath))
-            {
-                foreach (var scan in sortedScans)
-                {
-                    // Write scan entry header
-                    writer.WriteLine("BEGIN IONS");
-                    writer.WriteLine($"ID={scan.OneBasedScanNumber}");
-                    writer.WriteLine("FRACTION_ID=0");
-                    writer.WriteLine($"FILE_NAME={scan.FullFilePath}");
-                    writer.WriteLine($"SPECTRUM_ID={scan.OneBasedScanNumber}");
-                    writer.WriteLine($"TITLE=Scan_{scan.OneBasedScanNumber}");
-                    writer.WriteLine($"SCANS={scan.OneBasedScanNumber}");
-                    writer.WriteLine($"RETENTION_TIME={Math.Round(scan.RetentionTime, 2)}"); 
-                    writer.WriteLine($"LEVEL=2");
-                    writer.WriteLine($"MS_ONE_ID={scan.OneBasedScanNumber}");
-                    writer.WriteLine($"MS_ONE_SCAN={scan.OneBasedScanNumber}");
-                    writer.WriteLine($"PRECURSOR_WINDOW_BEGIN={scan.PrecursorMonoisotopicPeakMz}");
-                    writer.WriteLine($"PRECURSOR_WINDOW_END={scan.PrecursorMonoisotopicPeakMz + 3}");
-                    writer.WriteLine($"ACTIVATION=HCD");
-                    writer.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz}");
-                    writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
-                    writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");
-                    writer.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity}");
-                    writer.WriteLine($"PRECURSOR_FEATURE_ID=0");
-
-                    // Write peaks: monoMass, intensity, charge 
-                    for (int i = 0; i < scan.ExperimentalFragments.Length; i++)
-                    {
-                        writer.WriteLine($"{scan.ExperimentalFragments[i].MonoisotopicMass}\t{scan.ExperimentalFragments[i].TotalIntensity}\t{scan.ExperimentalFragments[i].Charge}");
-                    }
-
-                    writer.WriteLine("END IONS");
-                    writer.WriteLine();
-                }
-            }
-        }
     }
 }

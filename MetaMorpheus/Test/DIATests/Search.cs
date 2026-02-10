@@ -16,6 +16,8 @@ using System.Drawing.Imaging;
 using Nett;
 using Plotly.NET;
 using static iText.StyledXmlParser.Jsoup.Select.Evaluator;
+using iText.Kernel.Geom;
+using System.Globalization;
 
 namespace Test.DIATests
 {
@@ -164,7 +166,7 @@ namespace Test.DIATests
             var path12 = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
 
             var fileList1 = new List<string> { path12 };
-            var outputFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\MM6";
+            var outputFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\umpire0.75";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -179,9 +181,9 @@ namespace Test.DIATests
             //DIA parameters
             var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 5, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 4000, minCharge: 4, new XicCubicSpline(0.05, scanIndexBased: true));
             var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 5, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new XicCubicSpline(0.05, scanIndexBased: true));//, numberOfPeaksToAdd: 1
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.7, 15, 1, fragmentRankThreshold: 500);
-            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.65, 15, 10, fragmentRankThreshold: 500);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true, writePseudoScans: true);
+            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.2, 0.75, 15, 1, fragmentRankThreshold: 500);
+            var xicGroupingEngine = new XicGroupingEngine(0.3f, 0.2, 0.7, 15, 10, fragmentRankThreshold: 500);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, umpireGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: true, writePseudoScans: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
@@ -371,18 +373,71 @@ namespace Test.DIATests
         [Test]
         public static void DDAsequence()
         {
-            var psmPath = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\DDA\Task1-SearchTask\AllPSMs.psmtsv";
+            var psmPath = @"E:\ISD Project\260113\2026-02-09-12-54-59\Task1-SearchTask\AllPSMs.psmtsv";
             var psmTsvFile = new PsmFromTsvFile(psmPath);
             var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
 
-            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\DDAsequenceAnalysis";
+            var dataPath = @"E:\ISD Project\260113\01-15-26_4pro-mix21_81min_DDA_ISD_MS3_redo_reordered_relabeled-ms3.mzML";
+            var dataFile = MsDataFileReader.GetDataFile(dataPath);
+            var ms3scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 3).ToArray();
+            var ms3Psms = filteredPsms.Where(p => ms3scans.Any(s => s.OneBasedScanNumber == p.Ms2ScanNumber)).ToList();
+
+            var outputFolder = @"E:\ISD Project\260113\2026-02-09-12-54-59\Task1-SearchTask\DDAsequenceAnalysis2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
 
-            var outPath = Path.Combine(outputFolder, "sequenceCov.tsv");
+            var outPath = System.IO.Path.Combine(outputFolder, "sequenceCov.tsv");
             ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
+        }
+
+        [Test]
+        public static void PseudoMs3Search()
+        {
+            var filePath = @"E:\ISD Project\260113\01-15-26_4pro-mix21_81min_DDA_ISD_MS3_redo.raw";
+            string tomlFile_Variableonly = @"E:\ISD Project\260113\large_3pro\2026-01-16-17-47-09\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_Variableonly, MetaMorpheusTask.tomlConfig);
+            var dataFile = MsDataFileReader.GetDataFile(filePath);
+            var ms1Scans = dataFile.GetMS1Scans().ToArray();
+            var ms2Scans = dataFile.GetAllScansList().Where(s => s.MsnOrder ==2).ToArray();
+            var isdDic = new Dictionary<int, List<Ms2ScanWithSpecificMass>>();
+            isdDic[15] = new List<Ms2ScanWithSpecificMass>();
+            isdDic[60] = new List<Ms2ScanWithSpecificMass>();
+            isdDic[80] = new List<Ms2ScanWithSpecificMass>();
+            isdDic[100] = new List<Ms2ScanWithSpecificMass>();
+            var ms2WithPrecursor = MetaMorpheusTask.GetMs2Scans(dataFile, filePath, searchTask.CommonParameters).Where(s => s.RetentionTime > 47.4 && s.RetentionTime < 50);
+            ms2WithPrecursor = ms2WithPrecursor.GroupBy(s => s.TheScan.OneBasedScanNumber).Select(g => g.OrderByDescending(s => s.PrecursorIntensity).First());
+            foreach(var ms2 in ms2WithPrecursor)
+            {
+                var ms1 = ms1Scans.Where(s => s.OneBasedScanNumber == ms2.OneBasedPrecursorScanNumber).FirstOrDefault();
+                if (ms1.ScanFilter.Contains("sid=60")) isdDic[60].Add(ms2);
+                else if (ms1.ScanFilter.Contains("sid=80")) isdDic[80].Add(ms2);
+                else if (ms1.ScanFilter.Contains("sid=100")) isdDic[100].Add(ms2);
+                else if (ms1.ScanFilter.Contains("sid=15")) isdDic[15].Add(ms2);
+            }
+
+            var outputPath = @"E:\ISD Project\260113\01-15-26_4pro-mix21_81min_DDA_ISD_MS3_redo_pseudoMs3_47-50.csv";
+            using (StreamWriter output = new StreamWriter(outputPath))
+            {
+                // Write header
+                output.WriteLine(string.Join(",", new List<string> { "scanNum", "ISD_level", "PrecursorMass", "PrecursorCharge"}));
+
+                foreach (var kvp in isdDic)
+                {
+                   foreach(var ms2 in kvp.Value)
+                    {
+                        var row = new List<string>
+                        {
+                            ms2.OneBasedScanNumber.ToString(),
+                            kvp.Key.ToString(),
+                            ms2.PrecursorMass.ToString(CultureInfo.InvariantCulture),
+                            ms2.PrecursorCharge.ToString()
+                        };
+                        output.WriteLine(string.Join(",", row));
+                    }
+                }
+            }
         }
 
         [Test]

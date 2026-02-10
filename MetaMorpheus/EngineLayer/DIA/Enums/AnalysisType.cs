@@ -13,6 +13,7 @@ namespace EngineLayer.DIA
         MLbased_bottomUp,
         MLbased_topDown,
         ISD_PSM,
-        MS2Only
+        MS2Only,
+        PseudoMs3
     }
 }

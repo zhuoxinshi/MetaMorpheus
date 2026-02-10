@@ -410,7 +410,7 @@ namespace TaskLayer
                 if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.WritePseudoScans)
                 {
                     var outPath = Path.Combine(OutputFolder, "PseudoScans_ms2.msalign");
-                    DIAEngine.WriteMsAlignFile(outPath, arrayOfMs2ScansSortedByMass);
+                    ISDEngine.WriteMsAlignFile(outPath, arrayOfMs2ScansSortedByMass);
                 }
 
                 //look for internal fragments

@@ -100,9 +100,7 @@ namespace EngineLayer.DIA
             foreach (var group in groupByProteoform)
             {
                 var allMatchedIons = group.SelectMany(g => g.MatchedIons).ToList();
-                int allUniqueFragCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct.MonoisotopicMass).Distinct().Count();
-                int uniqueTerminalFragmentCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false)
-                    .Select(i => i.MonoisotopicMass).Distinct().Count();
+                int allUniqueFragCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct.Annotation).Distinct().Count();
                 var annotations = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
                 var proteoformResult = new ProteoformResult
                 {
@@ -111,7 +109,7 @@ namespace EngineLayer.DIA
                     BaseSequence = group.First().BaseSequence,
                     FullSequence = group.First().FullSequence,
                     UniqueFragmentCount = allUniqueFragCount,
-                    UniqueTerminalFragmentCount = uniqueTerminalFragmentCount,
+                    UniqueTerminalFragmentCount = annotations.Length,
                     MatchedIons = string.Join(",", annotations)
                 };
                 allResults.Add(proteoformResult);

@@ -302,16 +302,16 @@ namespace TaskLayer
                         // get child scans
                         List<MsDataScan> ms2ChildScans = null;
                         List<MsDataScan> ms3ChildScans = null;
-                        if (commonParameters.MS2ChildScanDissociationType != DissociationType.Unknown || commonParameters.MS3ChildScanDissociationType != DissociationType.Unknown)
-                        {
-                            ms3ChildScans = ms3Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber).ToList();
+                        //if (commonParameters.MS2ChildScanDissociationType != DissociationType.Unknown || commonParameters.MS3ChildScanDissociationType != DissociationType.Unknown)
+                        //{
+                        //    ms3ChildScans = ms3Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber).ToList();
 
-                            ms2ChildScans = ms2Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber ||
-                            (p.OneBasedPrecursorScanNumber == ms2scan.OneBasedPrecursorScanNumber
-                                && p.OneBasedScanNumber > ms2scan.OneBasedScanNumber
-                                && Math.Abs(p.IsolationMz.Value - ms2scan.IsolationMz.Value) < 0.01)).ToList();
-                        }
-
+                        //    ms2ChildScans = ms2Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber ||
+                        //    (p.OneBasedPrecursorScanNumber == ms2scan.OneBasedPrecursorScanNumber
+                        //        && p.OneBasedScanNumber > ms2scan.OneBasedScanNumber
+                        //        && Math.Abs(p.IsolationMz.Value - ms2scan.IsolationMz.Value) < 0.01)).ToList();
+                        //}
+                        ms3ChildScans = ms3Scans.Where(p => p.OneBasedPrecursorScanNumber == ms2scan.OneBasedScanNumber).ToList();
                         foreach (var precursor in precursors)
                         {
                             // assign precursor for this MS2 scan
@@ -337,36 +337,41 @@ namespace TaskLayer
                                 }
                             }
 
+                            var highestPrecursor = precursors.MaxBy(p => p.Intensity);
+                            int precursorCharge = highestPrecursor.Charge;
+                            double precursorMz = highestPrecursor.MonoPeakMz;
+                            var precursorSpectrum = ms2scan;
+
                             // assign precursors for MS3 child scans
                             if (ms3ChildScans != null)
                             {
                                 foreach (var ms3ChildScan in ms3ChildScans)
                                 {
-                                    int precursorCharge = 1;
-                                    double precursorMz = 0;
-                                    var precursorSpectrum = ms2scan;
+                                    //int precursorCharge = 1;
+                                    //double precursorMz = 0;
+                                    //var precursorSpectrum = ms2scan;
 
-                                    //In current situation, do we need to perform the following function. 
-                                    //In some weird data, the MS3 scan has mis-leading precursor mass. 
-                                    //MS3 scan is low res in most of the situation, and the matched ions are not scored in a good way.
+                                    ////In current situation, do we need to perform the following function. 
+                                    ////In some weird data, the MS3 scan has mis-leading precursor mass. 
+                                    ////MS3 scan is low res in most of the situation, and the matched ions are not scored in a good way.
+                                    ////{
+                                    ////    ms3ChildScan.RefineSelectedMzAndIntensity(precursorSpectrum.MassSpectrum);
+                                    ////    ms3ChildScan.ComputeMonoisotopicPeakIntensity(precursorSpectrum.MassSpectrum);
+                                    ////}
+
+                                    //if (ms3ChildScan.SelectedIonMonoisotopicGuessMz.HasValue)
                                     //{
-                                    //    ms3ChildScan.RefineSelectedMzAndIntensity(precursorSpectrum.MassSpectrum);
-                                    //    ms3ChildScan.ComputeMonoisotopicPeakIntensity(precursorSpectrum.MassSpectrum);
+                                    //    precursorMz = ms3ChildScan.SelectedIonMonoisotopicGuessMz.Value;
+                                    //}
+                                    //else if (ms3ChildScan.SelectedIonMZ.HasValue)
+                                    //{
+                                    //    precursorMz = ms3ChildScan.SelectedIonMZ.Value;
                                     //}
 
-                                    if (ms3ChildScan.SelectedIonMonoisotopicGuessMz.HasValue)
-                                    {
-                                        precursorMz = ms3ChildScan.SelectedIonMonoisotopicGuessMz.Value;
-                                    }
-                                    else if (ms3ChildScan.SelectedIonMZ.HasValue)
-                                    {
-                                        precursorMz = ms3ChildScan.SelectedIonMZ.Value;
-                                    }
-
-                                    if (ms3ChildScan.SelectedIonChargeStateGuess.HasValue)
-                                    {
-                                        precursorCharge = ms3ChildScan.SelectedIonChargeStateGuess.Value;
-                                    }
+                                    //if (ms3ChildScan.SelectedIonChargeStateGuess.HasValue)
+                                    //{
+                                    //    precursorCharge = ms3ChildScan.SelectedIonChargeStateGuess.Value;
+                                    //}
 
                                     IsotopicEnvelope[] childNeutralExperimentalFragments = null;
 
@@ -377,7 +382,8 @@ namespace TaskLayer
                                     var theChildScan = new Ms2ScanWithSpecificMass(ms3ChildScan, precursorMz,
                                         precursorCharge, fullFilePath, commonParameters, childNeutralExperimentalFragments);
 
-                                    scan.ChildScans.Add(theChildScan);
+                                    scansWithPrecursors[i].Add(theChildScan);
+                                    //scan.ChildScans.Add(theChildScan);
                                 }
                             }
 
