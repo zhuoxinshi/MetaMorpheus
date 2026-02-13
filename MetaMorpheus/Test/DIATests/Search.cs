@@ -166,7 +166,7 @@ namespace Test.DIATests
             var path12 = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_ISD\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
 
             var fileList1 = new List<string> { path12 };
-            var outputFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7_DIA\toppic-windows-1.7_DIA\ISD\ISD_vs_DDA\YD_ISD\umpire0.75";
+            var outputFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_DDA\MM-msalign";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -373,7 +373,7 @@ namespace Test.DIATests
         [Test]
         public static void DDAsequence()
         {
-            var psmPath = @"E:\ISD Project\260113\2026-02-09-12-54-59\Task1-SearchTask\AllPSMs.psmtsv";
+            var psmPath = @"E:\ISD Project\260113\mix20_DDA\Task1-SearchTask\AllPSMs.psmtsv";
             var psmTsvFile = new PsmFromTsvFile(psmPath);
             var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
 
@@ -382,7 +382,7 @@ namespace Test.DIATests
             var ms3scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 3).ToArray();
             var ms3Psms = filteredPsms.Where(p => ms3scans.Any(s => s.OneBasedScanNumber == p.Ms2ScanNumber)).ToList();
 
-            var outputFolder = @"E:\ISD Project\260113\2026-02-09-12-54-59\Task1-SearchTask\DDAsequenceAnalysis2";
+            var outputFolder = @"E:\ISD Project\260113\mix20_DDA\Task1-SearchTask\DDAsequenceAnalysis2";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -475,6 +475,17 @@ namespace Test.DIATests
 
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
             engine.Run();
+        }
+
+        [Test]
+        public static void WriteDDAmsalign()
+        {
+            var path = @"E:\Proteomics_software\TopPIC\toppic-windows-1.6.5\ISD\ISD_vs_DDA\YB_DDA\05-04-25_PEPPI-YB_81min_DDA_rep1.raw";
+            var msdataFile = MsDataFileReader.GetDataFile(path);
+            string tomlFile_CommonFixedVariable = @"E:\CE\250318_CE\0322_YC_SearchOnly\Task Settings\Task1-SearchTaskconfig.toml";
+            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            var allMs2WithPre = MetaMorpheusTask.GetMs2Scans(msdataFile, path, searchTask.CommonParameters);
+            ISDEngine.WriteMsAlignFile(@"E:\Proteomics_software\TopPIC\toppic-windows-1.7.4\ISD\ISD_vs_DDA\YB_DDA\MM-msalign\0504YB_DDA_PseudoScans_ms2.msalign", allMs2WithPre);
         }
     }
 }

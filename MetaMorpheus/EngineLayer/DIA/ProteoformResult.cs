@@ -4,14 +4,18 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CsvHelper.Configuration;
+using Easy.Common.Extensions;
 using Readers;
+using static Microsoft.FSharp.Core.ByRefKinds;
 
 namespace EngineLayer.DIA
 {
     public class ProteoformResult
     {
+        public string ProrteinName { get; set; }
         public string Accession { get; set; }
         public double MonoMass { get; set; }
         public string Modifications { get; set; }
@@ -19,7 +23,10 @@ namespace EngineLayer.DIA
         public string FullSequence { get; set; }
         public int UniqueFragmentCount { get; set; }
         public int UniqueTerminalFragmentCount { get; set; }
-        public string MatchedIons { get; set; }
+        public string MatchedTerminalIons { get; set; }
+        public string MatchedInternalIons { get; set; }
+        public string ModSiteTerminalIons { get; set; }
+        public string ModSiteInternalIons { get; set; }
 
         public static CsvConfiguration CsvConfiguration => new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -29,6 +36,11 @@ namespace EngineLayer.DIA
         };
 
         public ProteoformResult() { }
+
+        public void FindModSiteCoverage()
+        {
+            
+        }
     }
 
     public class ProteoformResultFile : ResultFile<ProteoformResult>, IResultFile
@@ -69,10 +81,11 @@ namespace EngineLayer.DIA
             foreach (var group in groupByProteoform)
             {
                 var allMatchedIons = group.SelectMany(g => g.MatchedFragmentIons).ToList();
-                int allUniqueFragCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct.MonoisotopicMass).Distinct().Count();
+                int allUniqueFragCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct.Annotation).Distinct().Count();
                 int uniqueTerminalFragmentCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false)
                     .Select(i => i.MonoisotopicMass).Distinct().Count();
                 var annotations = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
+                var internalIons = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == true).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
                 var proteoformResult = new ProteoformResult
                 {
                     Accession = group.First().Accession,
@@ -82,7 +95,8 @@ namespace EngineLayer.DIA
                     FullSequence = group.First().FullSequence,
                     UniqueFragmentCount = allUniqueFragCount,
                     UniqueTerminalFragmentCount = uniqueTerminalFragmentCount,
-                    MatchedIons = string.Join(",", annotations)
+                    MatchedTerminalIons = string.Join(",", annotations),
+                    MatchedInternalIons = string.Join(",", internalIons)
                 };
                 allResults.Add(proteoformResult);
             }
@@ -102,16 +116,29 @@ namespace EngineLayer.DIA
                 var allMatchedIons = group.SelectMany(g => g.MatchedIons).ToList();
                 int allUniqueFragCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct.Annotation).Distinct().Count();
                 var annotations = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
+                var internalIons = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == true).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
                 var proteoformResult = new ProteoformResult
                 {
+                    ProrteinName = group.First().Name,
+                    Modifications = SpectrumMatchFromTsv.ParseModifications(group.First().FullSequence).Where(kvp => !kvp.Value.Contains("Fixed")).ToString(),
                     Accession = group.First().Accession,
                     MonoMass = group.First().MonoisotopicMass,
                     BaseSequence = group.First().BaseSequence,
                     FullSequence = group.First().FullSequence,
                     UniqueFragmentCount = allUniqueFragCount,
                     UniqueTerminalFragmentCount = annotations.Length,
-                    MatchedIons = string.Join(",", annotations)
+                    MatchedTerminalIons = string.Join(",", annotations),
+                    MatchedInternalIons = string.Join(",", internalIons)
                 };
+
+                if (proteoformResult.Modifications != null)
+                {
+                    var mods = SpectrumMatchFromTsv.ParseModifications(group.First().FullSequence).Where(kvp => !kvp.Value.Contains("Fixed"));
+                    foreach (var kvp in mods)
+                    {
+                        //var terminalIons = allMatchedIons.Where(i => i.NeutralTheoreticalProduct.IsInternalFragment == false).Where(i => i.NeutralTheoreticalProduct.AminoAcidPosition).Select(i => i.NeutralTheoreticalProduct.Annotation).Distinct().ToArray();
+                    }
+                }
                 allResults.Add(proteoformResult);
             }
             var resultFile = new ProteoformResultFile
