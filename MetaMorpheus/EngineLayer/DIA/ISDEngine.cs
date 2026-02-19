@@ -27,7 +27,7 @@ namespace EngineLayer.DIA
 
         protected override MetaMorpheusEngineResults RunSpecific()
         {
-            PseudoMs2Scans = GetPseudoMs2Scans_deconResult();
+            PseudoMs2Scans = GetPseudoMs2Scans();
 
             if (DIAparams.CombineFragments)
             {

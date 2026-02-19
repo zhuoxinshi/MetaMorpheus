@@ -200,27 +200,25 @@ namespace Test.DIATests
         [Test]
         public static void TestISDStandard()
         {
-            var path1 = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\09-06-25_65min_4pro_ISD60-80-100_preFilter700-900-1100.raw";
-            var path2 = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\09-06-25_65min_4pro_ISD60-80-100_fullRange.raw";
-            var path3 = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\09-06-25_65min_4pro_ISD40-55-70-85-100_fullRange_mscan1.raw";
+            var folder = @"E:\ISD Project\ISD_250906";
             var denoised_test = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\denoised_ms1\denoised_ms_edit_centroid.mzML";
             var original = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\06-09-24_mix_sample10_5uL_ISD.raw";
-            var fileList1 = new List<string> { path1, path2, path3};
-            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\sequenceCovTest3";
+            var patterns = new List<string> { ".mzML", "09-06", "4pro", "ISD60-80-100" };
+            var fileList1 = Directory.GetFiles(folder, "*.mzML").Where(f => patterns.All(p => f.Contains(p))).ToList();
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro";
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
             }
-            string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\4pro_65min_xml-gptmd-xml\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_variableOnly, MetaMorpheusTask.tomlConfig);
-            searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
 
             //DIA parameters
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 3000, minCharge: 3, new Bspline(2, 150));
-            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 2, 2), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 3000, minCharge: 3, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
             var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.75, 15, 1, fragmentRankThreshold: 500);
-            var xicGroupingEngine = new XicGroupingEngine(0.5f, 0, 0, 15, 10);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: false, writePseudoScans: false);
+            var xicGroupingEngine = new XicGroupingEngine(0.1f, 0, 0.7, 15, 10);
+            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: false, writePseudoScans: true);
 
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
@@ -231,6 +229,40 @@ namespace Test.DIATests
 
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
             engine.Run();
+        }
+
+        [Test]
+        public static void DIAsequence()
+        {
+            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\sequenceCovTest2\search\Individual File Results";
+            var outputFolder = @"E:\ISD Project\260113\ms3_reordered\Task1-SearchTask";
+            var psmFilePaths = new List<string> { @"E:\ISD Project\260113\ms3_reordered\Task1-SearchTask\AllPSMs.psmtsv" };
+            foreach(var path in psmFilePaths)
+            {
+                var psmTsvFile = new PsmFromTsvFile(path);
+                var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
+                var fileName = path.Replace("_PSMs.psmtsv", "").Replace($"{folder}\\", "");
+                var outPath = System.IO.Path.Combine(outputFolder, $"{fileName}_sequenceCov.tsv");
+                ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
+            }
+        }
+
+        [Test]
+        public static void DDAsequence()
+        {
+            var psmPath = @"E:\ISD Project\ISD_250906\4pro_65min_xml-gptmd-xml\Task1-SearchTask\Individual File Results\09-06-25_DDA_65min_4pro_3iso_PSMs.psmtsv";
+            var psmTsvFile = new PsmFromTsvFile(psmPath);
+            var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
+
+            var dataPath = @"E:\ISD Project\260113\01-15-26_4pro-mix21_81min_DDA_ISD_MS3_redo_reordered_relabeled-ms3.mzML";
+            var dataFile = MsDataFileReader.GetDataFile(dataPath);
+            var ms3scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 3).ToArray();
+            var ms3Psms = filteredPsms.Where(p => ms3scans.Any(s => s.OneBasedScanNumber == p.Ms2ScanNumber)).ToList();
+
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro";
+
+            var outPath = System.IO.Path.Combine(outputFolder, "09-06-25_DDA_65min_4pro_3iso_sequenceCov.tsv");
+            ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
         }
 
         [Test]
@@ -370,27 +402,6 @@ namespace Test.DIATests
             engine.Run();
         }
 
-        [Test]
-        public static void DDAsequence()
-        {
-            var psmPath = @"E:\ISD Project\260113\mix20_DDA\Task1-SearchTask\AllPSMs.psmtsv";
-            var psmTsvFile = new PsmFromTsvFile(psmPath);
-            var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
-
-            var dataPath = @"E:\ISD Project\260113\01-15-26_4pro-mix21_81min_DDA_ISD_MS3_redo_reordered_relabeled-ms3.mzML";
-            var dataFile = MsDataFileReader.GetDataFile(dataPath);
-            var ms3scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 3).ToArray();
-            var ms3Psms = filteredPsms.Where(p => ms3scans.Any(s => s.OneBasedScanNumber == p.Ms2ScanNumber)).ToList();
-
-            var outputFolder = @"E:\ISD Project\260113\mix20_DDA\Task1-SearchTask\DDAsequenceAnalysis2";
-            if (!Directory.Exists(outputFolder))
-            {
-                Directory.CreateDirectory(outputFolder);
-            }
-
-            var outPath = System.IO.Path.Combine(outputFolder, "sequenceCov.tsv");
-            ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
-        }
 
         [Test]
         public static void PseudoMs3Search()

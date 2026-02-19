@@ -406,10 +406,12 @@ namespace TaskLayer
 
                     ReportProgress(new ProgressEventArgs(100, "Done with search!", thisId));
                 }
+
                 //write out pseudoScans
+                var fileName = myMsDataFile.SourceFile.FileName;
                 if (CommonParameters.DIAparameters != null && CommonParameters.DIAparameters.WritePseudoScans)
                 {
-                    var outPath = Path.Combine(OutputFolder, "PseudoScans_ms2.msalign");
+                    var outPath = Path.Combine(OutputFolder, $"{myMsDataFile.SourceFile.FileName}_pseudoScans_ms2.msalign");
                     ISDEngine.WriteMsAlignFile(outPath, arrayOfMs2ScansSortedByMass);
                 }
 

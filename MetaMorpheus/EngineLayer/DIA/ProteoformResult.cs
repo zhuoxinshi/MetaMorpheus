@@ -7,7 +7,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CsvHelper.Configuration;
+using CsvHelper.Configuration.Attributes;
 using Easy.Common.Extensions;
+using NWaves.Transforms;
+using Omics.Fragmentation;
+using Omics.Modifications;
 using Readers;
 using static Microsoft.FSharp.Core.ByRefKinds;
 
@@ -24,9 +28,22 @@ namespace EngineLayer.DIA
         public int UniqueFragmentCount { get; set; }
         public int UniqueTerminalFragmentCount { get; set; }
         public string MatchedTerminalIons { get; set; }
-        public string MatchedInternalIons { get; set; }
+        //public string MatchedInternalIons { get; set; }
         public string ModSiteTerminalIons { get; set; }
         public string ModSiteInternalIons { get; set; }
+
+        [Optional]
+        public string Isd60UniqueTerminal { get; set; }
+        [Optional]
+        public string Isd60FragmentCount { get; set; }
+        [Optional]
+        public string Isd80UniqueTerminal { get; set; }
+        [Optional]
+        public string Isd80FragmentCount { get; set; }
+        [Optional]
+        public string Isd100UniqueTerminal { get; set; }
+        [Optional]
+        public string Isd100FragmentCount { get; set; }
 
         public static CsvConfiguration CsvConfiguration => new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -96,7 +113,7 @@ namespace EngineLayer.DIA
                     UniqueFragmentCount = allUniqueFragCount,
                     UniqueTerminalFragmentCount = uniqueTerminalFragmentCount,
                     MatchedTerminalIons = string.Join(",", annotations),
-                    MatchedInternalIons = string.Join(",", internalIons)
+                    //MatchedInternalIons = string.Join(",", internalIons)
                 };
                 allResults.Add(proteoformResult);
             }
@@ -115,29 +132,68 @@ namespace EngineLayer.DIA
             {
                 var allMatchedIons = group.SelectMany(g => g.MatchedIons).ToList();
                 int allUniqueFragCount = allMatchedIons.Select(i => i.NeutralTheoreticalProduct.Annotation).Distinct().Count();
-                var annotations = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
-                var internalIons = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == true).OrderBy(i => i.FragmentNumber).Select(i => i.Annotation).Distinct().ToArray();
+                var terminalIons = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == false).OrderBy(i => i.FragmentNumber);
+                var internalIons = allMatchedIons.Select(i => i.NeutralTheoreticalProduct).Where(n => n.IsInternalFragment == true && n.SecondaryFragmentNumber - n.FragmentNumber > 10).OrderBy(i => i.FragmentNumber);
+                var uniqueTerminalIons = terminalIons.Select(i => i.Annotation).Distinct().ToArray();
+                var uniqueInternalIons = internalIons.Select(i => i.Annotation).Distinct().ToArray();
+
                 var proteoformResult = new ProteoformResult
                 {
                     ProrteinName = group.First().Name,
-                    Modifications = SpectrumMatchFromTsv.ParseModifications(group.First().FullSequence).Where(kvp => !kvp.Value.Contains("Fixed")).ToString(),
                     Accession = group.First().Accession,
                     MonoMass = group.First().MonoisotopicMass,
                     BaseSequence = group.First().BaseSequence,
                     FullSequence = group.First().FullSequence,
                     UniqueFragmentCount = allUniqueFragCount,
-                    UniqueTerminalFragmentCount = annotations.Length,
-                    MatchedTerminalIons = string.Join(",", annotations),
-                    MatchedInternalIons = string.Join(",", internalIons)
+                    UniqueTerminalFragmentCount = uniqueTerminalIons.Length,
+                    MatchedTerminalIons = string.Join(",", uniqueTerminalIons),
+                    //MatchedInternalIons = string.Join(",", uniqueInternalIons)
                 };
 
-                if (proteoformResult.Modifications != null)
+                var mods = SpectrumMatchFromTsv.ParseModifications(group.First().FullSequence).Where(m => !(m.Value.Count() == 1 && m.Value.First().Contains("Fixed")));
+                if (mods.Count() == 0)
                 {
-                    var mods = SpectrumMatchFromTsv.ParseModifications(group.First().FullSequence).Where(kvp => !kvp.Value.Contains("Fixed"));
-                    foreach (var kvp in mods)
+                    proteoformResult.Modifications = "NA";
+                }
+                else
+                {
+                    proteoformResult.Modifications = string.Join("; ", mods.Select(kvp => $"{kvp.Key}: [{string.Join(", ", kvp.Value)}]"));
+                    var outputStringTerminal = new StringBuilder();
+                    var outputStringInternal = new StringBuilder();
+                    foreach (var kvp in mods.Where(kvp => kvp.Key != 0))
                     {
-                        //var terminalIons = allMatchedIons.Where(i => i.NeutralTheoreticalProduct.IsInternalFragment == false).Where(i => i.NeutralTheoreticalProduct.AminoAcidPosition).Select(i => i.NeutralTheoreticalProduct.Annotation).Distinct().ToArray();
+                        var b_ions = terminalIons.Where(i => i.ProductType == ProductType.b && i.AminoAcidPosition > kvp.Key);
+                        var y_ions = terminalIons.Where(i => i.ProductType == ProductType.y && i.AminoAcidPosition < kvp.Key);
+                        var terminalIonsWithModSite = b_ions.Concat(y_ions).Select(i => i.Annotation).Distinct().ToArray();
+                        outputStringTerminal.AppendLine(kvp.Key + $":({terminalIonsWithModSite.Length}) " + string.Join(",", terminalIonsWithModSite));
+
+                        var internalIonsWithModSite = internalIons.Where(i => i.FragmentNumber <= kvp.Key + 1 && i.SecondaryFragmentNumber >= kvp.Key + 1).Select(i => i.Annotation).Distinct().ToArray();
+                        outputStringInternal.AppendLine(kvp.Key + $":({internalIonsWithModSite.Length}) " + string.Join(",", internalIonsWithModSite));
                     }
+                    proteoformResult.ModSiteTerminalIons = outputStringTerminal.ToString();
+                    proteoformResult.ModSiteInternalIons = outputStringInternal.ToString();
+                }
+
+                if (outputPath.Contains("ISD"))
+                {
+                    var psms60Fragments = group.Where(g => g.Ms2ScanNumber % 4 == 2).SelectMany(g => g.MatchedIons).Select(m => m.NeutralTheoreticalProduct).ToList();
+                    var psms80Fragments = group.Where(g => g.Ms2ScanNumber % 4 == 3).SelectMany(g => g.MatchedIons).Select(m => m.NeutralTheoreticalProduct).ToList();
+                    var psms100Fragments = group.Where(g => g.Ms2ScanNumber % 4 == 0).SelectMany(g => g.MatchedIons).Select(m => m.NeutralTheoreticalProduct).ToList();
+
+                    var isd60Terminal = psms60Fragments.Where(n => n.IsInternalFragment == false).Select(i => i.Annotation).Distinct().ToArray();
+                    var isd80Terminal = psms80Fragments.Where(n => n.IsInternalFragment == false).Select(i => i.Annotation).Distinct().ToArray();
+                    var isd100Terminal = psms100Fragments.Where(n => n.IsInternalFragment == false).Select(i => i.Annotation).Distinct().ToArray();
+
+                    var isd60UniqueTerminal = isd60Terminal.Where(i => !isd80Terminal.Contains(i) && !isd100Terminal.Contains(i)).ToList();
+                    var isd80UniqueTerminal = isd80Terminal.Where(i => !isd60Terminal.Contains(i) && !isd100Terminal.Contains(i)).ToList();
+                    var isd100UniqueTerminal = isd100Terminal.Where(i => !isd60Terminal.Contains(i) && !isd80Terminal.Contains(i)).ToList();
+
+                    proteoformResult.Isd60UniqueTerminal = string.Join(",", isd60UniqueTerminal);
+                    proteoformResult.Isd60FragmentCount = isd60Terminal.Length.ToString();
+                    proteoformResult.Isd80UniqueTerminal = string.Join(",", isd80UniqueTerminal);
+                    proteoformResult.Isd80FragmentCount = isd80Terminal.Length.ToString();
+                    proteoformResult.Isd100UniqueTerminal = string.Join(",", isd100UniqueTerminal);
+                    proteoformResult.Isd100FragmentCount = isd100Terminal.Length.ToString();
                 }
                 allResults.Add(proteoformResult);
             }
