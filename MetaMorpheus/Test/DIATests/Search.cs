@@ -227,22 +227,23 @@ namespace Test.DIATests
             var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
             string standard_xml = @"E:\ISD Project\Std_4pro.xml";
 
-            var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
+            var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> 
+{ new DbForTask(standard_xml, false) }, outputFolder);
             engine.Run();
         }
 
         [Test]
         public static void DIAsequence()
         {
-            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_id\sequenceCovTest2\search\Individual File Results";
-            var outputFolder = @"E:\ISD Project\260113\ms3_reordered\Task1-SearchTask";
-            var psmFilePaths = new List<string> { @"E:\ISD Project\260113\ms3_reordered\Task1-SearchTask\AllPSMs.psmtsv" };
+            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro\search\Individual File Results";
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro\search";
+            var psmFilePaths = Directory.GetFiles(folder, "*_PSMs.psmtsv");
             foreach(var path in psmFilePaths)
             {
                 var psmTsvFile = new PsmFromTsvFile(path);
                 var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
                 var fileName = path.Replace("_PSMs.psmtsv", "").Replace($"{folder}\\", "");
-                var outPath = System.IO.Path.Combine(outputFolder, $"{fileName}_sequenceCov.tsv");
+                var outPath = System.IO.Path.Combine(outputFolder, $"{fileName}_seqCov.tsv");
                 ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
             }
         }
@@ -250,19 +251,17 @@ namespace Test.DIATests
         [Test]
         public static void DDAsequence()
         {
-            var psmPath = @"E:\ISD Project\ISD_250906\4pro_65min_xml-gptmd-xml\Task1-SearchTask\Individual File Results\09-06-25_DDA_65min_4pro_3iso_PSMs.psmtsv";
-            var psmTsvFile = new PsmFromTsvFile(psmPath);
-            var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
-
-            var dataPath = @"E:\ISD Project\260113\01-15-26_4pro-mix21_81min_DDA_ISD_MS3_redo_reordered_relabeled-ms3.mzML";
-            var dataFile = MsDataFileReader.GetDataFile(dataPath);
-            var ms3scans = dataFile.GetAllScansList().Where(s => s.MsnOrder == 3).ToArray();
-            var ms3Psms = filteredPsms.Where(p => ms3scans.Any(s => s.OneBasedScanNumber == p.Ms2ScanNumber)).ToList();
-
-            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro";
-
-            var outPath = System.IO.Path.Combine(outputFolder, "09-06-25_DDA_65min_4pro_3iso_sequenceCov.tsv");
-            ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
+            var folder = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task1-SearchTask\Individual File Results";
+            var outputFolder = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task1-SearchTask";
+            var psmFilePaths = Directory.GetFiles(folder, "*_PSMs.psmtsv");
+            foreach (var path in psmFilePaths)
+            {
+                var psmTsvFile = new PsmFromTsvFile(path);
+                var filteredPsms = psmTsvFile.Results.Where(p => p.QValue <= 0.01 && p.DecoyContamTarget == "T").ToList();
+                var fileName = path.Replace("_PSMs.psmtsv", "").Replace($"{folder}\\", "");
+                var outPath = System.IO.Path.Combine(outputFolder, $"{fileName}_seqCov.tsv");
+                ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
+            }
         }
 
         [Test]

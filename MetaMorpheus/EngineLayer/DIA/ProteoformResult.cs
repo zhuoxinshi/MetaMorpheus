@@ -58,6 +58,40 @@ namespace EngineLayer.DIA
         {
             
         }
+
+        public static Dictionary<int, string> ParseModifications(string fullSeq)
+        {
+            // use a regex to get all modifications
+            // "-?": checks if the mod starts with an optional "-", which marks the mod as an C-Terminus for position tracking.
+            // "\[": indicates the start of a mod, and the end of the mod is indicated by "]"
+            // "(.+?)": captures the content of the mod, which can be anything except for a closing bracket
+            // "(?<!\[I+)": negative lookbehind to ensure that the closing bracket match does not correspond to a cation charge state (also defined with brackets).
+            // "\]": indicates the end of the mod
+            string pattern = @"-?\[(.+?)(?<!\[I+)\]";
+            Regex regex = new(pattern);
+
+            Dictionary<int, string> modDict = new();
+
+            MatchCollection matches = regex.Matches(fullSeq);
+            int totalCaptureLength = 0;
+            foreach (Match match in matches)
+            {
+                GroupCollection group = match.Groups;
+                string val = group[1].Value;
+                int startIndex = group[0].Index;
+
+                // int to add is startIndex - current position
+                int positionToAddToDict = startIndex - totalCaptureLength;
+                if (group[0].Value.StartsWith('-')) //if the mod starts with a "-", it is a C-Terminus mod, and the position should be incremented by 1
+                {
+                    positionToAddToDict++;
+                }
+
+                modDict.Add(positionToAddToDict, val);
+                totalCaptureLength += group[0].Length;
+            }
+            return modDict;
+        }
     }
 
     public class ProteoformResultFile : ResultFile<ProteoformResult>, IResultFile
@@ -126,7 +160,7 @@ namespace EngineLayer.DIA
 
         public static void WriteProteoformResults(string outputPath, IEnumerable<PsmFromTsv> psmTsvs)
         {
-            var groupByProteoform = psmTsvs.GroupBy(p => p.FullSequence);
+            var groupByProteoform = psmTsvs.GroupBy(p => p.FullSequence).Where(g => !g.Key.Contains("|"));
             var allResults = new List<ProteoformResult>();
             foreach (var group in groupByProteoform)
             {
@@ -150,7 +184,7 @@ namespace EngineLayer.DIA
                     //MatchedInternalIons = string.Join(",", uniqueInternalIons)
                 };
 
-                var mods = SpectrumMatchFromTsv.ParseModifications(group.First().FullSequence).Where(m => !(m.Value.Count() == 1 && m.Value.First().Contains("Fixed")));
+                var mods = ProteoformResult.ParseModifications(group.First().FullSequence).Where(m => !m.Value.Contains("Fixed"));
                 if (mods.Count() == 0)
                 {
                     proteoformResult.Modifications = "NA";
@@ -158,17 +192,18 @@ namespace EngineLayer.DIA
                 else
                 {
                     proteoformResult.Modifications = string.Join("; ", mods.Select(kvp => $"{kvp.Key}: [{string.Join(", ", kvp.Value)}]"));
+                    var modSites = mods.GroupBy(kvp => kvp.Key).Select(g => g.Key).ToArray();
                     var outputStringTerminal = new StringBuilder();
                     var outputStringInternal = new StringBuilder();
-                    foreach (var kvp in mods.Where(kvp => kvp.Key != 0))
+                    foreach (var site in modSites)
                     {
-                        var b_ions = terminalIons.Where(i => i.ProductType == ProductType.b && i.AminoAcidPosition > kvp.Key);
-                        var y_ions = terminalIons.Where(i => i.ProductType == ProductType.y && i.AminoAcidPosition < kvp.Key);
+                        var b_ions = terminalIons.Where(i => i.ProductType == ProductType.b && i.AminoAcidPosition > site);
+                        var y_ions = terminalIons.Where(i => i.ProductType == ProductType.y && i.AminoAcidPosition < site);
                         var terminalIonsWithModSite = b_ions.Concat(y_ions).Select(i => i.Annotation).Distinct().ToArray();
-                        outputStringTerminal.AppendLine(kvp.Key + $":({terminalIonsWithModSite.Length}) " + string.Join(",", terminalIonsWithModSite));
+                        outputStringTerminal.AppendLine(site + $":({terminalIonsWithModSite.Length}) " + string.Join(",", terminalIonsWithModSite));
 
-                        var internalIonsWithModSite = internalIons.Where(i => i.FragmentNumber <= kvp.Key + 1 && i.SecondaryFragmentNumber >= kvp.Key + 1).Select(i => i.Annotation).Distinct().ToArray();
-                        outputStringInternal.AppendLine(kvp.Key + $":({internalIonsWithModSite.Length}) " + string.Join(",", internalIonsWithModSite));
+                        var internalIonsWithModSite = internalIons.Where(i => i.FragmentNumber <= site + 1 && i.SecondaryFragmentNumber >= site + 1).Select(i => i.Annotation).Distinct().ToArray();
+                        outputStringInternal.AppendLine(site + $":({internalIonsWithModSite.Length}) " + string.Join(",", internalIonsWithModSite));
                     }
                     proteoformResult.ModSiteTerminalIons = outputStringTerminal.ToString();
                     proteoformResult.ModSiteInternalIons = outputStringInternal.ToString();
@@ -203,6 +238,7 @@ namespace EngineLayer.DIA
             };
             resultFile.WriteResults(outputPath);
         }
+
     }
 
 }
