@@ -203,33 +203,33 @@ namespace Test.DIATests
             var folder = @"E:\ISD Project\ISD_250906";
             var denoised_test = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\denoised_ms1\denoised_ms_edit_centroid.mzML";
             var original = @"E:\ISD Project\FW-DIA\TestMyData\StdMix\06-09-24_mix_sample10_5uL_ISD.raw";
-            var patterns = new List<string> { ".mzML", "09-06", "4pro", "ISD60-80-100" };
-            var fileList1 = Directory.GetFiles(folder, "*.mzML").Where(f => patterns.All(p => f.Contains(p))).ToList();
-            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro";
-            if (!Directory.Exists(outputFolder))
-            {
-                Directory.CreateDirectory(outputFolder);
-            }
-            string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\4pro_65min_xml-gptmd-xml\Task Settings\Task1-SearchTaskconfig.toml";
+            var patterns = new List<string> { ".raw", "09-06", "4pro_ISD" };
+            var fileList1 = Directory.GetFiles(folder, "*.raw").Where(f => patterns.All(p => f.Contains(p))).ToList();
+            var outputFolderAll = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen";
+
+            string tomlFile_variableOnly = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_noDIA\xml\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_variableOnly, MetaMorpheusTask.tomlConfig);
-
-            //DIA parameters
-            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 3000, minCharge: 3, new Bspline(2, 150));
-            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
-            var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.75, 15, 1, fragmentRankThreshold: 500);
-            var xicGroupingEngine = new XicGroupingEngine(0.1f, 0, 0.7, 15, 10);
-            searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: false, writePseudoScans: true);
-
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
+            //DIA parameters
+            var corrThreshold = new List<double> { 0.6, 0.7, 0.8, 0.9 };
+            var ms1XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 8000, minCharge: 3, new Bspline(2, 150));
+            var ms2XicConstructor = new NeutralMassXicConstructor(new PpmTolerance(20), 2, maxPeakHalfWidth: 0.5, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, 0, 1, new Bspline(2, 150));//, numberOfPeaksToAdd: 1
+            //var umpireGroupingEngine = new UmpirePfGroupingEngine(150, 0.3f, 0.3, 0.75, 15, 1, fragmentRankThreshold: 500);
+
             var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
             string standard_xml = @"E:\ISD Project\Std_4pro.xml";
 
-            var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> 
-{ new DbForTask(standard_xml, false) }, outputFolder);
-            engine.Run();
+            foreach (var corr in corrThreshold)
+            {
+                var xicGroupingEngine = new XicGroupingEngine(0.3f, 0, corr, 15, 10);
+                searchTask.CommonParameters.DIAparameters = new DIAparameters(AnalysisType.ISD, ms1XicConstructor, ms2XicConstructor, xicGroupingEngine, PseudoMs2ConstructionType.Mass, combineFragments: false, writePseudoScans: true);
+                var outputFolder = System.IO.Path.Combine(outputFolderAll, $"corr{corr}");
+                var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(standard_xml, false) }, outputFolder);
+                engine.Run();
+            }
         }
 
         [Test]
