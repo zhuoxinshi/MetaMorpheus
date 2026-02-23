@@ -207,7 +207,7 @@ namespace Test.DIATests
             var fileList1 = Directory.GetFiles(folder, "*.raw").Where(f => patterns.All(p => f.Contains(p))).ToList();
             var outputFolderAll = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen";
 
-            string tomlFile_variableOnly = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_noDIA\xml\Task Settings\Task1-SearchTaskconfig.toml";
+            string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_variableOnly, MetaMorpheusTask.tomlConfig);
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
@@ -235,8 +235,8 @@ namespace Test.DIATests
         [Test]
         public static void DIAsequence()
         {
-            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro\search\Individual File Results";
-            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\4pro_sequenceCov\0906_4pro\search";
+            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.9\search\Individual File Results";
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.9\search\DiaAnalysis";
             var psmFilePaths = Directory.GetFiles(folder, "*_PSMs.psmtsv");
             foreach(var path in psmFilePaths)
             {
@@ -246,6 +246,16 @@ namespace Test.DIATests
                 var outPath = System.IO.Path.Combine(outputFolder, $"{fileName}_seqCov.tsv");
                 ProteoformResultFile.WriteProteoformResults(outPath, filteredPsms);
             }
+        }
+
+        [Test]
+        public static void DIAsequenceCompare()
+        {
+            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.8\search\Individual File Results";
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.8\search\DiaAnalysis";
+            var psmFilePaths = Directory.GetFiles(folder, "*_PSMs.psmtsv");
+            var outPath = System.IO.Path.Combine(outputFolder, $"combinedProteoformResults.tsv");
+            CombinedProteoformFile.WriteCombinedProteoformResults(outPath, psmFilePaths);
         }
 
         [Test]
