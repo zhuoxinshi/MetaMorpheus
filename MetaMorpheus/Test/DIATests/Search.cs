@@ -251,11 +251,16 @@ namespace Test.DIATests
         [Test]
         public static void DIAsequenceCompare()
         {
-            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.8\search\Individual File Results";
-            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.8\search\DiaAnalysis";
+            var dda_3iso = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task1-SearchTask\Individual File Results\09-06-25_DDA_65min_4pro_3iso_PSMs.psmtsv";
+            var dda_1iso = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task1-SearchTask\Individual File Results\09-06-25_DDA_65min_4pro_1-5iso_PSMs.psmtsv";
+            var dda_files = new List<string> { dda_3iso, dda_1iso };
+
+            var folder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.6\search\Individual File Results";
+            var outputFolder = @"E:\ISD Project\Paper\Tentitative\Standard_protein\MM_DIA\0906_4pro_xicGrouping_xml_corrScreen\corr0.6\search\DiaAnalysis";
             var psmFilePaths = Directory.GetFiles(folder, "*_PSMs.psmtsv");
+            var allFiles = psmFilePaths.Concat(dda_files).ToList();
             var outPath = System.IO.Path.Combine(outputFolder, $"combinedProteoformResults.tsv");
-            CombinedProteoformFile.WriteCombinedProteoformResults(outPath, psmFilePaths);
+            CombinedProteoformFile.WriteCombinedProteoformResults(outPath, allFiles);
         }
 
         [Test]
