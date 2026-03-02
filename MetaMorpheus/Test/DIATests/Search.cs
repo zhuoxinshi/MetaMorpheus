@@ -210,7 +210,8 @@ namespace Test.DIATests
             string tomlFile_variableOnly = @"E:\ISD Project\ISD_250906\0906_4pro_DDA_xml\Task Settings\Task1-SearchTaskconfig.toml";
             SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_variableOnly, MetaMorpheusTask.tomlConfig);
             var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
-            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
+            var updated_gptmd_toml = @"E:\ISD Project\Paper\Tentitative\Lysate_quant\0919_YD_rep123\Task Settings\Task1-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(updated_gptmd_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
             //DIA parameters
