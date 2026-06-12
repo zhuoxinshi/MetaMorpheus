@@ -36,6 +36,48 @@ namespace EngineLayer
         public static readonly bool UseWeightedFragmentScore =
             Environment.GetEnvironmentVariable("MM_WEIGHTED_FRAGMENT_SCORE") == "1";
 
+        // ISD ladder-bonus scorer (Route 2, docs 20-21): add a SEQUENCE-COUPLED term to the count score —
+        // the longest run of CONSECUTIVE matched backbone ions (a residue ladder a decoy cannot fake; at
+        // q<=0.01 a run >=4 is 0% of decoys vs 39% of targets). Applied inside the per-scan competition so a
+        // correct long-ladder sequence can WIN scans it loses on raw count. Off by default; MM_LADDER_BONUS=1
+        // turns it on, MM_LADDER_LAMBDA sets the weight (default 3, the safe re-rank optimum).
+        public static readonly bool UseLadderBonus =
+            Environment.GetEnvironmentVariable("MM_LADDER_BONUS") == "1";
+        private static readonly double LadderLambda =
+            double.TryParse(Environment.GetEnvironmentVariable("MM_LADDER_LAMBDA"), out var _lam) ? _lam : 3.0;
+
+        // backbone series whose consecutive FragmentNumbers form a residue ladder (matches the doc-20/21 b/y/c/z analysis)
+        private static readonly HashSet<ProductType> LadderSeries = new HashSet<ProductType>
+        {
+            ProductType.a, ProductType.b, ProductType.c, ProductType.x, ProductType.y, ProductType.zDot, ProductType.zPlusOne
+        };
+
+        /// <summary>Longest run of consecutive matched ions within a single backbone series (the residue tag).</summary>
+        public static int LongestResidueLadder(List<MatchedFragmentIon> matchedFragmentIons)
+        {
+            // group matched fragment numbers by series; only backbone types contribute to a ladder
+            var bySeries = new Dictionary<ProductType, SortedSet<int>>();
+            foreach (var f in matchedFragmentIons)
+            {
+                ProductType pt = f.NeutralTheoreticalProduct.ProductType;
+                if (!LadderSeries.Contains(pt)) continue;
+                if (!bySeries.TryGetValue(pt, out var set)) { set = new SortedSet<int>(); bySeries[pt] = set; }
+                set.Add(f.NeutralTheoreticalProduct.FragmentNumber);
+            }
+            int best = 0;
+            foreach (var set in bySeries.Values)
+            {
+                int run = 0, prev = int.MinValue;
+                foreach (int n in set) // SortedSet enumerates ascending
+                {
+                    run = (n == prev + 1) ? run + 1 : 1;
+                    prev = n;
+                    if (run > best) best = run;
+                }
+            }
+            return best;
+        }
+
         protected MetaMorpheusEngine(CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds)
         {
             CommonParameters = commonParameters;
@@ -105,6 +147,14 @@ namespace EngineLayer
                     }
 
                 }
+            }
+
+            // Route-2 sequence-coupled term: reward a correct candidate's consecutive residue ladder, which a
+            // decoy structurally cannot reproduce (docs 20-21). Additive and non-negative, so it never demotes
+            // an existing match below ScoreCutoff; it lifts long-ladder candidates within the per-scan competition.
+            if (UseLadderBonus)
+            {
+                score += LadderLambda * LongestResidueLadder(matchedFragmentIons);
             }
 
             return score;
