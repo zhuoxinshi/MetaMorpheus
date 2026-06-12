@@ -28,6 +28,14 @@ namespace EngineLayer
         protected readonly List<(string FileName, CommonParameters Parameters)> FileSpecificParameters;
         protected readonly List<string> NestedIds;
 
+        // ISD weighted-PSM-scorer experiment (doc 18): when set, the classic Morpheus score credits each
+        // matched ion by its pre-computed quality/association weight (encoded as the peak intensity in the
+        // pseudo-MS2 MGF) instead of a flat +1. Off by default; flip per process via the env var so the same
+        // binary can A/B weighted-vs-count without a rebuild. The weight is dominated by chromatographic
+        // profile coherence (fragment XIC vs precursor 15 V XIC); a true fragment ~0.85, a chimeric one ~0.
+        public static readonly bool UseWeightedFragmentScore =
+            Environment.GetEnvironmentVariable("MM_WEIGHTED_FRAGMENT_SCORE") == "1";
+
         protected MetaMorpheusEngine(CommonParameters commonParameters, List<(string FileName, CommonParameters Parameters)> fileSpecificParameters, List<string> nestedIds)
         {
             CommonParameters = commonParameters;
@@ -87,10 +95,15 @@ namespace EngineLayer
                         case ProductType.D:
                             break;
                         default:
-                            score += 1 + matchedFragmentIons[i].Intensity / thisScan.TotalIonCurrent;
+                            // weighted: the peak intensity already encodes the per-fragment quality/association
+                            // weight, so credit it directly instead of a flat +1 (suppresses chimera-inflated
+                            // false matches that a count rewards). Otherwise the standard count + intensity tiebreak.
+                            score += UseWeightedFragmentScore
+                                ? matchedFragmentIons[i].Intensity
+                                : 1 + matchedFragmentIons[i].Intensity / thisScan.TotalIonCurrent;
                             break;
                     }
-                    
+
                 }
             }
 
