@@ -103,9 +103,13 @@ namespace Test.DIATests
             var ms1Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon,
                 minMass: precMinMass, minChargeCount: precMinCharge);
             var ms2Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon);
+            // ISD_FRAG_AGG=false -> fragments use mass tracing only (one XIC per charge-locked trace, no
+            // cross-charge aggregation); precursors always use full feature tracing.
+            bool fragAgg = (Environment.GetEnvironmentVariable("ISD_FRAG_AGG") ?? "true").ToLowerInvariant() != "false";
+            ms2Ctor.AggregateCharges = fragAgg;
             var ms1Xics = ms1Ctor.GetAllXics(ms1Scans);
             var ms2Xics = isdMap.Values.SelectMany(v => ms2Ctor.GetAllXics(v.ToArray())).ToList();
-            TestContext.WriteLine($"consensus XICs: {ms1Xics.Count} precursor (>= {precMinMass} Da, >= {precMinCharge} charges), {ms2Xics.Count} fragment");
+            TestContext.WriteLine($"consensus XICs: {ms1Xics.Count} precursor (>= {precMinMass} Da, >= {precMinCharge} charges), {ms2Xics.Count} fragment (chargeAggregation={fragAgg})");
 
             foreach (var corr in corrs)
             {
