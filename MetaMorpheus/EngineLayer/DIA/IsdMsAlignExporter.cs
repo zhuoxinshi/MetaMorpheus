@@ -1,0 +1,112 @@
+using MassSpectrometry;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+
+namespace EngineLayer.DIA
+{
+    /// <summary>
+    /// Writes ISD/DIA pseudo-MS2 scans (produced by <see cref="ISDEngine"/> / <see cref="DIAEngine"/> via
+    /// consensus XIC construction + precursor-fragment grouping) to a TopPIC-compatible ms2.msalign file so
+    /// they can be searched directly in TopPIC as if they were ordinary DDA MS2 spectra.
+    ///
+    /// The pseudo scans are already neutral-mass deconvoluted (each experimental fragment is an
+    /// <see cref="IsotopicEnvelope"/> with a monoisotopic mass and charge), which is exactly what an
+    /// ms2.msalign encodes. A companion ms1.msalign lists each distinct precursor as a single-peak MS1 entry
+    /// so TopPIC has the precursor features it expects.
+    /// </summary>
+    public static class IsdMsAlignExporter
+    {
+        private static readonly CultureInfo Ci = CultureInfo.InvariantCulture;
+
+        /// <summary>
+        /// Write pseudo-MS2 scans to a ms2.msalign file (TopPIC format).
+        /// </summary>
+        /// <param name="pseudoScans">Pseudo-MS2 scans, e.g. from MetaMorpheusTask.GetMs2Scans on an ISD file.</param>
+        /// <param name="filePath">Output path; conventionally ends in _ms2.msalign.</param>
+        /// <param name="activation">Activation label written to each entry (ISD source-region fragmentation ≈ HCD).</param>
+        public static void WriteMs2Align(IEnumerable<Ms2ScanWithSpecificMass> pseudoScans, string filePath,
+            DissociationType activation = DissociationType.HCD)
+        {
+            if (pseudoScans == null) throw new ArgumentNullException(nameof(pseudoScans));
+
+            using var sw = new StreamWriter(filePath, append: false);
+            int id = 0;
+            foreach (var scan in pseudoScans.OrderBy(s => s.OneBasedScanNumber))
+            {
+                id++;
+                int scanNum = scan.OneBasedScanNumber > 0 ? scan.OneBasedScanNumber : id;
+                int ms1Scan = scan.OneBasedPrecursorScanNumber ?? 0;
+
+                sw.WriteLine("BEGIN IONS");
+                sw.WriteLine($"ID={id}");
+                sw.WriteLine("FRACTION_ID=0");
+                sw.WriteLine($"SCANS={scanNum}");
+                // msalign retention time is in seconds; MsDataScan.RetentionTime is in minutes
+                sw.WriteLine($"RETENTION_TIME={(scan.RetentionTime * 60.0).ToString("F2", Ci)}");
+                sw.WriteLine("LEVEL=2");
+                sw.WriteLine($"ACTIVATION={activation.ToString().ToUpperInvariant()}");
+                sw.WriteLine($"MS_ONE_ID={ms1Scan}");
+                sw.WriteLine($"MS_ONE_SCAN={ms1Scan}");
+                sw.WriteLine($"PRECURSOR_MZ={scan.PrecursorMonoisotopicPeakMz.ToString("F6", Ci)}");
+                sw.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
+                sw.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass.ToString("F6", Ci)}");
+                sw.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity.ToString("F2", Ci)}");
+
+                // fragment peaks: monoisotopic-neutral-mass  intensity  charge   (tab separated)
+                foreach (var frag in (scan.ExperimentalFragments ?? Array.Empty<IsotopicEnvelope>())
+                             .OrderBy(f => f.MonoisotopicMass))
+                {
+                    int z = frag.Charge != 0 ? Math.Abs(frag.Charge) : 1;
+                    sw.WriteLine(string.Join("\t",
+                        frag.MonoisotopicMass.ToString("F5", Ci),
+                        frag.TotalIntensity.ToString("F2", Ci),
+                        z.ToString(Ci)));
+                }
+                sw.WriteLine("END IONS");
+                sw.WriteLine();
+            }
+        }
+
+        /// <summary>
+        /// Write a minimal companion ms1.msalign: one MS1 entry per distinct precursor (mass, intensity, charge).
+        /// TopPIC pairs ms1.msalign with ms2.msalign; this provides the precursor features the pseudo scans encode.
+        /// </summary>
+        public static void WriteMs1Align(IEnumerable<Ms2ScanWithSpecificMass> pseudoScans, string filePath)
+        {
+            if (pseudoScans == null) throw new ArgumentNullException(nameof(pseudoScans));
+
+            using var sw = new StreamWriter(filePath, append: false);
+            int id = 0;
+            // one MS1 entry per unique precursor scan number (fall back to per-scan if none)
+            foreach (var grp in pseudoScans
+                         .GroupBy(s => s.OneBasedPrecursorScanNumber ?? s.OneBasedScanNumber)
+                         .OrderBy(g => g.Key))
+            {
+                id++;
+                var rep = grp.First();
+                int scanNum = grp.Key > 0 ? grp.Key : id;
+                sw.WriteLine("BEGIN IONS");
+                sw.WriteLine($"ID={id}");
+                sw.WriteLine("FRACTION_ID=0");
+                sw.WriteLine($"SCANS={scanNum}");
+                sw.WriteLine($"RETENTION_TIME={(rep.RetentionTime * 60.0).ToString("F2", Ci)}");
+                sw.WriteLine("LEVEL=1");
+                foreach (var s in grp
+                             .GroupBy(s => Math.Round(s.PrecursorMass, 2))
+                             .Select(g => g.First()))
+                {
+                    int z = s.PrecursorCharge != 0 ? Math.Abs(s.PrecursorCharge) : 1;
+                    sw.WriteLine(string.Join("\t",
+                        s.PrecursorMass.ToString("F5", Ci),
+                        s.PrecursorIntensity.ToString("F2", Ci),
+                        z.ToString(Ci)));
+                }
+                sw.WriteLine("END IONS");
+                sw.WriteLine();
+            }
+        }
+    }
+}
