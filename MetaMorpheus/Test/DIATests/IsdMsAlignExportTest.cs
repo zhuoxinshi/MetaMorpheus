@@ -14,9 +14,10 @@ namespace Test.DIATests
     public static class IsdMsAlignExportTest
     {
         /// <summary>
-        /// End-to-end: take a real ISD mzML, build pseudo-MS2 scans via the ISD engine
-        /// (consensus XIC construction + apex-RT/Pearson precursor-fragment grouping + pseudo-MS2 generation),
-        /// export them to ms1/ms2.msalign, and confirm the ms2.msalign round-trips through the MsAlign reader
+        /// End-to-end: take a real ISD mzML, build pseudo-MS2 scans using CONSENSUS FEATURE TRACING
+        /// (<see cref="ConsensusMassXicConstructor"/> = mzLib MassTraceBuilder→TraceCorrector→MassFeatureBuilder)
+        /// as the XIC source, combined with apex-RT/Pearson precursor-fragment grouping and pseudo-MS2 generation,
+        /// then export them to ms1/ms2.msalign and confirm the ms2.msalign round-trips through the MsAlign reader
         /// (i.e. it is a valid file TopPIC could consume).
         /// </summary>
         [Test]
@@ -29,10 +30,11 @@ namespace Test.DIATests
             var dataFile = MsDataFileReader.GetDataFile(mzmlPath);
             dataFile.LoadAllStaticData();
 
+            // Consensus feature tracing as the XIC front-end for both the intact (precursor) and fragment channels.
             var diaParams = new DIAparameters(
                 DIAanalysisType.ISD,
-                new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)),
-                new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)),
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)),
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)),
                 new XicGroupingEngine(0.2f, 0.5, 0.5, 1),
                 PseudoMs2ConstructionType.Mass,
                 combineFragments: true);

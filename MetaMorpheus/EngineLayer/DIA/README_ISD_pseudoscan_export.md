@@ -3,14 +3,20 @@
 This branch (`isd-pseudoscan-msalign-export`) contains the code that turns an all-MS1 **ISD** acquisition into
 searchable **pseudo-MS2** scans, plus a static exporter that writes those scans to **TopPIC** `.msalign` files.
 
-## What generates the pseudo scans (already in this branch)
-The ISD pipeline lives in `EngineLayer/DIA/`:
-- **XIC construction** (`XicConstruction/NeutralMassXicConstructor.cs`) — deconvolutes each MS1 scan and builds
-  neutral-mass extracted-ion chromatograms (the "consensus feature tracing" step).
+## What generates the pseudo scans
+The ISD pipeline lives in `EngineLayer/DIA/`, run in three stages:
+- **Consensus feature tracing** (`XicConstruction/ConsensusMassXicConstructor.cs`) — the XIC front-end. It
+  deconvolutes each scan and runs the mzLib **consensus mass tracer** (`MassTraceBuilder → TraceCorrector →
+  MassFeatureBuilder`, the same tracer `deconscan tracefeat` uses) to build cross-charge consensus features,
+  one `ExtractedIonChromatogram` per feature. Use this (not `NeutralMassXicConstructor`) to get consensus tracing.
+  The tracer itself is vendored under `EngineLayer/DIA/Consensus/` — see that folder's README for why.
 - **Precursor–fragment grouping** (`PrecursorFragmentGrouping/XicGroupingEngine.cs`) — groups fragment XICs to a
   precursor XIC by **apex-RT tolerance + RT-overlap + Pearson correlation** of the elution profiles.
 - **Pseudo-MS2 generation** (`ISDEngine.cs`, `PrecursorFragmentGroup.GetPseudoMs2ScanFromPfGroup`) — turns each
   precursor–fragment group into an `Ms2ScanWithSpecificMass` (precursor + neutral-mass fragments).
+
+So the full method Zhuoxin asked for = **consensus feature tracing + precursor-fragment grouping + pseudoMS2**,
+obtained by using `ConsensusMassXicConstructor` as the `Ms1XicConstructor`/`Ms2XicConstructor` in `DIAparameters`.
 
 Source voltage is read from the Thermo scan filter (`sid=<V>`); the lowest voltage is the intact/precursor
 channel, the higher voltages are fragment channels.
@@ -34,8 +40,8 @@ Then, in code (see the worked example in `Test/DIATests/IsdMsAlignExportTest.cs`
 ```csharp
 var dataFile = MsDataFileReader.GetDataFile("your_ISD.mzML"); dataFile.LoadAllStaticData();
 var dia = new DIAparameters(DIAanalysisType.ISD,
-    new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1,20,4,3)),
-    new NeutralMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1,20,4,3)),
+    new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1,20,4,3)),
+    new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1,20,4,3)),
     new XicGroupingEngine(apexRTTolerance: 0.2f, overlapThreshold: 0.5, correlationThreshold: 0.5, maxThreadsForGrouping: 1),
     PseudoMs2ConstructionType.Mass, combineFragments: true);
 var common = new CommonParameters { DIAparameters = dia };
