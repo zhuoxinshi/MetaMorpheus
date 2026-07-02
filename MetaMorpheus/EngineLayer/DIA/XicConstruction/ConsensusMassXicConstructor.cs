@@ -34,12 +34,17 @@ namespace EngineLayer.DIA
         public int MaxGap { get; set; }
         /// <summary>ppm tolerance for stitching per-charge traces into a cross-charge feature.</summary>
         public double FeatureMassPpm { get; set; }
+        /// <summary>Minimum consensus (neutral) mass to keep a feature. Use e.g. 3000 on the precursor
+        /// channel to keep only intact proteoforms and drop small noise; leave 0 on the fragment channel.</summary>
         public double MinMass { get; set; }
+        /// <summary>Minimum number of distinct charge states a feature must be observed at (charge
+        /// multiplicity as a confidence signal). Use e.g. 3 on the precursor channel; 1 on the fragment channel.</summary>
+        public int MinChargeCount { get; set; }
 
         public ConsensusMassXicConstructor(Tolerance peakFindingTolerance, int maxMissedScansAllowed,
             double maxPeakHalfWidth, int minNumberOfPeaks, DeconvolutionParameters deconParameters,
             double traceToleranceDa = 0.02, int maxGap = 1, double featureMassPpm = 15.0, double minMass = 0,
-            XicSpline? xicSpline = null)
+            int minChargeCount = 1, XicSpline? xicSpline = null)
             : base(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks, xicSpline)
         {
             DeconParameters = deconParameters;
@@ -47,6 +52,7 @@ namespace EngineLayer.DIA
             MaxGap = maxGap;
             FeatureMassPpm = featureMassPpm;
             MinMass = minMass;
+            MinChargeCount = minChargeCount;
         }
 
         public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, MzRange isolationRange = null)
@@ -70,6 +76,7 @@ namespace EngineLayer.DIA
                 feature.Finalise();
                 if (feature.MaxTraceLength < MinNumberOfPeaks) continue;
                 if (feature.ConsensusMass < MinMass) continue;
+                if (feature.ChargeCount < MinChargeCount) continue;
 
                 double mass = feature.ConsensusMass;
                 var peaks = new List<IIndexedPeak>();

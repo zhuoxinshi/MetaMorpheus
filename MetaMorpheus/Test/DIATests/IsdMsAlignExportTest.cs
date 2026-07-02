@@ -93,12 +93,18 @@ namespace Test.DIATests
             var isdMap = ISDEngine.ConstructIsdGroups(allScans, out var ms1Scans);
             ISDEngine.ReLabelIsdScans(isdMap, allScans);
 
-            // consensus feature tracing -> XICs, built ONCE and reused across thresholds
-            var ms1Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon);
+            // consensus feature tracing -> XICs, built ONCE and reused across thresholds.
+            // PRECURSOR channel: keep only intact proteoforms (>=3 kDa, >=3 charge states) so small noise
+            // features do not become precursors. FRAGMENT channel: unfiltered (fragments are low mass/charge).
+            double precMinMass = double.Parse(Environment.GetEnvironmentVariable("ISD_PREC_MINMASS") ?? "3000",
+                System.Globalization.CultureInfo.InvariantCulture);
+            int precMinCharge = int.Parse(Environment.GetEnvironmentVariable("ISD_PREC_MINCHARGE") ?? "3");
+            var ms1Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon,
+                minMass: precMinMass, minChargeCount: precMinCharge);
             var ms2Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon);
             var ms1Xics = ms1Ctor.GetAllXics(ms1Scans);
             var ms2Xics = isdMap.Values.SelectMany(v => ms2Ctor.GetAllXics(v.ToArray())).ToList();
-            TestContext.WriteLine($"consensus XICs: {ms1Xics.Count} precursor, {ms2Xics.Count} fragment");
+            TestContext.WriteLine($"consensus XICs: {ms1Xics.Count} precursor (>= {precMinMass} Da, >= {precMinCharge} charges), {ms2Xics.Count} fragment");
 
             foreach (var corr in corrs)
             {
