@@ -4,6 +4,8 @@ using MassSpectrometry;
 using MzLibUtil;
 using NUnit.Framework;
 using Readers;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TaskLayer;
@@ -63,6 +65,57 @@ namespace Test.DIATests
 
             File.Delete(ms2Path);
             File.Delete(ms1Path);
+        }
+
+        /// <summary>
+        /// Environment-driven harness: generate consensus-path pseudo-MS2 MGFs at several precursor-fragment
+        /// correlation thresholds, reusing one consensus-XIC build. Set ISD_MZML (input), ISD_OUTDIR (output),
+        /// and optionally ISD_CORRS (comma list, default "0,0.4,0.6,0.7"). Writes consensus_corr&lt;t&gt;.mgf per
+        /// threshold; each MGF is then searched externally with the top-down td_pseudoMS2 config to count IDs.
+        /// Ignored unless ISD_MZML is set, so it never runs in normal CI.
+        /// </summary>
+        [Test]
+        public static void ConsensusIdSweep_FromEnv()
+        {
+            string mzml = Environment.GetEnvironmentVariable("ISD_MZML");
+            if (string.IsNullOrEmpty(mzml)) { Assert.Ignore("set ISD_MZML to run this harness"); return; }
+            string outDir = Environment.GetEnvironmentVariable("ISD_OUTDIR") ?? TestContext.CurrentContext.TestDirectory;
+            Directory.CreateDirectory(outDir);
+            var corrs = (Environment.GetEnvironmentVariable("ISD_CORRS") ?? "0,0.4,0.6,0.7")
+                .Split(',').Select(s => double.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            float apex = 0.2f;
+            double overlap = 0.5;
+            var decon = new ClassicDeconvolutionParameters(1, 30, 4, 3);
+
+            var dataFile = MsDataFileReader.GetDataFile(mzml);
+            dataFile.LoadAllStaticData();
+            var allScans = dataFile.GetAllScansList().ToArray();
+            var isdMap = ISDEngine.ConstructIsdGroups(allScans, out var ms1Scans);
+            ISDEngine.ReLabelIsdScans(isdMap, allScans);
+
+            // consensus feature tracing -> XICs, built ONCE and reused across thresholds
+            var ms1Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon);
+            var ms2Ctor = new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, decon);
+            var ms1Xics = ms1Ctor.GetAllXics(ms1Scans);
+            var ms2Xics = isdMap.Values.SelectMany(v => ms2Ctor.GetAllXics(v.ToArray())).ToList();
+            TestContext.WriteLine($"consensus XICs: {ms1Xics.Count} precursor, {ms2Xics.Count} fragment");
+
+            foreach (var corr in corrs)
+            {
+                var grouper = new XicGroupingEngine(apex, overlap, corr, Environment.ProcessorCount);
+                var groups = grouper.PrecursorFragmentGrouping(ms1Xics, ms2Xics).ToList();
+                int idx = 0;
+                var scans = new List<Ms2ScanWithSpecificMass>();
+                foreach (var g in groups)
+                {
+                    idx++;
+                    g.PFgroupIndex = idx;
+                    scans.Add(g.GetPseudoMs2ScanFromPfGroup(PseudoMs2ConstructionType.Mass, new CommonParameters(), mzml));
+                }
+                string outMgf = Path.Combine(outDir, $"consensus_corr{corr.ToString(System.Globalization.CultureInfo.InvariantCulture)}.mgf");
+                IsdMsAlignExporter.WriteMgf(scans, outMgf);
+                TestContext.WriteLine($"corr={corr}: {scans.Count} pseudo scans -> {outMgf}");
+            }
         }
     }
 }
