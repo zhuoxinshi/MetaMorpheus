@@ -23,8 +23,7 @@ namespace Test.DIATests
         [Test]
         public static void ExportIsdPseudoScansToMsAlign()
         {
-            string mzmlPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "DIA",
-                "08-12-24_PEPPI_FractionD_orbiMS1_ISD60-80-100_RT8.1-9.23.mzML");
+            string mzmlPath = @"E:\ISD Project\ISD_250906\09-17-25_YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
             Assert.That(File.Exists(mzmlPath), $"missing test fixture: {mzmlPath}");
 
             var dataFile = MsDataFileReader.GetDataFile(mzmlPath);
@@ -33,9 +32,9 @@ namespace Test.DIATests
             // Consensus feature tracing as the XIC front-end for both the intact (precursor) and fragment channels.
             var diaParams = new DIAparameters(
                 DIAanalysisType.ISD,
-                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)),
-                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3)),
-                new XicGroupingEngine(0.2f, 0.5, 0.5, 1),
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), minMass: 4000, xicSpline: new Bspline(2, 150)),
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), xicSpline: new Bspline(2, 150)),
+                new UmpirePfGroupingEngine(150, 0.2f, 0.3, 0.7),
                 PseudoMs2ConstructionType.Mass,
                 combineFragments: true);
             var commonParams = new CommonParameters { DIAparameters = diaParams };

@@ -38,7 +38,7 @@ namespace EngineLayer.DIA
                 var allMs2Xics = new Dictionary<int, List<ExtractedIonChromatogram>>();
                 foreach (var kvp in isdVoltageMap)
                 {
-                    var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXics(kvp.Value.ToArray());
+                    var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(kvp.Value.ToArray());
                     allMs2Xics.Add(kvp.Key, ms2Xics);
                 }
                 allPfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, allMs2Xics.Values.SelectMany(p => p).ToList()).ToList();
@@ -47,7 +47,7 @@ namespace EngineLayer.DIA
             {
                 foreach(var kvp in isdVoltageMap)
                 {
-                    var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXics(kvp.Value.ToArray());
+                    var ms2Xics = DIAparams.Ms2XicConstructor.GetAllXicsWithXicSpline(kvp.Value.ToArray());
                     var pfGroups = DIAparams.PfGroupingEngine.PrecursorFragmentGrouping(allMs1Xics, ms2Xics);
                     allPfGroups.AddRange(pfGroups);
                 }
