@@ -34,12 +34,22 @@ namespace EngineLayer.DIA
         public int MaxGap { get; set; }
         /// <summary>ppm tolerance for stitching per-charge traces into a cross-charge feature.</summary>
         public double FeatureMassPpm { get; set; }
+        /// <summary>Minimum consensus (neutral) mass to keep a feature. Use e.g. 3000 on the precursor
+        /// channel to keep only intact proteoforms and drop small noise; leave 0 on the fragment channel.</summary>
         public double MinMass { get; set; }
+        /// <summary>Minimum number of distinct charge states a feature must be observed at (charge
+        /// multiplicity as a confidence signal). Use e.g. 3 on the precursor channel; 1 on the fragment channel.</summary>
+        public int MinChargeCount { get; set; }
+        /// <summary>If true (default), cross-charge-aggregate corrected traces into <see cref="MassFeature"/>s
+        /// (one XIC per feature). If false, emit one XIC per charge-locked <see cref="CorrectedTrace"/> — i.e.
+        /// mass tracing only, NO charge aggregation. Use false on the fragment channel to keep each fragment
+        /// charge state as its own trace.</summary>
+        public bool AggregateCharges { get; set; } = true;
 
         public ConsensusMassXicConstructor(Tolerance peakFindingTolerance, int maxMissedScansAllowed,
             double maxPeakHalfWidth, int minNumberOfPeaks, DeconvolutionParameters deconParameters,
             double traceToleranceDa = 0.02, int maxGap = 1, double featureMassPpm = 15.0, double minMass = 0,
-            XicSpline? xicSpline = null)
+            int minChargeCount = 1, XicSpline? xicSpline = null)
             : base(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks, xicSpline)
         {
             DeconParameters = deconParameters;
@@ -47,6 +57,7 @@ namespace EngineLayer.DIA
             MaxGap = maxGap;
             FeatureMassPpm = featureMassPpm;
             MinMass = minMass;
+            MinChargeCount = minChargeCount;
         }
 
         public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, MzRange isolationRange = null)
@@ -58,18 +69,44 @@ namespace EngineLayer.DIA
                 perScan[i] = Deconvoluter.Deconvolute(scans[i], DeconParameters).ToList();
             });
 
-            // 2. consensus mass tracing: charge-locked traces -> off-by-one correction -> cross-charge features
+            // 2. consensus mass tracing: charge-locked traces -> off-by-one correction (-> cross-charge features)
             var traces = MassTraceBuilder.BuildTraces(scans, perScan, TraceToleranceDa, MaxGap);
             var corrected = traces.SelectMany(t => TraceCorrector.Correct(t)).ToList();
+
+            var xics = new List<ExtractedIonChromatogram>();
+
+            // 3b. mass tracing only (no charge aggregation): one XIC per charge-locked corrected trace.
+            if (!AggregateCharges)
+            {
+                foreach (var trace in corrected)
+                {
+                    if (trace.Envelopes.Count < MinNumberOfPeaks) continue;
+                    if (trace.ConsensusMass < MinMass) continue;
+                    int z = trace.Charge != 0 ? trace.Charge : 1;
+                    double tmass = trace.ConsensusMass;
+                    var tpeaks = new List<IIndexedPeak>();
+                    foreach (var e in trace.Envelopes)
+                    {
+                        var env = new IsotopicEnvelope(
+                            new List<(double mz, double intensity)> { (tmass.ToMz(z), e.Intensity) },
+                            tmass, z, e.Intensity, 0);
+                        tpeaks.Add(new IndexedMass(env, e.RT, e.ScanIndex, 1));
+                    }
+                    if (tpeaks.Count < MinNumberOfPeaks) continue;
+                    xics.Add(new ExtractedIonChromatogram(tpeaks));
+                }
+                return xics;
+            }
+
             var features = MassFeatureBuilder.BuildFeatures(corrected, FeatureMassPpm);
 
             // 3. each cross-charge MassFeature -> one XIC of per-scan IndexedMass peaks at the consensus mass
-            var xics = new List<ExtractedIonChromatogram>();
             foreach (var feature in features)
             {
                 feature.Finalise();
                 if (feature.MaxTraceLength < MinNumberOfPeaks) continue;
                 if (feature.ConsensusMass < MinMass) continue;
+                if (feature.ChargeCount < MinChargeCount) continue;
 
                 double mass = feature.ConsensusMass;
                 var peaks = new List<IIndexedPeak>();

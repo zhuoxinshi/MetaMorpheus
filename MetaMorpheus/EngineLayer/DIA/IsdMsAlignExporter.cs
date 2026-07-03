@@ -70,6 +70,39 @@ namespace EngineLayer.DIA
             }
         }
 
+        private const double Proton = 1.007276466879;
+
+        /// <summary>
+        /// Write pseudo-MS2 scans to an MGF (one BEGIN IONS block per scan) whose fragment peaks are the
+        /// neutral fragment masses written as singly-charged m/z (mass + proton). This matches a top-down
+        /// search configured with UseProvidedPrecursorInfo + product MaxAssumedChargeState=1 (e.g. the
+        /// project's td_pseudoMS2.toml), so consensus-path pseudo scans can be searched with the exact same
+        /// config as the earlier fd_profile MGFs — an apples-to-apples ID comparison.
+        /// </summary>
+        public static void WriteMgf(IEnumerable<Ms2ScanWithSpecificMass> pseudoScans, string filePath)
+        {
+            if (pseudoScans == null) throw new ArgumentNullException(nameof(pseudoScans));
+            using var sw = new StreamWriter(filePath, append: false);
+            int id = 0;
+            foreach (var scan in pseudoScans.OrderBy(s => s.OneBasedScanNumber))
+            {
+                id++;
+                int z = scan.PrecursorCharge != 0 ? Math.Abs(scan.PrecursorCharge) : 1;
+                sw.WriteLine("BEGIN IONS");
+                sw.WriteLine($"TITLE=isd.consensus.scan{id}");
+                sw.WriteLine($"PEPMASS={scan.PrecursorMonoisotopicPeakMz.ToString("F5", Ci)}");
+                sw.WriteLine($"CHARGE={z}+");
+                sw.WriteLine($"RTINSECONDS={(scan.RetentionTime * 60.0).ToString("F1", Ci)}");
+                sw.WriteLine($"SCANS={id}");
+                foreach (var frag in (scan.ExperimentalFragments ?? Array.Empty<IsotopicEnvelope>())
+                             .OrderBy(f => f.MonoisotopicMass))
+                {
+                    sw.WriteLine($"{(frag.MonoisotopicMass + Proton).ToString("F5", Ci)} {frag.TotalIntensity.ToString("F1", Ci)}");
+                }
+                sw.WriteLine("END IONS");
+            }
+        }
+
         /// <summary>
         /// Write a minimal companion ms1.msalign: one MS1 entry per distinct precursor (mass, intensity, charge).
         /// TopPIC pairs ms1.msalign with ms2.msalign; this provides the precursor features the pseudo scans encode.
