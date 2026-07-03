@@ -24,6 +24,11 @@ Two stages: **(A) generate pseudo-MS2 spectra** (code in this branch), **(B) sea
 The pseudo-MS2 is written as MGF by `IsdMsAlignExporter.WriteMgf` (fragments as neutral-mass+proton). It can
 also be written as TopPIC `.msalign` via `IsdMsAlignExporter.WriteMs2Align`/`WriteMs1Align`.
 
+**ISD and DDA assemble the MS2 scan differently — on purpose.** The PRECURSOR is built the same way in both
+(a consensus-traced MS1 feature → m/z at its charge). The FRAGMENTS differ by necessity: ISD fragments are
+consensus-traced across the all-MS1 voltage cycle (they are spread over multiple scans), while DDA has one real
+isolated MS2 scan per precursor and so deconvolutes that scan directly. Do not unify these.
+
 **B. Search (MetaMorpheus CMD):** a normal top-down `SearchTask` on the MGF (ISD paths) or the real `.mzML`
 (normal DDA), using the tomls in `tomls/`. Both ISD and DDA use **Classic** deconvolution so the comparison is
 fair. IDs are counted from `AllProteoforms.psmtsv` at `QValue <= 0.01`.

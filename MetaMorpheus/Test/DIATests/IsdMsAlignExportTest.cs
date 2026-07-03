@@ -136,6 +136,14 @@ namespace Test.DIATests
         /// from the consensus precursor + the scan's REAL (deconvoluted) fragments. Writes an MGF that is then
         /// searched with the same td_pseudoMS2 config as the ISD path (apples-to-apples ISD-consensus vs
         /// DDA-consensus). Env-driven: DDA_MZML (input), DDA_OUT (output MGF). Ignored unless DDA_MZML is set.
+        ///
+        /// NOTE (intentional design — do not "unify"): ISD and DDA assemble the Ms2ScanWithSpecificMass
+        /// PRECURSOR identically (a consensus-traced MS1 feature -> m/z at its charge), but assemble the
+        /// FRAGMENTS differently, by necessity. ISD fragments are synthesized from consensus-traced
+        /// fragmentation-channel features (they are spread across the all-MS1 voltage cycle, so they must be
+        /// traced across scans). DDA has a single real isolated MS2 scan per precursor -> nothing to trace, so
+        /// its fragments come from deconvoluting that real scan (GetNeutralExperimentalFragments). The two paths
+        /// SHOULD differ on the fragment side.
         /// </summary>
         [Test]
         public static void SearchDdaWithConsensusPrecursors_FromEnv()
