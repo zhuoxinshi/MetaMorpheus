@@ -215,7 +215,7 @@ namespace Test.DIATests
             string outMgf = Environment.GetEnvironmentVariable("DDAFF_OUT")
                 ?? Path.Combine(TestContext.CurrentContext.TestDirectory, "dda_fromfile.mgf");
             string featPath = Path.Combine(Path.GetDirectoryName(outMgf) ?? ".",
-                Path.GetFileNameWithoutExtension(outMgf) + ".ms1.feature"); // reader auto-detects by extension
+                Path.GetFileNameWithoutExtension(outMgf) + "_ms1.feature"); // reader keys on the "_ms1.feature" suffix
             var decon = new ClassicDeconvolutionParameters(1, 60, 4, 3);
             var fragParams = new CommonParameters(productDeconParams: new ClassicDeconvolutionParameters(1, 20, 4, 3));
 
