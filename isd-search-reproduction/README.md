@@ -17,12 +17,22 @@ Two stages: **(A) generate pseudo-MS2 spectra** (code in this branch), **(B) sea
   correlation cutoff. Env knobs: `ISD_MZML`, `ISD_OUTDIR`, `ISD_CORRS` (e.g. `0,0.4,0.6,0.7`),
   `ISD_PREC_MINMASS`/`ISD_PREC_MINCHARGE` (precursor intact filter), `ISD_FRAG_AGG` (`false` = fragment mass
   tracing only, no charge aggregation).
-- `SearchDdaWithConsensusPrecursors_FromEnv` — DDA-with-consensus-precursors path. Consensus-traces the DDA MS1,
-  pairs each real DDA MS2 to its consensus precursor (isolation m/z + RT), keeps the real fragments, writes an
-  MGF. Env knobs: `DDA_MZML`, `DDA_OUT`.
+- `SearchDdaWithConsensusPrecursors_FromEnv` — DDA-with-consensus-precursors path (hand-rolled nearest-feature
+  match). Consensus-traces the DDA MS1, pairs each real DDA MS2 to its consensus precursor (isolation m/z + RT),
+  keeps the real fragments, writes an MGF. Env knobs: `DDA_MZML`, `DDA_OUT`.
+- `SearchDdaWithFromFileConsensusFeatures_FromEnv` — **the consensus-paper DDA method.** Consensus-traces the
+  DDA MS1, writes an external `*_ms1.feature` file, and assembles each MS2's precursor via mzLib's real FromFile
+  join `ms2.GetIsolatedMassesAndCharges(ms1, FromFileDeconvolutionParameters)` (matching features to the
+  isolation window + precursor RT — the same mechanism MetaMorpheus uses), then attaches real fragments -> MGF.
+  Env knobs: `DDAFF_MZML`, `DDAFF_OUT`. (Script `05_dda_fromfile_search.sh`.)
 
 The pseudo-MS2 is written as MGF by `IsdMsAlignExporter.WriteMgf` (fragments as neutral-mass+proton). It can
 also be written as TopPIC `.msalign` via `IsdMsAlignExporter.WriteMs2Align`/`WriteMs1Align`.
+
+**ISD and DDA assemble the MS2 scan differently — on purpose.** The PRECURSOR is built the same way in both
+(a consensus-traced MS1 feature → m/z at its charge). The FRAGMENTS differ by necessity: ISD fragments are
+consensus-traced across the all-MS1 voltage cycle (they are spread over multiple scans), while DDA has one real
+isolated MS2 scan per precursor and so deconvolutes that scan directly. Do not unify these.
 
 **B. Search (MetaMorpheus CMD):** a normal top-down `SearchTask` on the MGF (ISD paths) or the real `.mzML`
 (normal DDA), using the tomls in `tomls/`. Both ISD and DDA use **Classic** deconvolution so the comparison is

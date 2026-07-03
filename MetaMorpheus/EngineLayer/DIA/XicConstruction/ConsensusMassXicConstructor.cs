@@ -60,6 +60,26 @@ namespace EngineLayer.DIA
             MinChargeCount = minChargeCount;
         }
 
+        /// <summary>
+        /// Run the consensus mass tracer over a set of scans and return the cross-charge <see cref="MassFeature"/>s
+        /// (deconvolute → MassTraceBuilder → TraceCorrector → MassFeatureBuilder → Finalise). Exposed so callers
+        /// can emit an external `_ms1.feature` file (e.g. to drive MetaMorpheus's FromFile precursor path).
+        /// </summary>
+        public static List<MassFeature> TraceFeatures(MsDataScan[] scans, DeconvolutionParameters deconParameters,
+            double traceToleranceDa = 0.02, int maxGap = 1, double featureMassPpm = 15.0)
+        {
+            var perScan = new IReadOnlyList<IsotopicEnvelope>[scans.Length];
+            Parallel.For(0, scans.Length, i =>
+            {
+                perScan[i] = Deconvoluter.Deconvolute(scans[i], deconParameters).ToList();
+            });
+            var traces = MassTraceBuilder.BuildTraces(scans, perScan, traceToleranceDa, maxGap);
+            var corrected = traces.SelectMany(t => TraceCorrector.Correct(t)).ToList();
+            var features = MassFeatureBuilder.BuildFeatures(corrected, featureMassPpm);
+            foreach (var f in features) f.Finalise();
+            return features;
+        }
+
         public override List<ExtractedIonChromatogram> GetAllXics(MsDataScan[] scans, MzRange isolationRange = null)
         {
             // 1. deconvolute every scan (parallel; order preserved by index -> aligns 1:1 with scans)

@@ -1,4 +1,5 @@
 using MassSpectrometry;
+using MassSpectrometry.Deconvolution.Consensus;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -71,6 +72,41 @@ namespace EngineLayer.DIA
         }
 
         private const double Proton = 1.007276466879;
+
+        /// <summary>
+        /// Write consensus <see cref="MassFeature"/>s to a TopFD/FlashDeconv-style `.ms1.feature` file that
+        /// mzLib's <c>FromFileDeconvolutionParameters</c> can load — so MetaMorpheus can assemble precursors
+        /// (and thus <c>Ms2ScanWithSpecificMass</c>) from these traced features (the "FromFile" path). Filters
+        /// to intact proteoforms on the precursor side (mass ≥ minMass, ≥ minChargeCount charge states).
+        /// Path MUST end in `.ms1.feature` for the reader's format auto-detection.
+        /// </summary>
+        public static void WriteMs1FeatureFile(IEnumerable<MassFeature> features, string filePath,
+            double minMass = 3000, int minChargeCount = 3)
+        {
+            if (features == null) throw new ArgumentNullException(nameof(features));
+            using var sw = new StreamWriter(filePath, append: false);
+            sw.WriteLine("Feature_ID\tMass\tIntensity\tMin_time\tMax_time\tApex_time\tIntensity_Apex\tMin_charge\tMax_charge");
+            int id = 0;
+            foreach (var f in features)
+            {
+                if (f.ConsensusMass < minMass) continue;
+                if (f.ChargeCount < minChargeCount) continue;
+                id++;
+                int zmin = f.Charges.Min();
+                int zmax = f.Charges.Max();
+                double apex = (f.RTStart + f.RTEnd) / 2.0;
+                sw.WriteLine(string.Join("\t",
+                    id.ToString(Ci),
+                    f.ConsensusMass.ToString("F5", Ci),
+                    f.SummedIntensity.ToString("F1", Ci),
+                    f.RTStart.ToString("F4", Ci),
+                    f.RTEnd.ToString("F4", Ci),
+                    apex.ToString("F4", Ci),
+                    f.SummedIntensity.ToString("F1", Ci),
+                    zmin.ToString(Ci),
+                    zmax.ToString(Ci)));
+            }
+        }
 
         /// <summary>
         /// Write pseudo-MS2 scans to an MGF (one BEGIN IONS block per scan) whose fragment peaks are the

@@ -158,6 +158,14 @@ namespace Test.DIATests
         /// from the consensus precursor + the scan's REAL (deconvoluted) fragments. Writes an MGF that is then
         /// searched with the same td_pseudoMS2 config as the ISD path (apples-to-apples ISD-consensus vs
         /// DDA-consensus). Env-driven: DDA_MZML (input), DDA_OUT (output MGF). Ignored unless DDA_MZML is set.
+        ///
+        /// NOTE (intentional design — do not "unify"): ISD and DDA assemble the Ms2ScanWithSpecificMass
+        /// PRECURSOR identically (a consensus-traced MS1 feature -> m/z at its charge), but assemble the
+        /// FRAGMENTS differently, by necessity. ISD fragments are synthesized from consensus-traced
+        /// fragmentation-channel features (they are spread across the all-MS1 voltage cycle, so they must be
+        /// traced across scans). DDA has a single real isolated MS2 scan per precursor -> nothing to trace, so
+        /// its fragments come from deconvoluting that real scan (GetNeutralExperimentalFragments). The two paths
+        /// SHOULD differ on the fragment side.
         /// </summary>
         [Test]
         public static void SearchDdaWithConsensusPrecursors_FromEnv()
@@ -209,6 +217,61 @@ namespace Test.DIATests
             IsdMsAlignExporter.WriteMgf(ms2WithPrecursors, outMgf);
             TestContext.WriteLine($"DDA consensus: {precursorXics.Count} MS1 features, {ms2Scans.Length} MS2, {assigned} assigned -> {outMgf}");
             Assert.That(assigned, Is.GreaterThan(0), "no MS2 scans matched a consensus precursor feature");
+        }
+
+        /// <summary>
+        /// Search DDA the CONSENSUS-PAPER way: precursor feature tracing + the built-in "FromFile" precursor
+        /// assembly. Consensus-trace the DDA MS1 into features, write them as a `.ms1.feature` file, then use
+        /// mzLib's real <c>FromFileDeconvolutionParameters</c> join — `ms2.GetIsolatedMassesAndCharges(ms1, ff)`
+        /// — to assemble each MS2's precursor exactly as MetaMorpheus's precursor pipeline does (matching
+        /// features to the isolation window + precursor RT), then attach the scan's real fragments. This is the
+        /// mechanism from the consensus-deconvolution paper's ExternalMs1Features / FromFile search, as opposed
+        /// to the hand-rolled nearest-feature matching in SearchDdaWithConsensusPrecursors_FromEnv.
+        /// Env-driven: DDAFF_MZML (input), DDAFF_OUT (output MGF). Ignored unless DDAFF_MZML is set.
+        /// </summary>
+        [Test]
+        public static void SearchDdaWithFromFileConsensusFeatures_FromEnv()
+        {
+            string mzml = Environment.GetEnvironmentVariable("DDAFF_MZML");
+            if (string.IsNullOrEmpty(mzml)) { Assert.Ignore("set DDAFF_MZML to run this harness"); return; }
+            string outMgf = Environment.GetEnvironmentVariable("DDAFF_OUT")
+                ?? Path.Combine(TestContext.CurrentContext.TestDirectory, "dda_fromfile.mgf");
+            string featPath = Path.Combine(Path.GetDirectoryName(outMgf) ?? ".",
+                Path.GetFileNameWithoutExtension(outMgf) + "_ms1.feature"); // reader keys on the "_ms1.feature" suffix
+            var decon = new ClassicDeconvolutionParameters(1, 60, 4, 3);
+            var fragParams = new CommonParameters(productDeconParams: new ClassicDeconvolutionParameters(1, 20, 4, 3));
+
+            var dataFile = MsDataFileReader.GetDataFile(mzml);
+            dataFile.LoadAllStaticData();
+            var allScans = dataFile.GetAllScansList().ToArray();
+            var ms1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
+            var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+
+            // (A) precursor feature tracing (consensus) -> external _ms1.feature file (intact precursors only)
+            var features = ConsensusMassXicConstructor.TraceFeatures(ms1Scans, decon);
+            IsdMsAlignExporter.WriteMs1FeatureFile(features, featPath, minMass: 3000, minChargeCount: 3);
+
+            // (B) assemble Ms2ScanWithSpecificMass via mzLib's FromFile join (the consensus-paper mechanism)
+            var ff = new Readers.FromFileDeconvolutionParameters(featPath, 1, 60);
+            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
+            int assigned = 0;
+            foreach (var ms2 in ms2Scans)
+            {
+                if (!ms2.OneBasedPrecursorScanNumber.HasValue) continue;
+                var ms1 = dataFile.GetOneBasedScan(ms2.OneBasedPrecursorScanNumber.Value);
+                IsotopicEnvelope[] frags = null;
+                foreach (var env in ms2.GetIsolatedMassesAndCharges(ms1, ff))
+                {
+                    frags ??= Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2, fragParams);
+                    assigned++;
+                    double precMz = env.MonoisotopicMass.ToMz(env.Charge);
+                    pseudoScans.Add(new Ms2ScanWithSpecificMass(ms2, precMz, env.Charge, mzml, fragParams, frags,
+                        env.TotalIntensity, env.Peaks.Count));
+                }
+            }
+            IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
+            TestContext.WriteLine($"FromFile consensus: {features.Count} features, {assigned} precursor assignments over {ms2Scans.Length} MS2 -> {outMgf}");
+            Assert.That(assigned, Is.GreaterThan(0), "no MS2 scans got a FromFile precursor");
         }
     }
 }
