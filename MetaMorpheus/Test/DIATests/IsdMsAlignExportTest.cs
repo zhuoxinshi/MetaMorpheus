@@ -67,8 +67,9 @@ namespace Test.DIATests
                 Directory.CreateDirectory(outputFolder);
             }
 
-            string tomlFile_CommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
-            SearchTask searchTask = Toml.ReadFile<SearchTask>(tomlFile_CommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            string tomlDir = @"E:\GitClones\MetaMorpheus\isd-search-reproduction\tomls";
+            var searchTask = Toml.ReadFile<SearchTask>(Path.Combine(tomlDir, "td_pseudoMS2_search.toml"), MetaMorpheusTask.tomlConfig);
+            var gptmdTask = Toml.ReadFile<GptmdTask>(Path.Combine(tomlDir, "gptmd_isd.toml"), MetaMorpheusTask.tomlConfig);
 
             //DIA parameters
             var diaParams = new DIAparameters(
@@ -80,14 +81,10 @@ namespace Test.DIATests
                 combineFragments: true);
             searchTask.CommonParameters = new CommonParameters { DIAparameters = diaParams };
             searchTask.CommonParameters.PrecursorMassTolerance = new PpmTolerance(10);
-
-            var lessGPTMD_toml = @"E:\ISD Project\FB-FD_lessGPTMD\Task Settings\Task3-GPTMDTaskconfig.toml";
-            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
             var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
             string yeast_xml = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
-            string standard_xml = @"E:\ISD Project\ISD_240606\idmapping_2024_06_11.xml";
 
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
             engine.Run();
@@ -186,7 +183,7 @@ namespace Test.DIATests
             var precursorXics = ms1Ctor.GetAllXics(ms1Scans);
 
             // pair each real DDA MS2 scan with the consensus feature matching its isolation m/z + RT
-            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
+            var ms2WithPrecursors = new List<Ms2ScanWithSpecificMass>();
             int assigned = 0;
             foreach (var ms2 in ms2Scans)
             {
@@ -196,7 +193,7 @@ namespace Test.DIATests
                 ExtractedIonChromatogram best = null; double bestErr = double.MaxValue; int bestZ = 1;
                 foreach (var xic in precursorXics)
                 {
-                    if (rt < xic.StartRT - 0.5 || rt > xic.EndRT + 0.5) continue;
+                    if (rt < xic.StartRT || rt > xic.EndRT) continue;
                     double mass = xic.ApexPeak.M;
                     int z = (int)Math.Round(mass / (isoMz - proton)); // charge that places this mass at the iso m/z
                     if (z < 1 || z > 60) continue;
@@ -207,9 +204,9 @@ namespace Test.DIATests
                 assigned++;
                 double precMz = ((double)best.ApexPeak.M).ToMz(bestZ);
                 var frags = Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2, fragParams);
-                pseudoScans.Add(new Ms2ScanWithSpecificMass(ms2, precMz, bestZ, mzml, fragParams, frags));
+                ms2WithPrecursors.Add(new Ms2ScanWithSpecificMass(ms2, precMz, bestZ, mzml, fragParams, frags));
             }
-            IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
+            IsdMsAlignExporter.WriteMgf(ms2WithPrecursors, outMgf);
             TestContext.WriteLine($"DDA consensus: {precursorXics.Count} MS1 features, {ms2Scans.Length} MS2, {assigned} assigned -> {outMgf}");
             Assert.That(assigned, Is.GreaterThan(0), "no MS2 scans matched a consensus precursor feature");
         }
