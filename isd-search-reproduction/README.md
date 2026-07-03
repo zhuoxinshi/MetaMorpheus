@@ -25,6 +25,11 @@ Two stages: **(A) generate pseudo-MS2 spectra** (code in this branch), **(B) sea
   join `ms2.GetIsolatedMassesAndCharges(ms1, FromFileDeconvolutionParameters)` (matching features to the
   isolation window + precursor RT — the same mechanism MetaMorpheus uses), then attaches real fragments -> MGF.
   Env knobs: `DDAFF_MZML`, `DDAFF_OUT`. (Script `05_dda_fromfile_search.sh`.)
+- `SearchDdaWithFromFileConsensusFeatures_Complete_FromEnv` — **fully self-contained**: does the above AND runs a
+  real top-down `SearchTask` (config built in C#, no external toml/CMD) against a supplied protein DB, then
+  reports proteoform + PSM counts at 1% FDR and writes the normal MetaMorpheus output (`AllProteoforms.psmtsv`,
+  `AllPSMs.psmtsv`, `results.txt`). Env knobs: `DDAFF_MZML`, `DDAFF_DB`, `DDAFF_OUT`. Run directly with:
+  `DDAFF_MZML=... DDAFF_DB=... DDAFF_OUT=... dotnet test Test.csproj --filter FullyQualifiedName~SearchDdaWithFromFileConsensusFeatures_Complete_FromEnv`
 
 The pseudo-MS2 is written as MGF by `IsdMsAlignExporter.WriteMgf` (fragments as neutral-mass+proton). It can
 also be written as TopPIC `.msalign` via `IsdMsAlignExporter.WriteMs2Align`/`WriteMs1Align`.
