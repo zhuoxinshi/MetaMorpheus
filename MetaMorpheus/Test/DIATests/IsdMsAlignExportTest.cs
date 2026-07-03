@@ -6,12 +6,14 @@ using MassSpectrometry;
 using MzLibUtil;
 using Nett;
 using NUnit.Framework;
+using Proteomics.ProteolyticDigestion;
 using Readers;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TaskLayer;
+using UsefulProteomicsDatabases;
 
 namespace Test.DIATests
 {
@@ -204,6 +206,104 @@ namespace Test.DIATests
             IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
             TestContext.WriteLine($"FromFile consensus: {features.Count} features, {assigned} precursor assignments over {ms2Scans.Length} MS2 -> {outMgf}");
             Assert.That(assigned, Is.GreaterThan(0), "no MS2 scans got a FromFile precursor");
+        }
+
+        /// <summary>
+        /// COMPLETE, self-contained DDA search via the consensus-paper method — no external toml or CMD needed.
+        /// Does the whole pipeline in-process: consensus-trace the DDA MS1 → write a `_ms1.feature` → assemble
+        /// each MS2's precursor with mzLib's FromFile join → write an MGF → run a real MetaMorpheus top-down
+        /// <see cref="SearchTask"/> (config built in code below) against a protein database → report proteoform
+        /// and PSM counts at 1% FDR, exactly like a normal MetaMorpheus search.
+        /// Env-driven: DDAFF_MZML (DDA input), DDAFF_DB (protein .xml/.fasta), DDAFF_OUT (output dir, optional).
+        /// Ignored unless both DDAFF_MZML and DDAFF_DB are set.
+        /// </summary>
+        [Test]
+        public static void SearchDdaWithFromFileConsensusFeatures_Complete_FromEnv()
+        {
+            string mzml = Environment.GetEnvironmentVariable("DDAFF_MZML");
+            string db = Environment.GetEnvironmentVariable("DDAFF_DB");
+            if (string.IsNullOrEmpty(mzml) || string.IsNullOrEmpty(db))
+            { Assert.Ignore("set DDAFF_MZML and DDAFF_DB to run the complete in-process search"); return; }
+            string outDir = Environment.GetEnvironmentVariable("DDAFF_OUT")
+                ?? Path.Combine(TestContext.CurrentContext.TestDirectory, "DdaFromFileSearch");
+            Directory.CreateDirectory(outDir);
+            string outMgf = Path.Combine(outDir, "dda_fromfile.mgf");
+            string featPath = Path.Combine(outDir, "dda_fromfile_ms1.feature");
+
+            // ---- (1) precursor feature tracing + FromFile assembly -> MGF ----
+            var decon = new ClassicDeconvolutionParameters(1, 60, 4, 3);
+            var fragParams = new CommonParameters(productDeconParams: new ClassicDeconvolutionParameters(1, 20, 4, 3));
+            var dataFile = MsDataFileReader.GetDataFile(mzml);
+            dataFile.LoadAllStaticData();
+            var allScans = dataFile.GetAllScansList().ToArray();
+            var ms1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
+            var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            var features = ConsensusMassXicConstructor.TraceFeatures(ms1Scans, decon);
+            IsdMsAlignExporter.WriteMs1FeatureFile(features, featPath, minMass: 3000, minChargeCount: 3);
+            var ff = new FromFileDeconvolutionParameters(featPath, 1, 60);
+            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
+            foreach (var ms2 in ms2Scans)
+            {
+                if (!ms2.OneBasedPrecursorScanNumber.HasValue) continue;
+                var ms1 = dataFile.GetOneBasedScan(ms2.OneBasedPrecursorScanNumber.Value);
+                IsotopicEnvelope[] frags = null;
+                foreach (var env in ms2.GetIsolatedMassesAndCharges(ms1, ff))
+                {
+                    frags ??= Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2, fragParams);
+                    pseudoScans.Add(new Ms2ScanWithSpecificMass(ms2, env.MonoisotopicMass.ToMz(env.Charge),
+                        env.Charge, mzml, fragParams, frags, env.TotalIntensity, env.Peaks.Count));
+                }
+            }
+            IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
+
+            // ---- (2) a complete top-down MetaMorpheus search (config in code — the "toml" as C#) ----
+            var searchTask = new SearchTask
+            {
+                CommonParameters = new CommonParameters(
+                    digestionParams: new DigestionParams(protease: "top-down"),
+                    doPrecursorDeconvolution: false,      // precursor is provided in the MGF (FromFile assembly)
+                    useProvidedPrecursorInfo: true,
+                    deconvolutionMaxAssumedChargeState: 60,
+                    productMassTolerance: new PpmTolerance(20),
+                    productDeconParams: new ClassicDeconvolutionParameters(1, 1, 4, 3)), // MGF fragments are neutral (z=1)
+                SearchParameters = new SearchParameters
+                {
+                    SearchType = SearchType.Classic,
+                    MassDiffAcceptorType = MassDiffAcceptorType.PlusOrMinusThreeMM,
+                    DecoyType = DecoyType.Reverse,
+                    DoLabelFreeQuantification = false,
+                    WriteMzId = false,
+                }
+            };
+            searchTask.RunTask(outDir, new List<DbForTask> { new DbForTask(db, false) },
+                new List<string> { outMgf }, "DdaFromFileConsensusSearch");
+
+            // ---- (3) report proteoform + PSM counts at 1% FDR, like a normal MetaMorpheus search ----
+            int proteoforms = CountAtFdr(Directory.GetFiles(outDir, "AllProteoforms.psmtsv", SearchOption.AllDirectories).FirstOrDefault());
+            int psms = CountAtFdr(Directory.GetFiles(outDir, "AllPSMs.psmtsv", SearchOption.AllDirectories).FirstOrDefault());
+            TestContext.WriteLine($"COMPLETE DDA FromFile-consensus search: {pseudoScans.Count} pseudo-MS2 | " +
+                                  $"{proteoforms} proteoforms, {psms} PSMs at 1% FDR | features={features.Count}");
+            Assert.That(proteoforms, Is.GreaterThanOrEqualTo(0));
+        }
+
+        /// <summary>Count rows at QValue &lt;= q that are Target/None (not Decoy/Contaminant) in a MetaMorpheus psmtsv.</summary>
+        private static int CountAtFdr(string psmtsv, double q = 0.01)
+        {
+            if (psmtsv == null || !File.Exists(psmtsv)) return -1;
+            var lines = File.ReadAllLines(psmtsv);
+            if (lines.Length < 2) return 0;
+            var header = lines[0].Split('\t');
+            int qi = Array.IndexOf(header, "QValue");
+            int ti = Array.IndexOf(header, "Decoy/Contaminant/Target");
+            int c = 0;
+            for (int i = 1; i < lines.Length; i++)
+            {
+                var f = lines[i].Split('\t');
+                if (qi >= 0 && qi < f.Length && double.TryParse(f[qi], out var qv) && qv <= q &&
+                    (ti < 0 || ti >= f.Length || f[ti] == "T" || f[ti] == "N"))
+                    c++;
+            }
+            return c;
         }
     }
 }
