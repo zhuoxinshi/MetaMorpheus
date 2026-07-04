@@ -49,7 +49,7 @@ namespace EngineLayer.DIA
         public ConsensusMassXicConstructor(Tolerance peakFindingTolerance, int maxMissedScansAllowed,
             double maxPeakHalfWidth, int minNumberOfPeaks, DeconvolutionParameters deconParameters,
             double traceToleranceDa = 0.02, int maxGap = 1, double featureMassPpm = 15.0, double minMass = 0,
-            int minChargeCount = 1, XicSpline? xicSpline = null)
+            int minChargeCount = 1, bool aggregateCharges = true, XicSpline? xicSpline = null)
             : base(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks, xicSpline)
         {
             DeconParameters = deconParameters;
@@ -58,6 +58,7 @@ namespace EngineLayer.DIA
             FeatureMassPpm = featureMassPpm;
             MinMass = minMass;
             MinChargeCount = minChargeCount;
+            AggregateCharges = aggregateCharges;
         }
 
         /// <summary>

@@ -69,8 +69,8 @@ namespace Test.DIATests
                 Directory.CreateDirectory(outputFolder);
             }
 
-            string tomlDir = @"E:\GitClones\MetaMorpheus\isd-search-reproduction\tomls";
-            var searchTask = Toml.ReadFile<SearchTask>(Path.Combine(tomlDir, "td_pseudoMS2_search.toml"), MetaMorpheusTask.tomlConfig);
+            string tomlDir = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
+            var searchTask = Toml.ReadFile<SearchTask>(tomlDir, MetaMorpheusTask.tomlConfig);
             var gptmdTask = Toml.ReadFile<GptmdTask>(Path.Combine(tomlDir, "gptmd_isd.toml"), MetaMorpheusTask.tomlConfig);
 
             //DIA parameters
@@ -91,6 +91,7 @@ namespace Test.DIATests
             var engine = new EverythingRunnerEngine(taskList, fileList1, new List<DbForTask> { new DbForTask(yeast_xml, false) }, outputFolder);
             engine.Run();
         }
+
 
         /// <summary>
         /// Environment-driven harness: generate consensus-path pseudo-MS2 MGFs at several precursor-fragment
@@ -153,59 +154,32 @@ namespace Test.DIATests
             }
         }
 
-        /// <summary>
-        /// Search DDA the CONSENSUS-PAPER way: precursor feature tracing + the built-in "FromFile" precursor
-        /// assembly. Consensus-trace the DDA MS1 into features, write them as a `.ms1.feature` file, then use
-        /// mzLib's real <c>FromFileDeconvolutionParameters</c> join — `ms2.GetIsolatedMassesAndCharges(ms1, ff)`
-        /// — to assemble each MS2's precursor exactly as MetaMorpheus's precursor pipeline does (matching
-        /// features to the isolation window + precursor RT), then attach the scan's real fragments. This is the
-        /// mechanism from the consensus-deconvolution paper's ExternalMs1Features / FromFile search, as opposed
-        /// to the hand-rolled nearest-feature matching in SearchDdaWithConsensusPrecursors_FromEnv.
-        /// Env-driven: DDAFF_MZML (input), DDAFF_OUT (output MGF). Ignored unless DDAFF_MZML is set.
-        /// </summary>
         [Test]
-        public static void SearchDdaWithFromFileConsensusFeatures_FromEnv()
+        public static void SearchISDConsensus()
         {
-            string mzml = Environment.GetEnvironmentVariable("DDAFF_MZML");
-            if (string.IsNullOrEmpty(mzml)) { Assert.Ignore("set DDAFF_MZML to run this harness"); return; }
-            string outMgf = Environment.GetEnvironmentVariable("DDAFF_OUT")
-                ?? Path.Combine(TestContext.CurrentContext.TestDirectory, "dda_fromfile.mgf");
-            string featPath = Path.Combine(Path.GetDirectoryName(outMgf) ?? ".",
-                Path.GetFileNameWithoutExtension(outMgf) + "_ms1.feature"); // reader keys on the "_ms1.feature" suffix
-            var decon = new ClassicDeconvolutionParameters(1, 60, 4, 3);
-            var fragParams = new CommonParameters(productDeconParams: new ClassicDeconvolutionParameters(1, 20, 4, 3));
+            var path1 = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
+            string dbPath = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            string outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YB\Consensus_MM\rep1_2";
+            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
 
-            var dataFile = MsDataFileReader.GetDataFile(mzml);
-            dataFile.LoadAllStaticData();
-            var allScans = dataFile.GetAllScansList().ToArray();
-            var ms1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
-            var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
+            string searchTomlCommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
+            var searchTask = Toml.ReadFile<SearchTask>(searchTomlCommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            var lessGPTMD_noFilter_toml = @"E:\ISD Project\ISD_250428\new_topDown_lessGPTMD_noFilter_toml\Task Settings\Task1-GPTMDTaskconfig.toml";
+            var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_noFilter_toml, MetaMorpheusTask.tomlConfig);
 
-            // (A) precursor feature tracing (consensus) -> external _ms1.feature file (intact precursors only)
-            var features = ConsensusMassXicConstructor.TraceFeatures(ms1Scans, decon);
-            IsdMsAlignExporter.WriteMs1FeatureFile(features, featPath, minMass: 3000, minChargeCount: 3);
+            //Figure out the correct traceToleranceDa, default is 0.02 Da, should use something similar from consensus paper
+            var diaParams = new DIAparameters(
+                DIAanalysisType.ISD,
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, xicSpline: new Bspline(2, 150)),
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), aggregateCharges: false, xicSpline: new Bspline(2, 150)),
+                new UmpirePfGroupingEngine(150, 0.2f, 0.3, 0.7, maxThreadsForGrouping: 10),
+                PseudoMs2ConstructionType.Mass,
+                combineFragments: true);
+            searchTask.CommonParameters.DIAparameters = diaParams;
 
-            // (B) assemble Ms2ScanWithSpecificMass via mzLib's FromFile join (the consensus-paper mechanism)
-            var ff = new Readers.FromFileDeconvolutionParameters(featPath, 1, 60);
-            var pseudoScans = new List<Ms2ScanWithSpecificMass>();
-            int assigned = 0;
-            foreach (var ms2 in ms2Scans)
-            {
-                if (!ms2.OneBasedPrecursorScanNumber.HasValue) continue;
-                var ms1 = dataFile.GetOneBasedScan(ms2.OneBasedPrecursorScanNumber.Value);
-                IsotopicEnvelope[] frags = null;
-                foreach (var env in ms2.GetIsolatedMassesAndCharges(ms1, ff))
-                {
-                    frags ??= Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2, fragParams);
-                    assigned++;
-                    double precMz = env.MonoisotopicMass.ToMz(env.Charge);
-                    pseudoScans.Add(new Ms2ScanWithSpecificMass(ms2, precMz, env.Charge, mzml, fragParams, frags,
-                        env.TotalIntensity, env.Peaks.Count));
-                }
-            }
-            IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
-            TestContext.WriteLine($"FromFile consensus: {features.Count} features, {assigned} precursor assignments over {ms2Scans.Length} MS2 -> {outMgf}");
-            Assert.That(assigned, Is.GreaterThan(0), "no MS2 scans got a FromFile precursor");
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
+            var engine = new EverythingRunnerEngine(taskList, new List<string> { path1 }, new List<DbForTask> { new DbForTask(dbPath, false) }, outDir);
+            engine.Run();
         }
 
         /// <summary>
@@ -220,26 +194,23 @@ namespace Test.DIATests
         [Test]
         public static void SearchDdaWithFromFileConsensusFeatures_Complete_FromEnv()
         {
-            string mzml = Environment.GetEnvironmentVariable("DDAFF_MZML");
-            string db = Environment.GetEnvironmentVariable("DDAFF_DB");
-            if (string.IsNullOrEmpty(mzml) || string.IsNullOrEmpty(db))
-            { Assert.Ignore("set DDAFF_MZML and DDAFF_DB to run the complete in-process search"); return; }
-            string outDir = Environment.GetEnvironmentVariable("DDAFF_OUT")
-                ?? Path.Combine(TestContext.CurrentContext.TestDirectory, "DdaFromFileSearch");
-            Directory.CreateDirectory(outDir);
+            string filePath = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep1.raw";
+            string dbPath = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
+            string outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YB\DDA\Consensus";
+            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
             string outMgf = Path.Combine(outDir, "dda_fromfile.mgf");
             string featPath = Path.Combine(outDir, "dda_fromfile_ms1.feature");
-
+            
             // ---- (1) precursor feature tracing + FromFile assembly -> MGF ----
             var decon = new ClassicDeconvolutionParameters(1, 60, 4, 3);
             var fragParams = new CommonParameters(productDeconParams: new ClassicDeconvolutionParameters(1, 20, 4, 3));
-            var dataFile = MsDataFileReader.GetDataFile(mzml);
+            var dataFile = MsDataFileReader.GetDataFile(filePath);
             dataFile.LoadAllStaticData();
             var allScans = dataFile.GetAllScansList().ToArray();
             var ms1Scans = allScans.Where(s => s.MsnOrder == 1).ToArray();
             var ms2Scans = allScans.Where(s => s.MsnOrder == 2).ToArray();
             var features = ConsensusMassXicConstructor.TraceFeatures(ms1Scans, decon);
-            IsdMsAlignExporter.WriteMs1FeatureFile(features, featPath, minMass: 3000, minChargeCount: 3);
+            //IsdMsAlignExporter.WriteMs1FeatureFile(features, featPath, minMass: 3000, minChargeCount: 3);
             var ff = new FromFileDeconvolutionParameters(featPath, 1, 60);
             var pseudoScans = new List<Ms2ScanWithSpecificMass>();
             foreach (var ms2 in ms2Scans)
@@ -251,12 +222,17 @@ namespace Test.DIATests
                 {
                     frags ??= Ms2ScanWithSpecificMass.GetNeutralExperimentalFragments(ms2, fragParams);
                     pseudoScans.Add(new Ms2ScanWithSpecificMass(ms2, env.MonoisotopicMass.ToMz(env.Charge),
-                        env.Charge, mzml, fragParams, frags, env.TotalIntensity, env.Peaks.Count));
+                        env.Charge, filePath, fragParams, frags, env.TotalIntensity, env.Peaks.Count));
                 }
             }
-            IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
+            //IsdMsAlignExporter.WriteMgf(pseudoScans, outMgf);
 
             // ---- (2) a complete top-down MetaMorpheus search (config in code — the "toml" as C#) ----
+            //string searchTomlCommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
+            //var searchTask = Toml.ReadFile<SearchTask>(searchTomlCommonFixedVariable, MetaMorpheusTask.tomlConfig);
+            //searchTask.CommonParameters.DoPrecursorDeconvolution = false; // already deconvoluted via FromFile
+            //searchTask.CommonParameters.ProductDeconvolutionParameters =  new ClassicDeconvolutionParameters(1, 1, 4, 3);
+
             var searchTask = new SearchTask
             {
                 CommonParameters = new CommonParameters(
@@ -265,7 +241,11 @@ namespace Test.DIATests
                     useProvidedPrecursorInfo: true,
                     deconvolutionMaxAssumedChargeState: 60,
                     productMassTolerance: new PpmTolerance(20),
-                    productDeconParams: new ClassicDeconvolutionParameters(1, 1, 4, 3)), // MGF fragments are neutral (z=1)
+                productDeconParams: new ClassicDeconvolutionParameters(1, 1, 4, 3), // MGF fragments are neutral (z=1)
+                    // pseudo-MS2 peaks are all real deconvoluted fragments -> do NOT trim them
+                    // (matches td_pseudoMS2.toml; CommonParameters defaults trimMsMsPeaks=true otherwise)
+                    trimMs1Peaks: false,
+                    trimMsMsPeaks: false),
                 SearchParameters = new SearchParameters
                 {
                     SearchType = SearchType.Classic,
@@ -275,35 +255,10 @@ namespace Test.DIATests
                     WriteMzId = false,
                 }
             };
-            searchTask.RunTask(outDir, new List<DbForTask> { new DbForTask(db, false) },
-                new List<string> { outMgf }, "DdaFromFileConsensusSearch");
 
-            // ---- (3) report proteoform + PSM counts at 1% FDR, like a normal MetaMorpheus search ----
-            int proteoforms = CountAtFdr(Directory.GetFiles(outDir, "AllProteoforms.psmtsv", SearchOption.AllDirectories).FirstOrDefault());
-            int psms = CountAtFdr(Directory.GetFiles(outDir, "AllPSMs.psmtsv", SearchOption.AllDirectories).FirstOrDefault());
-            TestContext.WriteLine($"COMPLETE DDA FromFile-consensus search: {pseudoScans.Count} pseudo-MS2 | " +
-                                  $"{proteoforms} proteoforms, {psms} PSMs at 1% FDR | features={features.Count}");
-            Assert.That(proteoforms, Is.GreaterThanOrEqualTo(0));
-        }
-
-        /// <summary>Count rows at QValue &lt;= q that are Target/None (not Decoy/Contaminant) in a MetaMorpheus psmtsv.</summary>
-        private static int CountAtFdr(string psmtsv, double q = 0.01)
-        {
-            if (psmtsv == null || !File.Exists(psmtsv)) return -1;
-            var lines = File.ReadAllLines(psmtsv);
-            if (lines.Length < 2) return 0;
-            var header = lines[0].Split('\t');
-            int qi = Array.IndexOf(header, "QValue");
-            int ti = Array.IndexOf(header, "Decoy/Contaminant/Target");
-            int c = 0;
-            for (int i = 1; i < lines.Length; i++)
-            {
-                var f = lines[i].Split('\t');
-                if (qi >= 0 && qi < f.Length && double.TryParse(f[qi], out var qv) && qv <= q &&
-                    (ti < 0 || ti >= f.Length || f[ti] == "T" || f[ti] == "N"))
-                    c++;
-            }
-            return c;
+        var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
+            var engine = new EverythingRunnerEngine(taskList, new List<string> { outMgf }, new List<DbForTask> { new DbForTask(dbPath, false) }, outDir);
+            engine.Run();
         }
     }
 }
