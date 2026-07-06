@@ -193,7 +193,7 @@ namespace EngineLayer
         public bool TrimMs1Peaks { get; private set; }
         public bool TrimMsMsPeaks { get; private set; }
         public List<ProductType> CustomIons { get; private set; }
-        public bool AssumeOrphanPeaksAreZ1Fragments { get; private set; }
+        public bool AssumeOrphanPeaksAreZ1Fragments { get;  set; } //changed for testing
         public int MaxHeterozygousVariants { get; private set; }
         public int MinVariantDepth { get; private set; }
         public bool AddTruncations { get; private set; }
