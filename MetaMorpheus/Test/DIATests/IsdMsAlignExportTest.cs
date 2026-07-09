@@ -32,7 +32,8 @@ namespace Test.DIATests
         public static void ExportIsdPseudoScans()
         {
             string mzmlPath = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1.raw";
-            var dataFile = MsDataFileReader.GetDataFile(mzmlPath);
+            var fullWindow = @"E:\ISD Project\ISD_241124\11-23-24_PEPPI-YD_ISD60-80-100_60k_micro1.raw";
+            var dataFile = MsDataFileReader.GetDataFile(fullWindow);
             dataFile.LoadAllStaticData();
 
             // Consensus feature tracing as the XIC front-end for both the intact (precursor) and fragment channels.
@@ -41,15 +42,15 @@ namespace Test.DIATests
                 new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), traceToleranceDa: 1.5, minMass: 4000, xicSpline: new XicCubicSpline(0.2, 1, 1, true)),
                 new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), traceToleranceDa: 1.5, aggregateCharges: false, xicSpline: new XicCubicSpline(0.2, 1, 1, true)),
                 //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
-                new XicGroupingEngine(0.3f, 0, -1, maxThreadsForGrouping: 10),
+                new XicGroupingEngine(0.3f, 0, 0, maxThreadsForGrouping: 10),
                 PseudoMs2ConstructionType.Mass,
                 combineFragments: true);
             var commonParams = new CommonParameters { DIAparameters = diaParams };
 
-            var pseudoScans = MetaMorpheusTask.GetMs2Scans(dataFile, mzmlPath, commonParams).ToArray();
-            var outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YB\Consensus_MM\rep1_xicGrouping_noCorr";
+            var pseudoScans = MetaMorpheusTask.GetMs2Scans(dataFile, dataFile.FilePath, commonParams).ToArray();
+            var outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\fullWindow\Consensus_MM\rep1_xicGrouping_0_outsideFilter+2";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
-            var pseudoScansFileName = Path.GetFileNameWithoutExtension(mzmlPath) + "_pseudo_ms2.msalign";
+            var pseudoScansFileName = Path.GetFileNameWithoutExtension(dataFile.FilePath) + "_pseudo_ms2.msalign";
 
             var msAlignOutPath = Path.Combine(outDir, pseudoScansFileName);
             ISDEngine.WriteMsAlignFile(msAlignOutPath, pseudoScans);
@@ -61,23 +62,25 @@ namespace Test.DIATests
         [Test]
         public static void SearchMgf()
         {
-            string filePath = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YB\Consensus_MM\rep1_xicGrouping_noCorr\05-04-25_PEPPI-YB_81min_ISD60-80-100_preFilter700-900-1100_rep1_pseudo_ms2.mgf";
+            string filePath = @"E:\ISD Project\Paper\Tentitative\Lysate_id\fullWindow\Consensus_MM\rep1_xicGrouping_0_outsideFilter+2\11-23-24_PEPPI-YD_ISD60-80-100_60k_micro1_pseudo_ms2.msalign";
             string dbPath = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
-            string outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YB\Consensus_MM\rep1_xicGrouping_noCorr";
+            string outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\fullWindow\Consensus_MM\rep1_xicGrouping_0_outsideFilter+2";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
 
             string searchTomlCommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
+            var searchTomlOpen = @"E:\ISD Project\ISD_250428\new_topDown_openSearch_toml\Task Settings\Task1-SearchTaskconfig.toml";
             var searchTask = Toml.ReadFile<SearchTask>(searchTomlCommonFixedVariable, MetaMorpheusTask.tomlConfig);
             searchTask.CommonParameters.DoPrecursorDeconvolution = false; // already deconvoluted via FromFile
             searchTask.CommonParameters.UseProvidedPrecursorInfo = true; // FromFile assembly provides the precursor info
             searchTask.CommonParameters.ProductDeconvolutionParameters = new ClassicDeconvolutionParameters(1, 1, 4, 3);
             searchTask.CommonParameters.AssumeOrphanPeaksAreZ1Fragments = true;
+            searchTask.SearchParameters.MinAllowedInternalFragmentLength = 0;
 
             var lessGPTMD_noFilter_toml = @"E:\ISD Project\ISD_250428\new_topDown_lessGPTMD_noFilter_toml\Task Settings\Task1-GPTMDTaskconfig.toml";
             var gptmdTask = Toml.ReadFile<GptmdTask>(lessGPTMD_noFilter_toml, MetaMorpheusTask.tomlConfig);
             gptmdTask.CommonParameters = searchTask.CommonParameters;
 
-            var taskList = new List<(string, MetaMorpheusTask)> { ("search1", searchTask), ("GPTMD", gptmdTask), ("search2", searchTask) }; //("GPTMD", gptmdTask)
+            var taskList = new List<(string, MetaMorpheusTask)> { ("search_YD", searchTask) }; //("GPTMD", gptmdTask)
             var engine = new EverythingRunnerEngine(taskList, new List<string> { filePath }, new List<DbForTask> { new DbForTask(dbPath, false) }, outDir);
             engine.Run();
         }
@@ -157,9 +160,9 @@ namespace Test.DIATests
         [Test]
         public static void SearchDdaWithFromFileConsensusFeatures_Complete_FromEnv()
         {
-            string filePath = @"E:\ISD Project\ISD_250428\05-04-25_PEPPI-YB_81min_DDA_rep1.raw";
+            string filePath = @"E:\ISD Project\ISD_250906\09-10-25_YD_81min_DDA_1-5iso_mscan1_rep1.raw";
             string dbPath = @"E:\ISD Project\uniprotkb_taxonomy_id_559292_AND_review_2024_08_16.xml";
-            string outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YB\DDA\Consensus\orphanPeaks";
+            string outDir = @"E:\ISD Project\Paper\Tentitative\Lysate_id\YD\DDA\Consensus";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
             string outMgf = Path.Combine(outDir, "dda_fromfile.mgf");
             string featPath = Path.Combine(outDir, "dda_fromfile_ms1.feature");
