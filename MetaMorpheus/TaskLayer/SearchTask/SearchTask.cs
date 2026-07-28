@@ -92,6 +92,10 @@ namespace TaskLayer
             FileSpecificParameters[] fileSettingsList)
         {
             MyTaskResults = new(this);
+
+            // for DIA/ISD searches, record the exact DIA engine settings used next to the search output
+            WriteDiaParametersFileIfPresent(OutputFolder, taskId);
+
             MyFileManager myFileManager = new MyFileManager(SearchParameters.DisposeOfFileWhenDone);
             var fileSpecificCommonParams = fileSettingsList.Select(b => SetAllFileSpecificCommonParams(CommonParameters, b));
 

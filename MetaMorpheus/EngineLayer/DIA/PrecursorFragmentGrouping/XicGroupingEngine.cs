@@ -88,7 +88,7 @@ namespace EngineLayer.DIA
             foreach (var fragmentXic in fragmentXics)
             {
                 // additional check, test only
-                if (fragmentXic.StartScanIndex < precursorXic.StartScanIndex - 2 || fragmentXic.EndScanIndex > precursorXic.EndScanIndex  + 2) continue;
+                //if (fragmentXic.StartScanIndex < precursorXic.StartScanIndex - 2 || fragmentXic.EndScanIndex > precursorXic.EndScanIndex  + 2) continue;
 
                 double overlap = PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursorXic, fragmentXic);
                 if (overlap >= overlapThreshold)

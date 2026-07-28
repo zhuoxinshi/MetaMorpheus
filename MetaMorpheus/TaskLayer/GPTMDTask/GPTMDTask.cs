@@ -42,6 +42,10 @@ namespace TaskLayer
             {
                 NewDatabases = new List<DbForTask>()
             };
+
+            // for DIA/ISD runs, record the exact DIA engine settings used next to the task output
+            WriteDiaParametersFileIfPresent(OutputFolder, taskId);
+
             bool isProtein = GlobalVariables.AnalyteType != AnalyteType.Oligo;
             MyFileManager myFileManager = new MyFileManager(true);
 

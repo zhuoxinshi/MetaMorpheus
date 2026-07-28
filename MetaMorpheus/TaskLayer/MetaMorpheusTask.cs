@@ -1109,6 +1109,21 @@ namespace TaskLayer
             OutProgressHandler?.Invoke(this, v);
         }
 
+        /// <summary>
+        /// If this task is running a DIA/ISD analysis (i.e. <see cref="CommonParameters"/>.DIAparameters is set),
+        /// writes a human-readable record of all DIA engine settings used to "DIAparameters.txt" in the task's
+        /// output folder. Does nothing for non-DIA runs.
+        /// </summary>
+        protected void WriteDiaParametersFileIfPresent(string outputFolder, string taskId)
+        {
+            if (CommonParameters?.DIAparameters == null)
+                return;
+
+            string diaSettingsPath = Path.Combine(outputFolder, "DIAparameters.txt");
+            CommonParameters.DIAparameters.WriteSettingsToFile(diaSettingsPath);
+            FinishedWritingFile(diaSettingsPath, new List<string> { taskId });
+        }
+
         protected abstract MyTaskResults RunSpecific(string OutputFolder, List<DbForTask> dbFilenameList, List<string> currentRawFileList, string taskId, FileSpecificParameters[] fileSettingsList);
 
         protected void FinishedWritingFile(string path, List<string> nestedIDs)
@@ -1579,7 +1594,7 @@ namespace TaskLayer
         }
 
         /// <summary>
-        /// Legacy TOML compatibility — when ProductMassTolerance_LowRes is omitted, the helper falls back to ProductMassTolerance to keep constant result.
+        /// Legacy TOML compatibility ï¿½ when ProductMassTolerance_LowRes is omitted, the helper falls back to ProductMassTolerance to keep constant result.
         /// </summary>
         /// <typeparam name="TTask"></typeparam>
         /// <param name="filePath"></param>
