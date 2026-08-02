@@ -32,14 +32,14 @@ namespace Test.DIATests
         [Test]
         public static void ExportIsdPseudoScansAndSearchMgf()
         {
-            string file1 = @"E:\ISD Project\071626_ISD\Quant\HC_YC\07-23-26_HC-YC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep1.raw";
-            var file2 = @"E:\ISD Project\071626_ISD\Quant\HC_YC\07-23-26_HC-YC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep2.raw";
-            var file3 = @"E:\ISD Project\071626_ISD\Quant\HC_YC\07-23-26_HC-YC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep3.raw";
+            string file1 = @"E:\ISD Project\071626_ISD\Quant\PierceYB\07-30-26_PierceYB_0-005_ISD_81min_rep1.raw";
+            var file2 = @"E:\ISD Project\071626_ISD\Quant\PierceYB\07-30-26_PierceYB_0-005_ISD_81min_rep2.raw";
+            var file3 = @"E:\ISD Project\071626_ISD\Quant\PierceYB\07-30-26_PierceYB_0-005_ISD_81min_rep3.raw";
             var file4 = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\07-25-26_HD_81min_ISD_1-4.raw";
 
             var fastYB = @"E:\ISD Project\ISD_250428\05-02-25_PEPPI-YB_60min_ISD60-80-100_preFilter700-900-1100_RF.raw";
-            var fileList = new List<string> { file4 };
-            var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\HD";
+            var fileList = new List<string> { file1, file2, file3 };
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\PierceYB";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
 
             foreach (var file in fileList)
@@ -94,7 +94,7 @@ namespace Test.DIATests
                 gptmdTask.CommonParameters = searchTask.CommonParameters;
 
                 var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) }; //("GPTMD", gptmdTask)
-                var engine = new EverythingRunnerEngine(taskList, new List<string> { mgfOutPath }, new List<DbForTask> { new DbForTask(human_xml, false) }, outFolder);
+                var engine = new EverythingRunnerEngine(taskList, new List<string> { mgfOutPath }, new List<DbForTask> { new DbForTask(dbPath, false) }, outFolder);
                 engine.Run();
             }
         }
