@@ -85,7 +85,7 @@ namespace EngineLayer.DIA
         {
             if (features == null) throw new ArgumentNullException(nameof(features));
             using var sw = new StreamWriter(filePath, append: false);
-            sw.WriteLine("Feature_ID\tMass\tIntensity\tMin_time\tMax_time\tApex_time\tIntensity_Apex\tMin_charge\tMax_charge");
+            sw.WriteLine("Feature_ID\tMass\tIntensity\tMin_time\tMax_time\tApex_time\tIntensity_Apex\tMin_charge\tMax_charge\tApex_intensity_top3\tSum_intensity_top3");
             int id = 0;
             foreach (var f in features)
             {
@@ -104,7 +104,9 @@ namespace EngineLayer.DIA
                     apex.ToString("F4", Ci),
                     f.SummedIntensity.ToString("F1", Ci),
                     zmin.ToString(Ci),
-                    zmax.ToString(Ci)));
+                    zmax.ToString(Ci),
+                    f.ApexIntensityTop3.ToString("F1", Ci),
+                    f.SummedIntensityTop3.ToString("F1", Ci)));
             }
         }
 
