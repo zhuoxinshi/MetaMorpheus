@@ -24,17 +24,17 @@ namespace Test.DIATests
         public void RunFeatureAligner()
         {
             // ---------- EDIT: input feature tables (FLASHQuant or FLASHDeconv .tsv) ----------
-            var dir = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HC_YC";
+            var dir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\HCD_ISD_8files";
             // filter on the FILE NAME (not the full path, which contains the folder "HC_YC" and would match YC too)
-            var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("DDA") & !f.Contains("_YC_")).ToList();
+            var files = Directory.GetFiles(dir, "*_ms1.feature").ToList();
 
             double massTol    = 20;
             var    massUnit   = MassToleranceUnit.Ppm;   // or MassToleranceUnit.Dalton
             double rtTol      = 120;                      // seconds, +/-
 
-            var outFolder = @"E:\ISD Project\071626_ISD\Quant\HC_YC\TopFD";
+            var outFolder = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
-            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HC_DDA_11files_{massTol}_{massUnit}_{rtTol}.tsv");
+            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HCD_ISD_8files_{massTol}_{massUnit}_{rtTol}.tsv");
 
             string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol, grouping: GroupingMethod.ReferenceAnchor, positiveNotch:2, negativeNotch:2);
 
@@ -512,6 +512,268 @@ namespace Test.DIATests
             TestContext.Out.WriteLine($"identified (mass only, RT ignored): {massOnly} / {shared.Count}");
 
             Assert.That(idMatch, Is.LessThanOrEqualTo(shared.Count));   // sanity: can't identify more than exist
+        }
+
+        /// <summary>
+        /// Analysis (manual runner): two-proteome titration differential expression. Experiment design = FIXED HCD,
+        /// VARY YBC 1:2. So HCD-origin species are constant across runs and YBC-origin species double from the
+        /// HCD-YBC_1-1 mixture (YBC x1) to HCD-YBC_1-2 (YBC x2).
+        ///
+        /// This is a DE across the MIXTURE runs only (3x HCD-YBC_1-1 vs 3x HCD-YBC_1-2). The two HCD-only runs are
+        /// NOT part of the computation — they exist in the HCD alignment only to identify which features are
+        /// HCD-origin (reference features). Features below minMass (default 4 kDa) are ignored, so this is an
+        /// intact-proteoform comparison.
+        ///
+        /// Process:
+        ///   1. NORMALIZE. Read the HCD alignment; keep SHARED features (n_files == requiredNFiles, mass &gt;= minMass,
+        ///      every quant &gt; 0). Because HCD is fixed, these anchor out per-run loading/instrument drift. Compute a
+        ///      per-run size factor by the DESeq2 median-of-ratios method OVER THE 6 MIXTURE RUNS ONLY (per-feature
+        ///      geometric mean across the mix runs; each run's size factor = median over features of quant / geomean).
+        ///   2. DIFFERENTIAL EXPRESSION. Read the YBC alignment; keep SHARED features (mass &gt;= minMass; present in
+        ///      every YBC run including the pure-YBC runs -&gt; YBC-origin). Divide each mixture run's quant by its HCD
+        ///      size factor, log2-transform, then compare HCD-YBC_1-1 vs HCD-YBC_1-2: per-feature log2 fold change +
+        ///      Welch's two-sample t-test, with Benjamini-Hochberg FDR across features.
+        ///   3. Write a per-feature DE tsv and print the summary. YBC should INCREASE from 1-1 to 1-2.
+        ///
+        /// Validity check: the fixed HCD anchors read lower in the 1-2 mix before normalization (median log2FC
+        /// = -0.19, a loading/dilution effect); after applying the HCD size factors their residual median log2FC is
+        /// ~0.00 (balanced by construction), confirming the normalization.
+        ///
+        /// Runs on both acquisition methods (see the two [TestCase]s). Observed 2026-08-14 (mass &gt;= 4 kDa, 6 mix
+        /// runs), both HCD residual ~0 (normalization valid):
+        ///   DDA: 147 HCD anchors, 311 YBC features; YBC median log2FC +1.66 (~3.2x), 97% up; FDR&lt;0.05 = 193.
+        ///   ISD: 408 HCD anchors, 796 YBC features; YBC median log2FC +1.51 (~2.9x), 96% up; FDR&lt;0.05 = 618.
+        /// ISD quantifies ~2.7x more shared features with lower replicate CV (0.16-0.18 vs 0.23) -&gt; more DE power.
+        /// Fold change is ABOVE the nominal 2x for both — the exact value depends on the true HCD:YBC loading.
+        /// [Explicit]; Ignored if either input is missing.
+        /// </summary>
+        // The SAME analysis runs on both acquisition methods via [TestCase], so DDA and ISD are directly comparable
+        // (keep the two cases identical apart from the input files). Each case points at that method's HCD (fixed
+        // anchor) and YBC (varying) alignment tables.
+        [Test, Explicit("analysis: HCD-normalized differential expression of shared YBC features (1-1 vs 1-2)")]
+        [TestCase("DDA",
+            @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\FeatureAlign_HCD_DDA_8_files_20ppm_120s_notch2.tsv",
+            @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\FeatureAlign_YBC_DDA_8files_20_Ppm_120.tsv")]
+        [TestCase("ISD",
+            @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\FeatureAlign_HCD_ISD_8files_20_Ppm_120.tsv",
+            @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\FeatureAlign_YBC_ISD_8files_20_Ppm_120.tsv")]
+        public void NormalizeAndDifferentialExpression_HCD_YBC(string label, string hcdFile, string ybcFile)
+        {
+            string outPath = $@"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\DE_YBC_1-2_vs_1-1_HCDnorm_{label}.tsv";
+
+            // ---------- EDIT: sharedness, mass floor, mixture-run tag, and the two YBC levels to compare ----------
+            int    requiredNFiles = 8;              // "shared" = present in every run of the alignment
+            double minMass = 4000;                  // ignore features below this mass (intact-proteoform comparison)
+            string mixTag = "HCD-YBC";              // mixture runs; HCD-only runs (no this tag) are reference-only
+            string groupA = "HCD-YBC_1-1";          // YBC x1
+            string groupB = "HCD-YBC_1-2";          // YBC x2
+            double fdrThresh = 0.05;
+            // ------------------------------------------------------------------------------------------------------
+
+            if (!File.Exists(hcdFile)) Assert.Ignore("HCD file not found: " + hcdFile);
+            if (!File.Exists(ybcFile)) Assert.Ignore("YBC file not found: " + ybcFile);
+            TestContext.Out.WriteLine($"===== {label} =====");
+
+            // ---- (1) size factors from the fixed-HCD anchors, computed over the MIX runs only ----
+            var hcd = ReadAlignedShared(hcdFile, requiredNFiles, minMass);
+            var hMix = Enumerable.Range(0, hcd.runs.Count).Where(j => hcd.runs[j].Contains(mixTag)).ToArray();
+            var hMixRuns = hMix.Select(j => hcd.runs[j]).ToList();
+            var hMixQuants = hcd.quants.Select(row => hMix.Select(j => row[j]).ToArray()).ToList();
+            double[] sizeFactors = MedianOfRatiosSizeFactors(hMixQuants);
+            var sf = new Dictionary<string, double>();
+            for (int j = 0; j < hMixRuns.Count; j++) sf[hMixRuns[j]] = sizeFactors[j];
+            TestContext.Out.WriteLine($"HCD anchors (shared, mass>={minMass}, all>0): {hcd.quants.Count}; " +
+                $"normalization uses {hMixRuns.Count} mix runs (HCD-only runs are reference-only)");
+            for (int j = 0; j < hMixRuns.Count; j++)
+                TestContext.Out.WriteLine($"  size factor {sizeFactors[j]:F3}  {hMixRuns[j]}");
+
+            // Normalization quality: the FIXED HCD anchors should be balanced between the two mixture levels after
+            // dividing by the size factors (residual median log2FC ~ 0). Compare against the raw (unnormalized) value.
+            var hIdxA = Enumerable.Range(0, hcd.runs.Count).Where(j => hcd.runs[j].Contains(groupA)).ToArray();
+            var hIdxB = Enumerable.Range(0, hcd.runs.Count).Where(j => hcd.runs[j].Contains(groupB)).ToArray();
+            double hcdRaw = MedianGroupLog2FC(hcd.quants, hIdxA, hIdxB,
+                hIdxA.Select(_ => 1.0).ToArray(), hIdxB.Select(_ => 1.0).ToArray());
+            double hcdResidual = MedianGroupLog2FC(hcd.quants, hIdxA, hIdxB,
+                hIdxA.Select(j => sf[hcd.runs[j]]).ToArray(), hIdxB.Select(j => sf[hcd.runs[j]]).ToArray());
+            TestContext.Out.WriteLine($"HCD anchors log2FC (1-2 vs 1-1): raw {hcdRaw:F3} -> normalized {hcdResidual:F3} (should be ~0)");
+
+            // ---- (2) YBC shared features + the two mixture groups ----
+            var ybc = ReadAlignedShared(ybcFile, requiredNFiles, minMass);
+            var idxA = Enumerable.Range(0, ybc.runs.Count).Where(j => ybc.runs[j].Contains(groupA)).ToArray();
+            var idxB = Enumerable.Range(0, ybc.runs.Count).Where(j => ybc.runs[j].Contains(groupB)).ToArray();
+            Assert.That(idxA.Length, Is.GreaterThan(1), "need >=2 replicates in group A");
+            Assert.That(idxB.Length, Is.GreaterThan(1), "need >=2 replicates in group B");
+            double[] sfA = idxA.Select(j => sf[ybc.runs[j]]).ToArray();   // HCD-derived size factors (mix runs are in both files)
+            double[] sfB = idxB.Select(j => sf[ybc.runs[j]]).ToArray();
+
+            // ---- per-feature DE: normalize -> log2 -> log2FC + Welch t-test ----
+            int n = ybc.quants.Count;
+            var log2fc = new double[n]; var pval = new double[n];
+            var meanA = new double[n]; var meanB = new double[n];
+            for (int i = 0; i < n; i++)
+            {
+                var q = ybc.quants[i];
+                var la = new double[idxA.Length]; var lb = new double[idxB.Length];
+                for (int k = 0; k < idxA.Length; k++) la[k] = System.Math.Log2(q[idxA[k]] / sfA[k]);
+                for (int k = 0; k < idxB.Length; k++) lb[k] = System.Math.Log2(q[idxB[k]] / sfB[k]);
+                meanA[i] = la.Average(); meanB[i] = lb.Average();
+                log2fc[i] = meanB[i] - meanA[i];
+                pval[i] = WelchTTestP(la, lb);
+            }
+            double[] qval = BenjaminiHochberg(pval);
+
+            // ---- (3) write per-feature DE table ----
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var dir = Path.GetDirectoryName(outPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            using (var sw = new StreamWriter(outPath, false))
+            {
+                sw.WriteLine("mass_mean\tlog2FC_1-2_vs_1-1\tmeanLog2_1-1\tmeanLog2_1-2\tp_value\tq_value_BH\tsignificant");
+                for (int i = 0; i < n; i++)
+                    sw.WriteLine(string.Join("\t",
+                        ybc.masses[i].ToString("F4", ci), log2fc[i].ToString("F4", ci),
+                        meanA[i].ToString("F4", ci), meanB[i].ToString("F4", ci),
+                        pval[i].ToString("E3", ci), qval[i].ToString("E3", ci),
+                        (qval[i] < fdrThresh ? 1 : 0).ToString()));
+            }
+
+            // ---- summary ----
+            double med = Median(log2fc);
+            int sig = 0, up = 0, dn = 0, fracUp = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (log2fc[i] > 0) fracUp++;
+                if (qval[i] < fdrThresh) { sig++; if (log2fc[i] > 0) up++; else dn++; }
+            }
+            TestContext.Out.WriteLine($"\nYBC shared features: {n}");
+            TestContext.Out.WriteLine($"median log2FC (1-2 vs 1-1) = {med:F3}   ({System.Math.Pow(2, med):F2}x; nominal 2x = +1.0)");
+            TestContext.Out.WriteLine($"mean   log2FC = {log2fc.Average():F3}");
+            TestContext.Out.WriteLine($"fraction up (log2FC>0): {(double)fracUp / n:F3}");
+            TestContext.Out.WriteLine($"FDR<{fdrThresh}: {sig} significant ({up} up, {dn} down)");
+            TestContext.Out.WriteLine($"DE table -> {outPath}");
+
+            // Assertions check the ANALYSIS is valid, not a brittle exact number:
+            Assert.That(n, Is.GreaterThan(0));
+            Assert.That(System.Math.Abs(hcdResidual), Is.LessThan(0.15), "normalization must balance the fixed HCD anchors (residual log2FC ~ 0)");
+            Assert.That(med, Is.GreaterThan(0.5), "YBC should increase from the 1-1 to the 1-2 mixture");
+            Assert.That((double)fracUp / n, Is.GreaterThan(0.6), "most YBC features should go up");
+        }
+
+        // -------- helpers for the titration DE analysis --------
+
+        // Read a FeatureAligner tsv and return its per-run quant matrix for the SHARED features (n_files == required,
+        // mass_mean >= minMass, and every quant_ column > 0). Returns the run labels (quant_ column suffixes), one
+        // double[] per feature, and the feature masses.
+        private static (List<string> runs, List<double[]> quants, List<double> masses) ReadAlignedShared(string path, int requiredNFiles, double minMass)
+        {
+            var lines = FeatureAligner.ReadAllLinesShared(path);
+            var head = lines[0].Split('\t');
+            var qcols = new List<int>(); var runs = new List<string>();
+            for (int c = 0; c < head.Length; c++)
+                if (head[c].StartsWith("quant_")) { qcols.Add(c); runs.Add(head[c].Substring("quant_".Length)); }
+            int nCol = System.Array.IndexOf(head, "n_files");
+            int mCol = System.Array.IndexOf(head, "mass_mean");
+            int last = qcols[qcols.Count - 1];
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var num = System.Globalization.NumberStyles.Any;
+            var quants = new List<double[]>(); var masses = new List<double>();
+            for (int r = 1; r < lines.Length; r++)
+            {
+                if (lines[r].Length == 0) continue;
+                var t = lines[r].Split('\t');
+                if (t.Length <= last) continue;
+                if (!int.TryParse(t[nCol], out int nf) || nf != requiredNFiles) continue;
+                double mass = (mCol >= 0 && double.TryParse(t[mCol], num, ci, out double mm)) ? mm : 0;
+                if (mass < minMass) continue;                                   // ignore small (sub-proteoform) features
+                var row = new double[qcols.Count]; bool ok = true;
+                for (int k = 0; k < qcols.Count; k++)
+                    if (!double.TryParse(t[qcols[k]], num, ci, out row[k]) || row[k] <= 0) { ok = false; break; }
+                if (!ok) continue;
+                quants.Add(row);
+                masses.Add(mass);
+            }
+            return (runs, quants, masses);
+        }
+
+        // Median over features of the per-feature log2 fold change between two run groups, each run divided by its
+        // size factor first. Used for the YBC DE central estimate and the HCD normalization-quality check.
+        private static double MedianGroupLog2FC(List<double[]> data, int[] ia, int[] ib, double[] sfA, double[] sfB)
+        {
+            var fc = new double[data.Count];
+            for (int i = 0; i < data.Count; i++)
+            {
+                double la = 0, lb = 0;
+                for (int k = 0; k < ia.Length; k++) la += System.Math.Log2(data[i][ia[k]] / sfA[k]);
+                for (int k = 0; k < ib.Length; k++) lb += System.Math.Log2(data[i][ib[k]] / sfB[k]);
+                fc[i] = lb / ib.Length - la / ia.Length;
+            }
+            return Median(fc);
+        }
+
+        // DESeq2-style median-of-ratios size factors. data = features x runs, all values > 0.
+        private static double[] MedianOfRatiosSizeFactors(List<double[]> data)
+        {
+            int nRuns = data[0].Length, nFeat = data.Count;
+            var geo = new double[nFeat];
+            for (int i = 0; i < nFeat; i++)
+            {
+                double s = 0; for (int j = 0; j < nRuns; j++) s += System.Math.Log(data[i][j]);
+                geo[i] = System.Math.Exp(s / nRuns);
+            }
+            var factors = new double[nRuns];
+            var ratios = new double[nFeat];
+            for (int j = 0; j < nRuns; j++)
+            {
+                for (int i = 0; i < nFeat; i++) ratios[i] = data[i][j] / geo[i];
+                factors[j] = Median(ratios);
+            }
+            return factors;
+        }
+
+        // Welch's two-sample t-test, two-sided p-value (Student-t via MathNet).
+        private static double WelchTTestP(double[] a, double[] b)
+        {
+            double ma = a.Average(), mb = b.Average();
+            double va = SampleVar(a, ma), vb = SampleVar(b, mb);
+            int na = a.Length, nb = b.Length;
+            double se2 = va / na + vb / nb;
+            if (se2 <= 0) return 1.0;                                   // no within-group variance -> untestable
+            double t = (mb - ma) / System.Math.Sqrt(se2);
+            double df = se2 * se2 / ((va / na) * (va / na) / (na - 1) + (vb / nb) * (vb / nb) / (nb - 1));
+            if (double.IsNaN(df) || df <= 0) return 1.0;
+            double p = 2.0 * (1.0 - MathNet.Numerics.Distributions.StudentT.CDF(0.0, 1.0, df, System.Math.Abs(t)));
+            return p < 0 ? 0 : (p > 1 ? 1 : p);
+        }
+
+        private static double SampleVar(double[] x, double mean)
+        {
+            if (x.Length < 2) return 0;
+            double s = 0; foreach (var v in x) s += (v - mean) * (v - mean);
+            return s / (x.Length - 1);
+        }
+
+        private static double Median(double[] x)
+        {
+            var s = (double[])x.Clone(); System.Array.Sort(s);
+            int n = s.Length;
+            return n == 0 ? 0 : (n % 2 == 1 ? s[n / 2] : 0.5 * (s[n / 2 - 1] + s[n / 2]));
+        }
+
+        // Benjamini-Hochberg step-up FDR; returns q-values aligned to the input order.
+        private static double[] BenjaminiHochberg(double[] p)
+        {
+            int m = p.Length;
+            var order = Enumerable.Range(0, m).OrderBy(i => p[i]).ToArray();
+            var q = new double[m];
+            double prev = 1.0;
+            for (int rank = m - 1; rank >= 0; rank--)   // walk from largest p down, enforcing monotonicity
+            {
+                int i = order[rank];
+                double val = p[i] * m / (rank + 1);
+                prev = System.Math.Min(prev, val);
+                q[i] = prev;
+            }
+            return q;
         }
     }
 }

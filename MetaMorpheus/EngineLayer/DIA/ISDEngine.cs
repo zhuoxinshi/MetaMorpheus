@@ -94,6 +94,8 @@ namespace EngineLayer.DIA
             string pattern = $@"sid=(\d+)";
             foreach (var scan in scans)
             {
+                if (scan.IsDefaultOrNull() || string.IsNullOrEmpty(scan.ScanFilter)) 
+                        continue;
                 int voltage = 0;
                 var match = Regex.Match(scan.ScanFilter, pattern);
                 if (match.Success) voltage = int.Parse(match.Groups[1].Value);

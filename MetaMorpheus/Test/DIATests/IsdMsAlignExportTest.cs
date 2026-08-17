@@ -276,7 +276,47 @@ namespace Test.DIATests
             engine.Run();
         }
 
-        
+        [Test]
+        public static void RNA()
+        {
+            var filePath = @"R:\Zhuoxin\2026_08_14-mix_134min_ISD40-60-80_filter.raw";
+            string AllStandards_fasta = @"E:\ISD Project\RNA\AllStandards.fasta";
+            var databases = new List<DbForTask> { new DbForTask(AllStandards_fasta, false) };
+            var fileList = new List<string> { filePath };
+
+            var searchToml = @"E:\ISD Project\RNA\2026-08-15-10-48-07\Task Settings\Task1-RnaSearchTaskconfig.toml";
+            var searchTask = Toml.ReadFile<SearchTask>(searchToml, MetaMorpheusTask.tomlConfig);
+            var outDir = @"E:\ISD Project\RNA\ISD_search";
+            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+
+            bool group = true;
+            bool write = true;
+            bool search = true;
+            foreach (var file in fileList)
+            {
+                var dataFile = MsDataFileReader.GetDataFile(file);
+                dataFile.LoadAllStaticData();
+
+                // Consensus feature tracing as the XIC front-end for both the intact (precursor) and fragment channels.
+                var diaParams = new DIAparameters(
+                    DIAanalysisType.ISD,
+                    //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, searchTask.CommonParameters.PrecursorDeconvolutionParameters, traceToleranceDa: 1.5, minMass: 4000,xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                    //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), traceToleranceDa: 1.5, aggregateCharges: false, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                    new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 2, 5, searchTask.CommonParameters.PrecursorDeconvolutionParameters, minMass: 500, minCharge: -40, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                    new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, searchTask.CommonParameters.ProductDeconvolutionParameters, minCharge: -10, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                    //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
+                    new XicGroupingEngine(0.2f, 0, 0, maxThreadsForGrouping: 10), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                searchTask.CommonParameters.DIAparameters = diaParams;
+
+                var outFolder = Path.Combine(outDir, Path.GetFileNameWithoutExtension(dataFile.FilePath), "neutralMass3");
+                if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
+
+                var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask) }; //("GPTMD", gptmdTask)
+                var engine = new EverythingRunnerEngine(taskList, fileList, databases, outFolder);
+                engine.Run();
+            }
+        }
+
         /// <summary>
         /// Environment-driven harness: generate consensus-path pseudo-MS2 MGFs at several precursor-fragment
         /// correlation thresholds, reusing one consensus-XIC build. Set ISD_MZML (input), ISD_OUTDIR (output),
