@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using TaskLayer;
 using UsefulProteomicsDatabases;
 using static iText.StyledXmlParser.Jsoup.Select.Evaluator;
@@ -111,7 +112,11 @@ namespace Test.DIATests
         public static void SearchAllPseudoScansMgf()
         {
             var dataDir = @"E:\ISD Project\071626_ISD\Quant\HC_YC";
-            var fileList = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HC-YC")).ToList();
+            //var fileList = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HC-YC")).ToList();
+            var fileList = new List<string>
+            {
+                @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep1.raw"
+            };
 
             var outDir = @"E:\ISD Project\071626_ISD\Quant\HC_YC\ISD_search";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
@@ -124,9 +129,9 @@ namespace Test.DIATests
 
             var diaParams = new DIAparameters(
                 DIAanalysisType.ISD,
-                //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), traceToleranceDa: 1.5, minMass: 4000, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), traceToleranceDa: 1.5, minMass: 4000, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), traceToleranceDa: 1.5, aggregateCharges: false, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
-                new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                //new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
                 new XicGroupingEngine(0.2f, 0, 0.6, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
@@ -176,6 +181,161 @@ namespace Test.DIATests
 
                 var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.mgf").ToList();
                 var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) }; //("GPTMD", gptmdTask)
+                var engine = new EverythingRunnerEngine(taskList, searchFileList, databases, outFolder);
+                engine.Run();
+            }
+        }
+
+        /// <summary>
+        /// Same pipeline as <see cref="SearchAllPseudoScansMgf"/> - ISD pseudo-MS2 construction, msAlign/mgf
+        /// export, then MetaMorpheus search + GPTMD + post-GPTMD search - but the two XIC constructors read
+        /// EXTERNAL deconvolution results (TopFD msAlign) instead of running MetaMorpheus's classic
+        /// deconvolution. Everything downstream of the neutral masses is unchanged.
+        ///
+        /// TopFD is run per ISD channel, so each raw file has one msAlign per channel. The MS1-channel msAlign
+        /// (*_ms1_ms1.msalign) drives the precursor XICs; the source-voltage channels (*_isd60/80/100_ms1.msalign)
+        /// drive the fragment XICs. The join back to the raw file is by scan number, which the channel splits
+        /// preserve (channel k of cycle n is raw scan 4n+k).
+        /// </summary>
+        [Test]
+        public static void SearchAllPseudoScansMgf_ExternalDecon()
+        {
+            // Each entry is a spectra file paired with the TopFD output base name for that run, i.e. the prefix
+            // its "<base>_feature.xml" / "<base>_ms2.msalign" companions share.
+            //
+            // REQUIRES TopFD 1.8 OR LATER. The MS1 side reads the per-charge <envelope_list> blocks out of
+            // feature.xml, and those were only added in 1.8 - a 1.7.x feature.xml stops at <envelope_num> and
+            // carries no per-scan points at all (197 KB vs 105 MB for the same kind of run), so this path yields
+            // zero precursor XICs on it. The YB runs deconvoluted with 1.7.4 therefore cannot be used here; they
+            // still work with the msAlign-tracing front end (see FeatureGroupedXicConstructor).
+            //
+            // The spectra file is the labelCorrected mzML TopFD actually saw, so scan numbers are guaranteed to
+            // line up with what it wrote.
+            var topFdRoot = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ISD";
+            var fileList = new List<(string SpectraFile, string TopFdBase)>
+            {
+                (Path.Combine(topFdRoot, "07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected.mzML"),
+                 Path.Combine(topFdRoot, "07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected")),
+                (Path.Combine(topFdRoot, "07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep2_labelCorrected.mzML"),
+                 Path.Combine(topFdRoot, "07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep2_labelCorrected")),
+            };
+
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\ISD_search_externalDecon";
+            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+            var outFolder = Path.Combine(outDir, "topfdDecon1");
+            if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
+
+            bool group = true;
+            bool write = false; // counting fragments per precursor only; flip on to write the msalign/mgf
+            // the goal here is the pseudo ms2.msalign itself; flip to true to run the MetaMorpheus search on it
+            bool search = false;
+
+            if (group)
+            {
+                foreach (var (spectraFile, topFdBase) in fileList)
+                {
+                    string stem = Path.GetFileNameWithoutExtension(spectraFile);
+                    // TopFD writes both companions beside the spectra file it was run on. The feature xml covers
+                    // MS1 scans ONLY - every envelope in it sits on an MS1 scan - which is why the fragment
+                    // channels below stay on the msAlign path.
+                    string precursorFeatureXml = topFdBase + "_feature.xml";
+                    string combinedMs2MsAlign = topFdBase + "_ms2.msalign";
+
+                    // the data file has to be loaded up front here: splitting the combined ms2.msalign into ISD
+                    // channels needs the scan filters, so the constructors depend on the scans
+                    var dataFile = MsDataFileReader.GetDataFile(spectraFile);
+                    dataFile.LoadAllStaticData();
+                    var allScans = dataFile.GetAllScansList().ToArray();
+
+                    TestContext.Progress.WriteLine($"{stem}: {allScans.Length} scans; precursor feature xml " +
+                        $"{Path.GetFileName(precursorFeatureXml)}; combined fragment msAlign " +
+                        $"{Path.GetFileName(combinedMs2MsAlign)}");
+
+                    // ---- the change from SearchAllPseudoScansMgf: masses come from TopFD, not ClassicDecon ----
+                    // MS1: feature XICs read STRAIGHT out of TopFD's feature xml - its per-charge envelope lists
+                    //      already give scan, RT and intensity for every point of every feature, so there is no
+                    //      tracing at all. That sidesteps the two things that crippled tracing the ms1.msalign on
+                    //      this data: masses recurring in only ~2 scans per feature, and TopFD flipping a
+                    //      species' monoisotope between scans (M vs M+1.003 Da). On a matched slice this yields
+                    //      ~3x the precursor XICs, with a median length of 6 points rather than the 3-point floor.
+                    // was: new FeatureGroupedXicConstructor(...precursorMsAlign, precursorFeatureFile...)
+                    // was: new NeutralMassXicConstructor(..., new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, ...)
+                    //
+                    // The tolerance is unused here (nothing is matched by mass) but is still passed so the
+                    // constructor stays interchangeable with the others and the value is recorded in the settings
+                    // dump. minEcScore is now the quality lever: TopFD writes this file at ECScore >= 0.1, which
+                    // is permissive, so raise it to drop low-confidence features.
+                    var ms1Constructor = new FeatureXmlXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
+                        precursorFeatureXml, minMass: 4000, maxMass: 70000, minEcScore: 0,
+                        xicSpline: new XicCubicSpline(0.05, 1, 1, true));
+
+                    // MS2: still the msAlign path, because the feature xml holds MS1 scans only. This run was
+                    //      deconvoluted in one go rather than per channel split, so all three source voltages sit
+                    //      in ONE ms2.msalign and are told apart purely by scan number - FromCombinedMsAlign reads
+                    //      it once and splits it using the sid= filters of the scans.
+                    // was: new NeutralMassXicConstructor(..., new ClassicDeconvolutionParameters(1, 20, 4, 3), ...)
+                    var ms2Constructor = ExternalDeconXicConstructor.FromCombinedMsAlign(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
+                        combinedMs2MsAlign, allScans, maxMass: 70000, xicSpline: new XicCubicSpline(0.05, 1, 1, true));
+
+                    // apex RT tolerance 0.1 min, no overlap requirement, NO correlation filter. The fragment rank
+                    // cap is left off deliberately: with correlationThreshold 0 nothing else limits the fragment
+                    // list, so a cap would just report itself back rather than the true assignment count.
+                    var diaParams = new DIAparameters(
+                        DIAanalysisType.ISD, ms1Constructor, ms2Constructor,
+                        new XicGroupingEngine(0.1f, 0, 0, maxThreadsForGrouping: 10),
+                        PseudoMs2ConstructionType.Mass, combineFragments: true);
+                    var commonParams = new CommonParameters { DIAparameters = diaParams };
+
+                    var pseudoScans = MetaMorpheusTask.GetMs2Scans(dataFile, dataFile.FilePath, commonParams).ToArray();
+                    TestContext.Progress.WriteLine($"{stem}: {pseudoScans.Length} pseudo-MS2 scans; MS1 " +
+                        $"{ms1Constructor.FeatureCountBeforeFilters} features -> {ms1Constructor.FeatureCount} after filters " +
+                        $"-> {ms1Constructor.LastXicCount} feature XICs " +
+                        $"({ms1Constructor.LastFeaturesBelowMinPeaksCount} below minNumberOfPeaks)");
+
+                    // fragments assigned per precursor - the number the grouping thresholds actually control
+                    var fragmentCounts = pseudoScans.Select(s => s.ExperimentalFragments.Length).OrderBy(n => n).ToArray();
+                    if (fragmentCounts.Length > 0)
+                    {
+                        TestContext.Progress.WriteLine($"   fragments/precursor: mean={fragmentCounts.Average():F1} " +
+                            $"median={fragmentCounts[fragmentCounts.Length / 2]} " +
+                            $"min={fragmentCounts[0]} max={fragmentCounts[^1]} " +
+                            $"p25={fragmentCounts[fragmentCounts.Length / 4]} " +
+                            $"p75={fragmentCounts[3 * fragmentCounts.Length / 4]} " +
+                            $"p90={fragmentCounts[9 * fragmentCounts.Length / 10]}; " +
+                            $"total assignments={fragmentCounts.Sum():N0}");
+                    }
+
+                    var msAlignOutPath = Path.Combine(outFolder, stem + "_pseudo_ms2.msalign");
+                    var mgfOutPath = Path.Combine(outFolder, stem + "_pseudo_ms2.mgf");
+                    if (write)
+                    {
+                        diaParams.WriteSettingsToFile(Path.Combine(outFolder, "DIAparameters.txt"));
+                        ISDEngine.WriteMsAlignFile(msAlignOutPath, pseudoScans);
+                        IsdMsAlignExporter.WriteMgf(pseudoScans, mgfOutPath);
+                    }
+                }
+            }
+
+            if (search)
+            {
+                string searchTomlCommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
+                var searchTask = Toml.ReadFile<SearchTask>(searchTomlCommonFixedVariable, MetaMorpheusTask.tomlConfig);
+                searchTask.CommonParameters.DoPrecursorDeconvolution = false; // already deconvoluted via FromFile
+                searchTask.CommonParameters.UseProvidedPrecursorInfo = true; // FromFile assembly provides the precursor info
+                searchTask.CommonParameters.ProductDeconvolutionParameters = new ClassicDeconvolutionParameters(1, 1, 4, 3);
+                searchTask.CommonParameters.AssumeOrphanPeaksAreZ1Fragments = true;
+
+                var moreGPTMD_toml = @"E:\ISD Project\ISD_250428\moreGPTMD_toml\Task Settings\Task1-GPTMDTaskconfig.toml";
+                var gptmdTask = Toml.ReadFile<GptmdTask>(moreGPTMD_toml, MetaMorpheusTask.tomlConfig);
+                gptmdTask.CommonParameters = searchTask.CommonParameters;
+
+                // YB is yeast; add the human xml back if the data files are switched to the HC_YC mixes
+                string yeast_xml = @"E:\Databases\uniprotkb_taxonomy_id_559292_AND_review_2026_08_05.xml";
+                var human_xml = @"E:\Databases\uniprotkb_taxonomy_id_9606_AND_reviewed_2026_07_23.xml";
+                var databases = new List<DbForTask> { new DbForTask(yeast_xml, false) };
+
+                var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.mgf").ToList();
+                var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) };
                 var engine = new EverythingRunnerEngine(taskList, searchFileList, databases, outFolder);
                 engine.Run();
             }

@@ -74,6 +74,15 @@
     <None Update="DatabaseTests\Task1-SearchTaskconfig.toml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="DIATests\ExternalDeconTestData\HcdYbc_subset_feature.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="DIATests\ExternalDeconTestData\HcdYbc_subset_ms1.msalign">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="DIATests\ExternalDeconTestData\HcdYbc_subset_ms1.feature">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="GlycoTestData\11901_AIETD.mgf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

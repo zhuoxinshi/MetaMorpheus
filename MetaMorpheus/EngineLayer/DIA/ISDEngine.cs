@@ -32,6 +32,14 @@ namespace EngineLayer.DIA
             //Get all MS1 XICs
             var allMs1Xics = DIAparams.Ms1XicConstructor.GetAllXicsWithXicSpline(ms1Scans);
 
+            //Remember which deconvoluted MS1 feature each precursor XIC came from, so the pseudo MS2 scans can
+            //name it. The map has to be snapshotted HERE: the constructor overwrites it on every call, and the
+            //fragment channels are built below. Only a feature-file constructor knows feature ids; anything else
+            //leaves the map null and the ids are written as unknown.
+            var featureByPrecursorXic = DIAparams.Ms1XicConstructor is FeatureXmlXicConstructor ms1FeatureConstructor
+                ? new Dictionary<ExtractedIonChromatogram, TopFdFeature>(ms1FeatureConstructor.LastFeatureByXic)
+                : null;
+
             //Precursor-fragment Grouping
             var allPfGroups = new List<PrecursorFragmentsGroup>();
             if (DIAparams.CombineFragments)
@@ -58,7 +66,9 @@ namespace EngineLayer.DIA
             {
                 OneBasedScanNumber++;
                 pfGroup.PFgroupIndex = OneBasedScanNumber;
-                var pseudoScan = pfGroup.GetPseudoMs2ScanFromPfGroup(DIAparams.PseudoMs2ConstructionType, CommonParams, DataFile.FilePath);
+                PrecursorFragmentsGroup.AssignPrecursorFeatureIds(new[] { pfGroup }, featureByPrecursorXic);
+                var pseudoScan = pfGroup.GetPseudoMs2ScanFromPfGroup(DIAparams.PseudoMs2ConstructionType, CommonParams, DataFile.FilePath,
+                    DIAparams.PseudoMs2IntensityType);
                 yield return pseudoScan;
             }
         }
@@ -141,7 +151,9 @@ namespace EngineLayer.DIA
                     writer.WriteLine($"PRECURSOR_CHARGE={scan.PrecursorCharge}");
                     writer.WriteLine($"PRECURSOR_MASS={scan.PrecursorMass}");
                     writer.WriteLine($"PRECURSOR_INTENSITY={scan.PrecursorIntensity}");
-                    writer.WriteLine($"PRECURSOR_FEATURE_ID=0");
+                    //TopFD writes this EMPTY when no feature backs the precursor, and 0 is a real feature id, so
+                    //an unknown id must not be written as 0 - that is what made every exported scan claim feature 0
+                    writer.WriteLine($"PRECURSOR_FEATURE_ID={scan.PrecursorFeatureId?.ToString() ?? string.Empty}");
 
                     // Write peaks: monoMass, intensity, charge 
                     for (int i = 0; i < scan.ExperimentalFragments.Length; i++)
