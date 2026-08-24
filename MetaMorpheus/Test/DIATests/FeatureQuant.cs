@@ -212,6 +212,67 @@ namespace Test.DIATests
         }
 
         /// <summary>
+        /// Manual runner (not an assertion test): aligns the SAME set of MetaMorpheus runs under all three
+        /// <see cref="ProteoformMatchKey"/> definitions and reports how the cross-run sharing changes with the
+        /// definition of "same proteoform".
+        ///
+        /// The three keys are nested - FullSequence splits what ModsIgnorePosition merges, which splits what
+        /// BaseSequence merges - so reading them together separates two different failures. Rows that appear in
+        /// one run under FullSequence but in several under ModsIgnorePosition were identified in every run and
+        /// merely LOCALIZED differently; rows that only come together under BaseSequence differ in the modification
+        /// itself, not just its position. Anything still single-run under BaseSequence was genuinely found once.
+        ///
+        /// [Explicit] so it runs only when selected. Edit the folder below.
+        /// </summary>
+        [Test, Explicit("manual runner: compares the three proteoform match keys across runs")]
+        public void CompareProteoformMatchKeysAcrossRuns()
+        {
+            // ---------- EDIT: Individual File Results folder + q-value cutoff ----------
+            var dir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\HCD-YBC_DDA_6files_xml\Task1-SearchTask\Individual File Results";
+            const double qValueThresh = 0.01;
+            // --------------------------------------------------------------------------
+
+            var files = Directory.GetFiles(dir, "*_Proteoforms.psmtsv").OrderBy(f => f).ToList();
+            Assert.That(files.Count, Is.GreaterThan(1), "need at least two per-run *_Proteoforms.psmtsv in " + dir);
+
+            string outDir = Path.Combine(Directory.GetParent(dir).Parent.FullName, "proteoform_alignments");
+            Directory.CreateDirectory(outDir);
+            int runCount = files.Count;
+            TestContext.Out.WriteLine($"{runCount} runs from {dir}");
+            foreach (var f in files) TestContext.Out.WriteLine("   " + Path.GetFileName(f));
+
+            foreach (var key in new[] { ProteoformMatchKey.FullSequence, ProteoformMatchKey.ModsIgnorePosition,
+                                        ProteoformMatchKey.BaseSequence })
+            {
+                string outPath = Path.Combine(outDir, $"proteoform_align_{runCount}runs_{key}.tsv");
+                ProteoformAligner.Align(files, outPath, key, qValueThresh);
+
+                var lines = File.ReadAllLines(outPath);
+                var header = lines[0].Split('\t');
+                int nRunsCol = System.Array.IndexOf(header, "n_runs");
+                var nRuns = lines.Skip(1).Select(l => int.Parse(l.Split('\t')[nRunsCol])).ToList();
+
+                // per-run identification counts, read off the qvalue_<run> cells (empty = not identified there)
+                var qCols = Enumerable.Range(0, header.Length).Where(i => header[i].StartsWith("qvalue_")).ToList();
+                var perRun = qCols.Select(i => lines.Skip(1).Count(l => !string.IsNullOrEmpty(l.Split('\t')[i]))).ToList();
+
+                int total = nRuns.Count;
+                int shared = nRuns.Count(n => n >= 2);
+                int inAll = nRuns.Count(n => n == runCount);
+                var dist = string.Join("  ", Enumerable.Range(1, runCount).Select(k => $"{k}:{nRuns.Count(n => n == k)}"));
+
+                TestContext.Out.WriteLine($"\n--- {key} ---");
+                TestContext.Out.WriteLine($"  distinct proteoforms : {total}");
+                TestContext.Out.WriteLine($"  in >= 2 runs         : {shared} ({100.0 * shared / total:F1}%)");
+                TestContext.Out.WriteLine($"  in all {runCount} runs        : {inAll} ({100.0 * inAll / total:F1}%)");
+                TestContext.Out.WriteLine($"  n_runs distribution  : {dist}");
+                TestContext.Out.WriteLine($"  per-run IDs          : {string.Join(", ", perRun)} " +
+                    $"(mean {perRun.Average():F0})");
+                TestContext.Out.WriteLine($"  wrote {outPath}");
+            }
+        }
+
+        /// <summary>
         /// Manual runner (not an assertion test): runs OpenMS's ConsensusFeatureGroupDetector.exe directly on the
         /// FLASHQuant output tsv files below and reports the consensus row count, for side-by-side comparison with
         /// <see cref="FeatureAligner"/>. [Explicit] so it runs only when selected; Ignored if the exe isn't installed.

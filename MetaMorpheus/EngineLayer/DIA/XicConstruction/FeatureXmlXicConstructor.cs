@@ -7,6 +7,26 @@ using System.Linq;
 namespace EngineLayer.DIA
 {
     /// <summary>
+    /// How the charge states of one TopFD feature are turned into XICs by <see cref="FeatureXmlXicConstructor"/>.
+    /// A feature is one neutral mass observed at several charges, each with its own envelope list, so there is
+    /// more than one defensible way to collapse that into a single elution profile.
+    /// </summary>
+    public enum FeatureChargeMode
+    {
+        /// <summary>One XIC per feature, intensities SUMMED across charge states within each scan. The default,
+        /// and the analogue of what the msAlign path carries.</summary>
+        SumAllCharges,
+
+        /// <summary>One XIC per feature, built from the SINGLE most abundant charge state only - the charge whose
+        /// in-range envelopes carry the most intensity. Scans in which only weaker charges were observed are not
+        /// part of the XIC, so the profile is one charge's measured elution rather than a blend of several.</summary>
+        MostAbundantCharge,
+
+        /// <summary>One XIC per charge state, charges left separate.</summary>
+        SeparateCharges
+    }
+
+    /// <summary>
     /// A <see cref="XicConstructor"/> that reads feature XICs STRAIGHT OUT of TopFD's <c>*_feature.xml</c>,
     /// with no peak finding of any kind.
     ///
@@ -59,9 +79,22 @@ namespace EngineLayer.DIA
         /// is the main lever for dropping low-confidence features.</summary>
         public double MinEcScore { get; set; }
 
-        /// <summary>If true (default), emit ONE XIC per feature, summing envelope intensities across charge
-        /// states within each scan. If false, emit one XIC per charge state, leaving the charges separate.</summary>
-        public bool AggregateCharges { get; set; } = true;
+        /// <summary>How the charge states of a feature become XICs; see <see cref="FeatureChargeMode"/>. Defaults
+        /// to <see cref="FeatureChargeMode.SumAllCharges"/>.</summary>
+        public FeatureChargeMode ChargeMode { get; set; } = FeatureChargeMode.SumAllCharges;
+
+        /// <summary>
+        /// Back-compatible view of <see cref="ChargeMode"/>: true for either one-XIC-per-feature mode
+        /// (<see cref="FeatureChargeMode.SumAllCharges"/> and <see cref="FeatureChargeMode.MostAbundantCharge"/>),
+        /// false for <see cref="FeatureChargeMode.SeparateCharges"/>. Because a bool cannot name three modes,
+        /// SETTING it can only choose between summing and separating - assign <see cref="ChargeMode"/> directly to
+        /// ask for <see cref="FeatureChargeMode.MostAbundantCharge"/>.
+        /// </summary>
+        public bool AggregateCharges
+        {
+            get => ChargeMode != FeatureChargeMode.SeparateCharges;
+            set => ChargeMode = value ? FeatureChargeMode.SumAllCharges : FeatureChargeMode.SeparateCharges;
+        }
 
         /// <summary>If true, use each envelope's tallest isotopic peak (<see cref="TopFdEnvelope.MaxIntensity"/>)
         /// as the XIC intensity instead of the summed envelope intensity. Summed is the default because it is the
@@ -81,19 +114,35 @@ namespace EngineLayer.DIA
         public Dictionary<ExtractedIonChromatogram, TopFdFeature> LastFeatureByXic { get; private set; }
             = new Dictionary<ExtractedIonChromatogram, TopFdFeature>();
 
+        /// <summary>Under <see cref="FeatureChargeMode.MostAbundantCharge"/>, the charge state chosen to represent
+        /// each feature in the most recent call. Empty in the other modes.</summary>
+        public Dictionary<TopFdFeature, int> LastMostAbundantChargeByFeature { get; private set; }
+            = new Dictionary<TopFdFeature, int>();
+
+        /// <summary>How many of the charges in <see cref="LastMostAbundantChargeByFeature"/> matched TopFD's own
+        /// <c>rep_charge</c> for the feature. TopFD picks its representative charge over the whole run, while this
+        /// class picks it over the scans handed in, so the two need not agree on an ISD channel.</summary>
+        public int LastMostAbundantChargeMatchingTopFdCount { get; private set; }
+
         /// <param name="peakFindingTolerance">Not used for peak finding - there is none - but kept on the base
         /// class so this constructor is interchangeable with the others and its settings are recorded.</param>
+        /// <param name="aggregateCharges">Legacy two-way switch, used only when <paramref name="chargeMode"/> is
+        /// null: true sums the charge states, false keeps them separate.</param>
+        /// <param name="chargeMode">Names the charge handling outright and overrides
+        /// <paramref name="aggregateCharges"/>. Pass <see cref="FeatureChargeMode.MostAbundantCharge"/> to build
+        /// each feature's XIC from its strongest charge state alone.</param>
         public FeatureXmlXicConstructor(Tolerance peakFindingTolerance, int maxMissedScansAllowed,
             double maxPeakHalfWidth, int minNumberOfPeaks, List<TopFdFeature> features, double minMass = 0,
             double maxMass = double.MaxValue, int minChargeCount = 1, double minEcScore = 0,
-            bool aggregateCharges = true, XicSpline xicSpline = null)
+            bool aggregateCharges = true, XicSpline xicSpline = null, FeatureChargeMode? chargeMode = null)
             : base(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks, xicSpline)
         {
             MinMass = minMass;
             MaxMass = maxMass;
             MinChargeCount = minChargeCount;
             MinEcScore = minEcScore;
-            AggregateCharges = aggregateCharges;
+            ChargeMode = chargeMode ??
+                (aggregateCharges ? FeatureChargeMode.SumAllCharges : FeatureChargeMode.SeparateCharges);
 
             FeatureCountBeforeFilters = features?.Count ?? 0;
             Features = (features ?? new List<TopFdFeature>())
@@ -106,10 +155,10 @@ namespace EngineLayer.DIA
         public FeatureXmlXicConstructor(Tolerance peakFindingTolerance, int maxMissedScansAllowed,
             double maxPeakHalfWidth, int minNumberOfPeaks, string featureXmlFilePath, double minMass = 0,
             double maxMass = double.MaxValue, int minChargeCount = 1, double minEcScore = 0,
-            bool aggregateCharges = true, XicSpline xicSpline = null)
+            bool aggregateCharges = true, XicSpline xicSpline = null, FeatureChargeMode? chargeMode = null)
             : this(peakFindingTolerance, maxMissedScansAllowed, maxPeakHalfWidth, minNumberOfPeaks,
                 TopFdFeatureXmlFile.ReadFile(featureXmlFilePath), minMass, maxMass, minChargeCount, minEcScore,
-                aggregateCharges, xicSpline)
+                aggregateCharges, xicSpline, chargeMode)
         {
         }
 
@@ -124,7 +173,8 @@ namespace EngineLayer.DIA
         public static FeatureXmlXicConstructor BySourceVoltage(Tolerance peakFindingTolerance,
             int maxMissedScansAllowed, double maxPeakHalfWidth, int minNumberOfPeaks,
             Dictionary<int, string> featureXmlPathsByVoltage, double minMass = 0, double maxMass = double.MaxValue,
-            int minChargeCount = 1, double minEcScore = 0, bool aggregateCharges = true, XicSpline xicSpline = null)
+            int minChargeCount = 1, double minEcScore = 0, bool aggregateCharges = true, XicSpline xicSpline = null,
+            FeatureChargeMode? chargeMode = null)
         {
             if (featureXmlPathsByVoltage == null || featureXmlPathsByVoltage.Count == 0)
                 throw new MetaMorpheusException("No per-voltage feature xml files were supplied.");
@@ -143,7 +193,7 @@ namespace EngineLayer.DIA
             // without a recognisable sid= filter
             var constructor = new FeatureXmlXicConstructor(peakFindingTolerance, maxMissedScansAllowed,
                 maxPeakHalfWidth, minNumberOfPeaks, byVoltage.OrderBy(k => k.Key).First().Value,
-                minMass, maxMass, minChargeCount, minEcScore, aggregateCharges, xicSpline);
+                minMass, maxMass, minChargeCount, minEcScore, aggregateCharges, xicSpline, chargeMode);
             constructor.FeaturesBySourceVoltage = byVoltage;
             constructor.FeatureCountBeforeFilters = byVoltage.Sum(kvp => kvp.Value.Count);
             return constructor;
@@ -208,6 +258,8 @@ namespace EngineLayer.DIA
             LastFeaturesWithNoScansInRangeCount = 0;
             LastFeaturesBelowMinPeaksCount = 0;
             LastFeatureByXic = new Dictionary<ExtractedIonChromatogram, TopFdFeature>();
+            LastMostAbundantChargeByFeature = new Dictionary<TopFdFeature, int>();
+            LastMostAbundantChargeMatchingTopFdCount = 0;
 
             // 2. one pass over the features - there is no seeding, no walking and no tolerance anywhere below,
             //    because TopFD already decided which envelopes form which feature. This loop only reshapes its
@@ -220,12 +272,38 @@ namespace EngineLayer.DIA
                 if (isolationRange != null && !feature.SingleChargeFeatures.Any(c => isolationRange.Contains(c.MonoisotopicMz)))
                     continue;
 
-                // aggregating puts every charge state in one group -> one XIC per feature, intensities summed per
-                // scan. Not aggregating makes each charge its own group -> one XIC per charge state, which is what
-                // a fragment channel wants (there is no cross-charge proteoform to reassemble there).
-                var chargeGroups = AggregateCharges
-                    ? new[] { feature.SingleChargeFeatures.AsEnumerable() }
-                    : feature.SingleChargeFeatures.Select(c => new[] { c }.AsEnumerable()).ToArray();
+                // The mode decides how the feature's charge states are partitioned into XICs:
+                //   SumAllCharges      - one group holding every charge -> one XIC per feature, summed per scan
+                //   MostAbundantCharge - one group holding only the strongest charge -> one XIC per feature, but
+                //                        carrying that charge's own measured profile rather than a blend
+                //   SeparateCharges    - one group per charge -> one XIC per charge state, which is what a
+                //                        fragment channel wants if there is no cross-charge proteoform to rebuild
+                IEnumerable<TopFdSingleChargeFeature>[] chargeGroups;
+                switch (ChargeMode)
+                {
+                    case FeatureChargeMode.SeparateCharges:
+                        chargeGroups = feature.SingleChargeFeatures.Select(c => new[] { c }.AsEnumerable()).ToArray();
+                        break;
+
+                    case FeatureChargeMode.MostAbundantCharge:
+                        var dominantCharge = SelectMostAbundantCharge(feature, scanIndexByScanNumber);
+                        // no charge has an envelope on these scans: leave chargeGroups empty so the feature falls
+                        // through to the "no scans in range" tally below, exactly as in the other modes
+                        chargeGroups = dominantCharge == null
+                            ? new IEnumerable<TopFdSingleChargeFeature>[0]
+                            : new[] { new[] { dominantCharge }.AsEnumerable() };
+                        if (dominantCharge != null)
+                        {
+                            LastMostAbundantChargeByFeature[feature] = dominantCharge.Charge;
+                            if (dominantCharge.Charge == feature.RepresentativeCharge)
+                                LastMostAbundantChargeMatchingTopFdCount++;
+                        }
+                        break;
+
+                    default:
+                        chargeGroups = new[] { feature.SingleChargeFeatures.AsEnumerable() };
+                        break;
+                }
 
                 bool anyScanInRange = false;
                 foreach (var group in chargeGroups)
@@ -253,6 +331,55 @@ namespace EngineLayer.DIA
 
             LastXicCount = xics.Count;
             return xics;
+        }
+
+        /// <summary>
+        /// Picks the charge state that carries the most intensity ON THE SCANS HANDED IN, which is what
+        /// <see cref="FeatureChargeMode.MostAbundantCharge"/> builds its XIC from.
+        ///
+        /// The ranking is deliberately computed from the in-range envelopes rather than read off the feature xml's
+        /// per-charge <c>intensity</c> field or TopFD's <c>rep_charge</c>: both of those describe the charge over
+        /// the WHOLE run, and an ISD fragment channel sees only every fourth scan, so the strongest charge there
+        /// need not be the strongest overall. It also uses the same intensity measure the XIC will carry
+        /// (<see cref="UseMaxIntensityInsteadOfSum"/>), so the charge that wins is the charge that would have
+        /// contributed most to the summed XIC.
+        ///
+        /// Returns null when no charge state has an envelope on any of these scans - i.e. the feature does not
+        /// elute within the array at all.
+        /// </summary>
+        private TopFdSingleChargeFeature SelectMostAbundantCharge(TopFdFeature feature,
+            Dictionary<int, int> scanIndexByScanNumber)
+        {
+            TopFdSingleChargeFeature best = null;
+            double bestIntensity = double.NegativeInfinity;
+
+            foreach (var chargeFeature in feature.SingleChargeFeatures)
+            {
+                double total = 0;
+                bool anyInRange = false;
+                foreach (var envelope in chargeFeature.Envelopes)
+                {
+                    if (!scanIndexByScanNumber.ContainsKey(envelope.OneBasedScanNumber))
+                        continue;
+                    anyInRange = true;
+                    total += UseMaxIntensityInsteadOfSum ? envelope.MaxIntensity : envelope.IntensitySum;
+                }
+
+                // a charge with no envelope here cannot represent the feature on these scans; one whose envelopes
+                // happen to sum to zero still can, which is why eligibility is anyInRange and not total > 0
+                if (!anyInRange)
+                    continue;
+
+                // strictly greater, and the xml lists charges in ascending order, so ties resolve to the LOWER
+                // charge - the choice has to be reproducible run to run
+                if (total > bestIntensity)
+                {
+                    bestIntensity = total;
+                    best = chargeFeature;
+                }
+            }
+
+            return best;
         }
 
         /// <summary>

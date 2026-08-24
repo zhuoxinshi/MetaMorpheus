@@ -228,5 +228,76 @@ namespace Test.DIATests
                 $"summed over charge XICs {perChargeTotal:e3}");
             Assert.That(aggregateTotal, Is.EqualTo(perChargeTotal).Within(0.001).Percent);
         }
+
+        /// <summary>
+        /// The third charge mode: instead of summing the charge states, represent the feature by the single most
+        /// abundant one. The resulting XIC must be exactly the per-charge XIC of the strongest charge - same
+        /// intensities, one constant charge on every peak - and so can never carry more signal than the summed XIC.
+        /// </summary>
+        [Test]
+        public static void MostAbundantChargeUsesOnlyTheStrongestChargeState()
+        {
+            var scans = SynthesiseScans();
+            var features = TopFdFeatureXmlFile.ReadFile(FeatureXmlPath);
+
+            var summed = new FeatureXmlXicConstructor(new PpmTolerance(20), 2, 1, 3, features,
+                minMass: 3000, maxMass: 50000, chargeMode: FeatureChargeMode.SumAllCharges);
+            var dominant = new FeatureXmlXicConstructor(new PpmTolerance(20), 2, 1, 3, features,
+                minMass: 3000, maxMass: 50000, chargeMode: FeatureChargeMode.MostAbundantCharge);
+            var perCharge = new FeatureXmlXicConstructor(new PpmTolerance(20), 2, 1, 3, features,
+                minMass: 3000, maxMass: 50000, chargeMode: FeatureChargeMode.SeparateCharges);
+
+            var summedXics = summed.GetAllXics(scans);
+            var dominantXics = dominant.GetAllXics(scans);
+            var perChargeXics = perCharge.GetAllXics(scans);
+            TestContext.Progress.WriteLine($"summed: {summedXics.Count} XICs; most-abundant-charge: " +
+                $"{dominantXics.Count} XICs; per charge: {perChargeXics.Count} XICs");
+            Assert.That(dominantXics.Count, Is.GreaterThan(0));
+
+            // one XIC per feature, as with summing - but a single charge's trace can fall below MinNumberOfPeaks
+            // where the summed trace cleared it, so this mode can only ever emit fewer
+            Assert.That(dominant.LastFeatureByXic.Values.Distinct().Count(), Is.EqualTo(dominantXics.Count));
+            Assert.That(dominantXics.Count, Is.LessThanOrEqualTo(summedXics.Count));
+
+            // the chosen charge is recorded for every feature that elutes within these scans, which is at least
+            // every feature that produced an XIC
+            Assert.That(dominant.LastMostAbundantChargeByFeature.Count, Is.GreaterThanOrEqualTo(dominantXics.Count));
+            TestContext.Progress.WriteLine(
+                $"charge chosen for {dominant.LastMostAbundantChargeByFeature.Count} features, " +
+                $"{dominant.LastMostAbundantChargeMatchingTopFdCount} agreeing with TopFD rep_charge");
+
+            int comparedFeatures = 0;
+            foreach (var kvp in dominant.LastFeatureByXic)
+            {
+                var feature = kvp.Value;
+
+                // every peak carries the one chosen charge, not a per-scan winner
+                var masses = kvp.Key.Peaks.OfType<IndexedMass>().ToList();
+                Assert.That(masses.Count, Is.EqualTo(kvp.Key.Peaks.Count));
+                Assert.That(masses.Select(m => m.Charge).Distinct().ToList(),
+                    Is.EqualTo(new List<int> { dominant.LastMostAbundantChargeByFeature[feature] }));
+
+                var perChargeForFeature = perCharge.LastFeatureByXic
+                    .Where(x => x.Value == feature).Select(x => x.Key).ToList();
+                if (perChargeForFeature.Count < 2)
+                    continue; // single-charge feature: nothing was selected between
+
+                double dominantTotal = kvp.Key.Peaks.Sum(peak => (double)peak.Intensity);
+                double strongestPerChargeTotal = perChargeForFeature.Max(x => x.Peaks.Sum(peak => (double)peak.Intensity));
+                double summedTotal = summed.LastFeatureByXic.Where(x => x.Value == feature)
+                    .Sum(x => x.Key.Peaks.Sum(peak => (double)peak.Intensity));
+
+                // it IS the strongest charge state's own XIC ...
+                Assert.That(dominantTotal, Is.EqualTo(strongestPerChargeTotal).Within(0.001).Percent);
+                // ... so it is a part of the summed XIC, never the whole of it
+                Assert.That(dominantTotal, Is.LessThanOrEqualTo(summedTotal * 1.000001));
+                comparedFeatures++;
+            }
+
+            Assert.That(comparedFeatures, Is.GreaterThan(0),
+                "no multi-charge feature produced an XIC in this fixture, so nothing was actually selected between");
+            TestContext.Progress.WriteLine($"{comparedFeatures} multi-charge features compared against their " +
+                "per-charge XICs");
+        }
     }
 }

@@ -366,10 +366,11 @@ namespace Test.DIATests
                 // knob produced it, best so far (0.2, 0.0) -> 110 proteoforms. Round 3 fills in the apex axis at
                 // correlation 0, which is also a test of that relationship: if fragment count is all that
                 // matters, these should order 0.05 < 0.1 < 0.2 < 0.3 < 0.5 by both fragments AND proteoforms.
-                (0.1f, 0.0),
-                (0.1f, 0.3),
-                (0.3f, 0.0),
-                (0.5f, 0.0),
+                (0.05f, 0.7),
+                (0.1f, 0.0), (0.1f, 0.3), (0.1f, 0.7),
+                (0.2f, 0.0), (0.2f, 0.3), (0.2f, 0.5), (0.2f, 0.7), (0.2f, 0.9),
+                (0.3f, 0.0), (0.3f, 0.3), (0.3f, 0.5),
+                (0.5f, 0.0), (0.5f, 0.5),
             };
             const double overlapThreshold = 0;
             const double qValueCutoff = 0.01;
@@ -387,7 +388,9 @@ namespace Test.DIATests
             string channelDir = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\OneFileTest\HCD_YBC_ISDseparate";
             string searchToml = @"E:\ISD Project\071626_ISD\Quant\HC_YC\MM\DDA_1-1\Task Settings\Task1-SearchTaskconfig.toml";
             string databaseXml = @"E:\Databases\uniprotkb_taxonomy_id_9606_AND_reviewed_2026_07_23.xml";
-            string screenRoot = Path.Combine(Path.GetDirectoryName(channelDir), "GroupingScreen");
+            // NEW root: the previous screen (flat intensities, PRECURSOR_FEATURE_ID=0) stays untouched at
+            // allFeatureXml\GroupingScreen so the two writers can be compared condition by condition
+            string screenRoot = Path.Combine(Path.GetDirectoryName(channelDir), "GroupingScreen_newWriter");
 
             foreach (var f in new[] { parentMzml, precursorFeatureXml, searchToml, databaseXml })
                 Assert.That(File.Exists(f), $"missing {f}");
