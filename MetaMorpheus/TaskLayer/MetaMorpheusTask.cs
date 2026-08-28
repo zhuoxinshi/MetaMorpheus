@@ -31,6 +31,7 @@ using EngineLayer.Util;
 using EngineLayer.DIA;
 using EngineLayer.SpectrumMatch;
 using Omics.Fragmentation;
+using System.Reflection.Metadata.Ecma335;
 
 namespace TaskLayer
 {
@@ -271,23 +272,47 @@ namespace TaskLayer
 
                             if (commonParameters.DoPrecursorDeconvolution)
                             {
+                                //Turn off chimera
+                                IsotopicEnvelope mostAbundantPrecursor = null;
+                                //Turn off chimera
+
                                 foreach (IsotopicEnvelope envelope in ms2scan.GetIsolatedMassesAndCharges(
                                     precursorSpectrum.MassSpectrum, commonParameters.PrecursorDeconvolutionParameters))
                                 {
                                     double? intensity = null;
                                     if (commonParameters.UseMostAbundantPrecursorIntensity) 
-                                        intensity = envelope.Peaks.Max(p => p.intensity); 
+                                        intensity = envelope.Peaks.Max(p => p.intensity);
 
-                                    var fractionalIntensity = envelope.TotalIntensity /
-                                          precursorSpectrum.MassSpectrum.YArray
-                                          [
-                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)
-                                              ..
-                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
-                                          ].Sum();
+                                    if (mostAbundantPrecursor == null)
+                                    {
+                                        mostAbundantPrecursor = envelope;
+                                    }
+                                    else
+                                    {
+                                        if (envelope.Peaks.Sum(p => p.intensity) > mostAbundantPrecursor.Peaks.Sum(p => p.intensity))
+                                        {
+                                            mostAbundantPrecursor = envelope;
+                                        }
+                                    }
+                                    //var fractionalIntensity = envelope.TotalIntensity /
+                                    //      precursorSpectrum.MassSpectrum.YArray
+                                    //      [
+                                    //          precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
+                                    //      ].Sum();
 
-                                    precursorSet.Add(new(envelope, intensity, fractionalIntensity));
+                                    //precursorSet.Add(new(envelope, intensity, fractionalIntensity));
                                 }
+
+                                //Turn off chimera
+                                if (mostAbundantPrecursor == null) continue;
+                                var fractionalIntensity = mostAbundantPrecursor.TotalIntensity /
+                                      precursorSpectrum.MassSpectrum.YArray
+                                      [
+                                          precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
+                                      ].Sum();
+
+                                precursorSet.Add(new(mostAbundantPrecursor, mostAbundantPrecursor.TotalIntensity, fractionalIntensity));
+                                //Turn off chimera
                             }
                         }
 

@@ -63,7 +63,7 @@ namespace Test.DIATests
                     new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                     new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                     //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
-                    new XicGroupingEngine(0.2f, 0, 0.5, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                    new XicGroupingEngine(0.1f, 0, 0.5, maxThreadsForGrouping: 10, fragmentRankThreshold: 1000), PseudoMs2ConstructionType.Mass, combineFragments: true);
                 var commonParams = new CommonParameters { DIAparameters = diaParams };
 
                 Ms2ScanWithSpecificMass[] pseudoScans = null;
@@ -111,16 +111,16 @@ namespace Test.DIATests
         [Test]
         public static void SearchAllPseudoScansMgf()
         {
-            var dataDir = @"E:\ISD Project\071626_ISD\Quant\HC_YC";
-            //var fileList = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HC-YC")).ToList();
+            //var dataDir = @"E:\ISD Project\071626_ISD\Quant\PierceYB";
+            //var fileList = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HCD-YBC")).ToList();
             var fileList = new List<string>
             {
-                @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep1.raw"
+                @"E:\ISD Project\071626_ISD\Quant\PierceYB\08-03-26_PierceYB_0-005_ISD_55min_rep1.raw"
             };
 
-            var outDir = @"E:\ISD Project\071626_ISD\Quant\HC_YC\ISD_search";
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\PierceYB\MM\ISD_search";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
-            var outFolder = Path.Combine(outDir, "neutralMass3");
+            var outFolder = Path.Combine(outDir, "neutralMass1");
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
 
             bool group = true;
@@ -129,12 +129,12 @@ namespace Test.DIATests
 
             var diaParams = new DIAparameters(
                 DIAanalysisType.ISD,
-                new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), traceToleranceDa: 1.5, minMass: 4000, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), traceToleranceDa: 1.5, minMass: 4000, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), traceToleranceDa: 1.5, aggregateCharges: false, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
-                //new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
-                new XicGroupingEngine(0.2f, 0, 0.6, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                new XicGroupingEngine(0.1f, 0, -1, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
             var commonParams = new CommonParameters { DIAparameters = diaParams };
 
             if (group)
@@ -160,7 +160,8 @@ namespace Test.DIATests
                 string calibrationToml = @"E:\ISD Project\071626_ISD\Quant\HC_YC\MM\HC_YC_DDA_xml-cali-xml\Task Settings\Task2-CalibrateTaskconfig.toml";
                 var calibrationTask = Toml.ReadFile<CalibrationTask>(calibrationToml, MetaMorpheusTask.tomlConfig);
                 string searchTomlCommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
-                var searchTask = Toml.ReadFile<SearchTask>(searchTomlCommonFixedVariable, MetaMorpheusTask.tomlConfig);
+                var searchTomlNoFixed = @"E:\ISD Project\071626_ISD\Quant\PierceYB\MM\DDA_6files_6protDb\Task Settings\Task1-SearchTaskconfig.toml";
+                var searchTask = Toml.ReadFile<SearchTask>(searchTomlNoFixed, MetaMorpheusTask.tomlConfig);
                 searchTask.CommonParameters.DoPrecursorDeconvolution = false; // already deconvoluted via FromFile
                 searchTask.CommonParameters.UseProvidedPrecursorInfo = true; // FromFile assembly provides the precursor info
                 searchTask.CommonParameters.ProductDeconvolutionParameters = new ClassicDeconvolutionParameters(1, 1, 4, 3);
@@ -175,12 +176,12 @@ namespace Test.DIATests
                 string yeast_xml = @"E:\Databases\uniprotkb_taxonomy_id_559292_AND_review_2026_08_05.xml";
                 var human_xml = @"E:\Databases\uniprotkb_taxonomy_id_9606_AND_reviewed_2026_07_23.xml";
                 var yeast_fasta = @"E:\Databases\uniprotkb_taxonomy_id_559292_AND_review_2026_08_05.fasta";
-                string pierceDb = @"E:\ISD Project\071626_ISD\Quant\Pierce\Pierce_6pro.fasta";
+                string pierceDb = @"E:\ISD Project\071626_ISD\Quant\Pierce\Pierce_6prot_new.fasta";
                 string human_fasta = @"E:\Databases\Human_9606.fasta";
-                var databases = new List<DbForTask> { new DbForTask(yeast_xml, false), new DbForTask(human_xml, false) };
+                var databases = new List<DbForTask> { new DbForTask(pierceDb, false) };//, new DbForTask(human_xml, false)
 
                 var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.mgf").ToList();
-                var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) }; //("GPTMD", gptmdTask)
+                var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask)}; // ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) 
                 var engine = new EverythingRunnerEngine(taskList, searchFileList, databases, outFolder);
                 engine.Run();
             }

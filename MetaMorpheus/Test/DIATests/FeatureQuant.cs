@@ -2,9 +2,11 @@ using EngineLayer.DIA;
 using EngineLayer.DIA.FeatureAlign;
 using iText.Forms.Form.Element;
 using MassSpectrometry;
+using MzLibUtil;
 using MassSpectrometry.Deconvolution.Consensus;
 using NUnit.Framework;
 using Readers;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -24,22 +26,90 @@ namespace Test.DIATests
         public void RunFeatureAligner()
         {
             // ---------- EDIT: input feature tables (FLASHQuant or FLASHDeconv .tsv) ----------
-            var dir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\HCD_ISD_8files";
+            var dir = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ISD\SeparateISD\TopFD";
             // filter on the FILE NAME (not the full path, which contains the folder "HC_YC" and would match YC too)
-            var files = Directory.GetFiles(dir, "*_ms1.feature").ToList();
+            var files = Directory.GetFiles(dir, "*_ms1_ms1.feature").Where(f => ! f.Contains("_HCD_2-3")).ToList();
 
             double massTol    = 20;
             var    massUnit   = MassToleranceUnit.Ppm;   // or MassToleranceUnit.Dalton
             double rtTol      = 120;                      // seconds, +/-
 
-            var outFolder = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD";
+            var outFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ForBrief";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
-            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HCD_ISD_8files_{massTol}_{massUnit}_{rtTol}.tsv");
+            string outputPath = Path.Combine(outFolder, $"FeatureAlign_YBC_ISD_8files_{massTol}_{massUnit}_{rtTol}.tsv");
 
             string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol, grouping: GroupingMethod.ReferenceAnchor, positiveNotch:2, negativeNotch:2);
 
             TestContext.Out.WriteLine("FeatureAligner wrote: " + written);
             TestContext.Out.WriteLine("Rows: " + (File.ReadAllLines(written).Length - 1));
+        }
+
+        /// <summary>
+        /// Manual runner: aligns the 8 HCD/YBC MM-averaged FLASHDeconv feature tables (explicit list) with
+        /// <see cref="FeatureAligner"/> at 120 ppm / notch +-2 / 120 s, ReferenceAnchor grouping. [Explicit].
+        /// </summary>
+        [Test, Explicit("manual runner: HCD/YBC averaged 8-file feature align 120ppm notch2 120s")]
+        public void RunHcdYbcAveragedFeatureAlign()
+        {
+            var dir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\Averaging";
+            var names = new[]
+            {
+                "07-26-26_HCD_2-3_81min_DDA_3iso_mscan4_rep1-averaged.tsv",
+                "07-26-26_HCD_2-3_81min_DDA_3iso_mscan4_rep2-averaged.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1-averaged.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep2-averaged.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep3-averaged.tsv",
+                "07-28-26_HCD-YBC_1-2_81min_DDA_3iso_mscan4_rep1-averaged.tsv",
+                "07-28-26_HCD-YBC_1-2_81min_DDA_3iso_mscan4_rep2-averaged.tsv",
+                "07-28-26_HCD-YBC_1-2_81min_DDA_3iso_mscan4_rep3-averaged.tsv",
+            };
+            var files = names.Select(n => Path.Combine(dir, n)).ToList();
+
+            double massTol = 20; var massUnit = MassToleranceUnit.Ppm; double rtTol = 120;   // ppm / seconds
+            string outputPath = Path.Combine(dir, "FeatureAlign_HCD_YBC_averaged_8files_20ppm_120s_notch2.tsv");
+            string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol,
+                positiveNotch: 2, negativeNotch: 2, grouping: GroupingMethod.ReferenceAnchor);
+
+            var l = File.ReadAllLines(written);
+            int nfCol = System.Array.IndexOf(l[0].Split('\t'), "n_files");
+            var dist = l.Skip(1).Select(x => int.Parse(x.Split('\t')[nfCol]))
+                        .GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}");
+            TestContext.Out.WriteLine("wrote: " + written + "  rows: " + (l.Length - 1));
+            TestContext.Out.WriteLine("n_files dist -> " + string.Join("  ", dist));
+        }
+
+        /// <summary>
+        /// Manual runner: same as <see cref="RunHcdYbcAveragedFeatureAlign"/> but for the 8 HCD/YBC MM-averaged
+        /// ISD FLASHDeconv feature tables (explicit list). 20 ppm / notch +-2 / 120 s, ReferenceAnchor. [Explicit].
+        /// </summary>
+        [Test, Explicit("manual runner: HCD/YBC averaged ISD 8-file feature align 20ppm notch2 120s")]
+        public void RunHcdYbcAveragedIsdFeatureAlign()
+        {
+            var dir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\Averaging";
+            var names = new[]
+            {
+                "07-28-26_HCD-YBC_1-2_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected-averaged.tsv",
+                "07-28-26_HCD-YBC_1-2_81min_ISD60-80-100_preFilter800-1000-1200_rep2_labelCorrected-averaged.tsv",
+                "07-28-26_HCD-YBC_1-2_81min_ISD60-80-100_preFilter800-1000-1200_rep3_labelCorrected-averaged.tsv",
+                "07-25-26_HC_1-3_81min_ISD60-80-100_preFilter800-1000-1200_rep2_labelCorrected-averaged.tsv",
+                "07-26-26_HCD_2-3_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected-averaged.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep1_labelCorrected-averaged.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep2_labelCorrected-averaged.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep3_labelCorrected-averaged.tsv",
+            };
+            var files = names.Select(n => Path.Combine(dir, n)).ToList();
+
+            double massTol = 20; var massUnit = MassToleranceUnit.Ppm; double rtTol = 120;   // ppm / seconds
+            string outputPath = Path.Combine(dir, "FeatureAlign_HCD_YBC_averaged_ISD_8files_20ppm_120s_notch2.tsv");
+            string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol,
+                positiveNotch: 2, negativeNotch: 2, grouping: GroupingMethod.ReferenceAnchor);
+
+            var l = File.ReadAllLines(written);
+            int nfCol = System.Array.IndexOf(l[0].Split('\t'), "n_files");
+            var dist = l.Skip(1).Select(x => int.Parse(x.Split('\t')[nfCol]))
+                        .GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}");
+            TestContext.Out.WriteLine("wrote: " + written + "  rows: " + (l.Length - 1));
+            TestContext.Out.WriteLine("n_files dist -> " + string.Join("  ", dist));
         }
 
         /// <summary>
@@ -270,6 +340,102 @@ namespace Test.DIATests
                     $"(mean {perRun.Average():F0})");
                 TestContext.Out.WriteLine($"  wrote {outPath}");
             }
+        }
+
+        /// <summary>
+        /// Manual runner (not an assertion test): links each MetaMorpheus identification to the TopFD MS1 feature
+        /// it came from, within one run, by matching precursor mass (ppm + C13 notches) and retention time to the
+        /// run's <c>*_ms1.feature</c>. MetaMorpheus writes no feature id, so this reconstructs the join TopPIC gets
+        /// for free from its <c>Feature ID</c> column. Writes one row per identification (matched or not). Edit the
+        /// paths below.
+        /// </summary>
+        [Test, Explicit("manual runner: links MetaMorpheus IDs to TopFD features and writes a tsv")]
+        public void RunIdToFeatureAligner()
+        {
+            // ---------- EDIT: MetaMorpheus psmtsv + the run's TopFD *_ms1.feature + output ----------
+            string psmtsv = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\HCD-YBC_DDA_6files_xml\Task1-SearchTask\Individual File Results\07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1_Proteoforms.psmtsv";
+            string feature = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\HCD_DDA_8files\07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1_ms1.feature";
+            string outPath = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\id_to_feature\rep1_id_to_feature.tsv";
+            // ---------- EDIT: match tolerances ----------
+            var massTol = new PpmTolerance(20);
+            double rtTolMinutes = 0.0;       // slack on the feature's elution window
+            bool matchWithinRtWindow = true; // RT must fall inside [begin, end]; false uses |apex - RT| <= tol
+            // -----------------------------------------------------------------------------------------
+
+            foreach (var f in new[] { psmtsv, feature })
+                Assert.That(File.Exists(f), $"missing {f}");
+
+            var summary = IdToFeatureAligner.Align(psmtsv, feature, outPath,
+                massTolerance: massTol, retentionTimeToleranceMinutes: rtTolMinutes,
+                matchWithinRtWindow: matchWithinRtWindow);
+
+            TestContext.Out.WriteLine($"IDs {summary.TotalIdentifications}, features {summary.FeatureCount}, " +
+                $"matched {summary.MatchedIdentifications} ({100.0 * summary.MatchedFraction:F1}%)");
+            TestContext.Out.WriteLine("matched by C13 notch: " +
+                string.Join("  ", summary.NotchCounts.Select(kv => $"{kv.Key}:{kv.Value}")));
+            TestContext.Out.WriteLine("wrote " + summary.OutputPath);
+        }
+
+        /// <summary>
+        /// Manual runner (not an assertion test): runs <see cref="IdToFeatureAligner"/> over all 6 DDA and all 6
+        /// ISD (neutralMass5 search) individual files and prints, per file, how many proteoform identifications map
+        /// to a TopFD MS1 feature. Writes one id-to-feature tsv per file. Edit the roots below.
+        /// </summary>
+        [Test, Explicit("manual runner: id-to-feature mapping rate for all 12 individual files")]
+        public void RunIdToFeatureAlignerAllFiles()
+        {
+            const string mm = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM";
+            const string topfd = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD";
+            string outDir = Path.Combine(mm, "id_to_feature");
+            Directory.CreateDirectory(outDir);
+            var massTol = new PpmTolerance(20);
+
+            var ddaStems = new[]
+            {
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1", "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep2",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep3", "07-28-26_HCD-YBC_1-2_81min_DDA_3iso_mscan4_rep1",
+                "07-28-26_HCD-YBC_1-2_81min_DDA_3iso_mscan4_rep2", "07-28-26_HCD-YBC_1-2_81min_DDA_3iso_mscan4_rep3",
+            };
+            var isdStems = new[]
+            {
+                "07-27-26_HCD-YBC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep1",
+                "07-27-26_HCD-YBC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep2",
+                "07-27-26_HCD-YBC_1-1_81min_ISD60-80-100_preFilter800-1000-1200_rep3",
+                "07-28-26_HCD-YBC_1-2_81min_ISD60-80-100_preFilter800-1000-1200_rep1",
+                "07-28-26_HCD-YBC_1-2_81min_ISD60-80-100_preFilter800-1000-1200_rep2",
+                "07-28-26_HCD-YBC_1-2_81min_ISD60-80-100_preFilter800-1000-1200_rep3",
+            };
+
+            // (platform, short label, psmtsv, feature file)
+            var jobs = new List<(string Platform, string Label, string Psm, string Feature)>();
+            foreach (var stem in ddaStems)
+                jobs.Add(("DDA", stem.Contains("1-1") ? "1-1_" + stem.Substring(stem.Length - 4) : "1-2_" + stem.Substring(stem.Length - 4),
+                    Path.Combine(mm, @"HCD-YBC_DDA_6files_xml\Task1-SearchTask\Individual File Results", stem + "_Proteoforms.psmtsv"),
+                    Path.Combine(topfd, @"HCD_DDA_8files", stem + "_ms1.feature")));
+            foreach (var stem in isdStems)
+                jobs.Add(("ISD", (stem.Contains("1-1") ? "1-1_" : "1-2_") + stem.Substring(stem.Length - 4),
+                    Path.Combine(mm, @"ISD_search\neutralMass5\search\Individual File Results", stem + "_pseudo_ms2_Proteoforms.psmtsv"),
+                    Path.Combine(topfd, @"HCD_ISD_8files", stem + "_labelCorrected_ms1.feature")));
+
+            TestContext.Out.WriteLine($"{"platform",-9}{"file",-10}{"IDs",6}{"features",10}{"mapped",8}{"pct",8}   notch distribution");
+            var totals = new Dictionary<string, (int Ids, int Mapped)>();
+            foreach (var job in jobs)
+            {
+                Assert.That(File.Exists(job.Psm), $"missing {job.Psm}");
+                Assert.That(File.Exists(job.Feature), $"missing {job.Feature}");
+                string outPath = Path.Combine(outDir, job.Platform + "_" + job.Label + "_id_to_feature.tsv");
+                var sm = IdToFeatureAligner.Align(job.Psm, job.Feature, outPath, massTolerance: massTol);
+                var notch = string.Join(" ", sm.NotchCounts.Select(kv => $"{kv.Key}:{kv.Value}"));
+                TestContext.Out.WriteLine($"{job.Platform,-9}{job.Label,-10}{sm.TotalIdentifications,6}{sm.FeatureCount,10}" +
+                    $"{sm.MatchedIdentifications,8}{100.0 * sm.MatchedFraction,7:F1}%   {notch}");
+                var t = totals.TryGetValue(job.Platform, out var v) ? v : (0, 0);
+                totals[job.Platform] = (t.Item1 + sm.TotalIdentifications, t.Item2 + sm.MatchedIdentifications);
+            }
+            TestContext.Out.WriteLine(new string('-', 60));
+            foreach (var kv in totals)
+                TestContext.Out.WriteLine($"{kv.Key,-9}{"TOTAL",-10}{kv.Value.Ids,6}{"",10}{kv.Value.Mapped,8}" +
+                    $"{100.0 * kv.Value.Mapped / Math.Max(1, kv.Value.Ids),7:F1}%");
+            TestContext.Out.WriteLine("wrote per-file tsvs to " + outDir);
         }
 
         /// <summary>
