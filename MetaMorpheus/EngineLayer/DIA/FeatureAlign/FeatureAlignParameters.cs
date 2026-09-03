@@ -12,8 +12,17 @@ namespace EngineLayer.DIA.FeatureAlign
         UnionFind,
         /// <summary>OpenMS ConsensusFeatureGroupDetector style: greedy, each group is anchored to the most-abundant
         /// remaining feature and candidates are matched to that anchor only. The group can't be wider than the
-        /// tolerance (no runaway chaining); one feature per run is kept via <see cref="DuplicateResolution"/>.</summary>
-        ReferenceAnchor
+        /// tolerance (no runaway chaining); one feature per run is kept via <see cref="DuplicateResolution"/>.
+        /// NOTE: an approximation — it marks the whole anchor window used, so in a dense region two proteoforms
+        /// sharing a window get merged/discarded. Use <see cref="OpenMSConsensus"/> to match OpenMS exactly.</summary>
+        ReferenceAnchor,
+        /// <summary>Faithful port of OpenMS TopDownConsensusFeatureGroup (the ConsensusFeatureGroupDetector exe).
+        /// Like ReferenceAnchor but with the two behaviours that make it match OpenMS: after forming a group it
+        /// removes ONLY the chosen members (reference + one winner per other run) and leaves the rest of the window
+        /// in the pool for later anchors, so two proteoforms sharing a tolerance window resolve into two groups;
+        /// and it emits ONLY groups present in EVERY run (an intersection — singletons and partial groups are
+        /// dropped). Uses an absolute ppm/Da window with NO monoisotope notch, exactly like OpenMS.</summary>
+        OpenMSConsensus
     }
 
     /// <summary>Which feature to keep when one run has several candidates for the same group (ReferenceAnchor).
@@ -55,6 +64,32 @@ namespace EngineLayer.DIA.FeatureAlign
 
         /// <summary>When one run has several candidates for a group, which to keep (ReferenceAnchor only).</summary>
         public DuplicateResolution WhenDuplicate { get; set; } = DuplicateResolution.MaxAbundance;
+
+        // ---- OUTPUT FILTERS -------------------------------------------------------------------------------
+        // Applied only when WRITING the consensus tsv, so grouping is unaffected — a consensus row is kept only
+        // if its n_files is within [MinNFiles, MaxNFiles] AND its mass_mean is within [MinMass, MaxMass].
+        // Each bound is null by default = unbounded, so leaving them all null reproduces the old output exactly.
+        // Bounds are INCLUSIVE.
+
+        /// <summary>Drop consensus rows present in fewer than this many runs (the n_files column). Null = no lower bound.</summary>
+        public int? MinNFiles { get; set; }
+
+        /// <summary>Drop consensus rows present in more than this many runs (the n_files column). Null = no upper bound.</summary>
+        public int? MaxNFiles { get; set; }
+
+        /// <summary>Drop consensus rows whose mean mass is below this (Da). Null = no lower bound.</summary>
+        public double? MinMass { get; set; }
+
+        /// <summary>Drop consensus rows whose mean mass is above this (Da). Null = no upper bound.</summary>
+        public double? MaxMass { get; set; }
+
+        /// <summary>True if a consensus row with this <paramref name="nFiles"/> and <paramref name="massMean"/> passes
+        /// the output filters (all bounds inclusive; a null bound is not enforced).</summary>
+        public bool PassesOutputFilter(int nFiles, double massMean) =>
+            (!MinNFiles.HasValue || nFiles   >= MinNFiles.Value) &&
+            (!MaxNFiles.HasValue || nFiles   <= MaxNFiles.Value) &&
+            (!MinMass.HasValue   || massMean >= MinMass.Value)   &&
+            (!MaxMass.HasValue   || massMean <= MaxMass.Value);
 
         public FeatureAlignParameters() { }
 

@@ -129,12 +129,12 @@ namespace EngineLayer.DIA.FeatureAlign
             // Sort by mass so the matching loop only compares near-mass neighbours (same trick as FeatureAligner).
             all.Sort((a, b) => a.Mass.CompareTo(b.Mass));
 
-            var massTol = FeatureAligner.MakeTolerance(massTolerance, massUnit);
-            var shifts  = FeatureAligner.NotchShifts(positiveNotch, negativeNotch);
+            // Notch-aware when notches are allowed (PpmToleranceWithNotch); matching then uses massTol.Within().
+            var massTol = FeatureAligner.MakeTolerance(massTolerance, massUnit, positiveNotch, negativeNotch);
 
             var groups = grouping == GroupingMethod.ReferenceAnchor
-                ? GroupReferenceAnchor(all, massTol, shifts, rtTolerance, whenDuplicate)
-                : GroupUnionFind(all, massTol, shifts, rtTolerance, positiveNotch);
+                ? GroupReferenceAnchor(all, massTol, rtTolerance, whenDuplicate)
+                : GroupUnionFind(all, massTol, rtTolerance);
 
             WriteConsensusTsv(groups, labels, outputPath);
             return outputPath;
@@ -146,22 +146,21 @@ namespace EngineLayer.DIA.FeatureAlign
 
         // Transitive connected components: link any two features within mass(+notch)+RT tolerance of each other.
         private static List<List<CFeature>> GroupUnionFind(
-            List<CFeature> all, Tolerance massTol, double[] shifts, double rtTol, int positiveNotch)
+            List<CFeature> all, Tolerance massTol, double rtTol)
         {
             int n = all.Count;
             var parent = new int[n];
             for (int i = 0; i < n; i++) parent[i] = i;
-            double maxPosShift = positiveNotch * FeatureAligner.NotchStep;
 
             for (int i = 0; i < n; i++)   // sorted by mass, so the inner scan can stop early
             {
                 double mi = all[i].Mass, ri = all[i].RtSeconds;
-                double upper = massTol.GetMaximumValue(mi + maxPosShift);
+                double upper = massTol.GetMaximumValue(mi);   // notch-aware tolerance already widens this to the top notch
                 for (int j = i + 1; j < n; j++)
                 {
                     if (all[j].Mass > upper) break;
                     if (Math.Abs(all[j].RtSeconds - ri) <= rtTol &&
-                        FeatureAligner.WithinNotch(massTol, all[j].Mass, mi, shifts))
+                        massTol.Within(all[j].Mass, mi))
                         Union(parent, i, j);
                 }
             }
@@ -180,7 +179,7 @@ namespace EngineLayer.DIA.FeatureAlign
         // unused feature as a fixed anchor, gather every unused feature within tolerance OF THE ANCHOR, keep one
         // per run (WhenDuplicate), discard the rest. Group width is capped at the tolerance (no runaway chaining).
         private static List<List<CFeature>> GroupReferenceAnchor(
-            List<CFeature> all, Tolerance massTol, double[] shifts, double rtTol, DuplicateResolution whenDuplicate)
+            List<CFeature> all, Tolerance massTol, double rtTol, DuplicateResolution whenDuplicate)
         {
             int n = all.Count;
             var used = new bool[n];
@@ -198,7 +197,7 @@ namespace EngineLayer.DIA.FeatureAlign
                     if (used[j]) continue;
                     var c = all[j];
                     if (Math.Abs(c.RtSeconds - reference.RtSeconds) <= rtTol &&
-                        FeatureAligner.WithinNotch(massTol, c.Mass, reference.Mass, shifts))
+                        massTol.Within(c.Mass, reference.Mass))
                     {
                         if (!perRun.TryGetValue(c.RunIndex, out var li)) { li = new List<int>(); perRun[c.RunIndex] = li; }
                         li.Add(j);

@@ -115,12 +115,12 @@ namespace Test.DIATests
             //var fileList = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HCD-YBC")).ToList();
             var fileList = new List<string>
             {
-                @"E:\ISD Project\071626_ISD\Quant\PierceYB\08-03-26_PierceYB_0-005_ISD_55min_rep1.raw"
+                @"E:\ISD Project\071626_ISD\Quant\4proYB\07-31-26_4proYB_1-5_ISD_65min_rep1.raw"
             };
 
-            var outDir = @"E:\ISD Project\071626_ISD\Quant\PierceYB\MM\ISD_search";
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\4proYB\MM\ISD_search";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
-            var outFolder = Path.Combine(outDir, "neutralMass1");
+            var outFolder = Path.Combine(outDir, "neutralMass2");
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
 
             bool group = true;
@@ -134,7 +134,7 @@ namespace Test.DIATests
                 new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
-                new XicGroupingEngine(0.1f, 0, -1, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                new XicGroupingEngine(0.1f, 0, 0, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
             var commonParams = new CommonParameters { DIAparameters = diaParams };
 
             if (group)
@@ -178,7 +178,8 @@ namespace Test.DIATests
                 var yeast_fasta = @"E:\Databases\uniprotkb_taxonomy_id_559292_AND_review_2026_08_05.fasta";
                 string pierceDb = @"E:\ISD Project\071626_ISD\Quant\Pierce\Pierce_6prot_new.fasta";
                 string human_fasta = @"E:\Databases\Human_9606.fasta";
-                var databases = new List<DbForTask> { new DbForTask(pierceDb, false) };//, new DbForTask(human_xml, false)
+                var std4pro_xml = @"E:\ISD Project\Std_4pro.xml";
+                var databases = new List<DbForTask> { new DbForTask(std4pro_xml, false) };//, new DbForTask(human_xml, false)
 
                 var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.mgf").ToList();
                 var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask)}; // ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) 

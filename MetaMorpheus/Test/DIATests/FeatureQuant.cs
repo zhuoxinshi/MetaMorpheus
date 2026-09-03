@@ -34,13 +34,27 @@ namespace Test.DIATests
             var    massUnit   = MassToleranceUnit.Ppm;   // or MassToleranceUnit.Dalton
             double rtTol      = 120;                      // seconds, +/-
 
+            // ---------- EDIT: OUTPUT FILTERS (write out fewer features) ----------
+            // Keep only consensus rows whose n_files and mean mass fall inside these INCLUSIVE ranges. Any bound left
+            // null is not enforced, so all four null => write every row (the original behaviour). Grouping/alignment
+            // is unchanged; this only shrinks the written tsv.
+            int?    minNFiles = 8;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
+            int?    maxNFiles = null;   // null = no upper bound
+            double? minMass   = 4000;   // Da; null = no lower bound (e.g. 4000 keeps intact proteoforms only)
+            double? maxMass   = null;   // Da; null = no upper bound
+            // --------------------------------------------------------------------
+
             var outFolder = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ForBrief";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
             string outputPath = Path.Combine(outFolder, $"FeatureAlign_YBC_ISD_8files_{massTol}_{massUnit}_{rtTol}.tsv");
 
-            string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol, grouping: GroupingMethod.ReferenceAnchor, positiveNotch:2, negativeNotch:2);
+            string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol,
+                grouping: GroupingMethod.ReferenceAnchor, positiveNotch: 2, negativeNotch: 2,
+                minNFiles: minNFiles, maxNFiles: maxNFiles, minMass: minMass, maxMass: maxMass);
 
             TestContext.Out.WriteLine("FeatureAligner wrote: " + written);
+            TestContext.Out.WriteLine($"Filters -> n_files [{minNFiles?.ToString() ?? "-"}, {maxNFiles?.ToString() ?? "-"}], " +
+                $"mass [{minMass?.ToString() ?? "-"}, {maxMass?.ToString() ?? "-"}]");
             TestContext.Out.WriteLine("Rows: " + (File.ReadAllLines(written).Length - 1));
         }
 
@@ -110,6 +124,33 @@ namespace Test.DIATests
                         .GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}");
             TestContext.Out.WriteLine("wrote: " + written + "  rows: " + (l.Length - 1));
             TestContext.Out.WriteLine("n_files dist -> " + string.Join("  ", dist));
+        }
+
+        /// <summary>
+        /// Manual runner: aligns the TopFD _ms1.feature files in the HCD DDA and HCD ISD 8-file folders with the
+        /// principled ReferenceAnchor grouping (20 ppm / notch +-2 / 120 s) and reports features present in all 8
+        /// runs, and the subset >= 4 kDa. [Explicit].
+        /// </summary>
+        [Test, Explicit("manual runner: HCD DDA/ISD TopFD ReferenceAnchor in-all-8 check")]
+        public void RunToppicrFolderAlign()
+        {
+            foreach (var dir in new[] {
+                @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\ToppicR\HCD_DDA_8files",
+                @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\TopFD\ToppicR\HCD_ISD_8files" })
+            {
+                var files = Directory.GetFiles(dir, "*_ms1.feature").ToList();
+                string outp = Path.Combine(dir, "FeatureAlign_referenceAnchor_20ppm_120s_notch2.tsv");
+                FeatureAligner.Align(files, outp, 20, MassToleranceUnit.Ppm, 120,
+                    positiveNotch: 2, negativeNotch: 2, grouping: GroupingMethod.ReferenceAnchor);
+                var l = File.ReadAllLines(outp); var hdr = l[0].Split('\t');
+                int nf = System.Array.IndexOf(hdr, "n_files"), mm = System.Array.IndexOf(hdr, "mass_mean");
+                int inAll  = l.Skip(1).Count(r => int.Parse(r.Split('\t')[nf]) == files.Count);
+                int inAll4 = l.Skip(1).Count(r => { var c = r.Split('\t');
+                    return int.Parse(c[nf]) == files.Count &&
+                           double.Parse(c[mm], System.Globalization.CultureInfo.InvariantCulture) >= 4000; });
+                TestContext.Out.WriteLine($"{Path.GetFileName(dir)}: {files.Count} files, rows={l.Length - 1}, " +
+                                          $"in-all-{files.Count}={inAll}, in-all & >=4kDa={inAll4}");
+            }
         }
 
         /// <summary>

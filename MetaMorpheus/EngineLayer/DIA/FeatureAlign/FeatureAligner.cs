@@ -74,38 +74,41 @@ namespace EngineLayer.DIA.FeatureAlign
             for (int f = 0; f < files.Count; f++)
                 all.AddRange(ReadFeatures(files[f], f, parameters.PreferredQuantColumn));
             all.Sort((a, b) => a.Mass.CompareTo(b.Mass));
-            var massTol = MakeTolerance(parameters.MassTolerance, parameters.MassUnit);
-            var shifts  = NotchShifts(parameters.PositiveNotch, parameters.NegativeNotch);
+            // Notch-aware when notches are allowed (PpmToleranceWithNotch); the grouping then matches via massTol.Within().
+            var massTol = MakeTolerance(parameters.MassTolerance, parameters.MassUnit, parameters.PositiveNotch, parameters.NegativeNotch);
 
-            // Two grouping strategies, both using the same mass(+notch)+RT match:
+            // Grouping strategies:
             //  - UnionFind (default): transitive connected components.
-            //  - ReferenceAnchor: OpenMS ConsensusFeatureGroupDetector style (greedy anchor, bounded window).
-            var groups = parameters.Grouping == GroupingMethod.ReferenceAnchor
-                ? GroupReferenceAnchor(all, massTol, shifts, parameters)
-                : GroupUnionFind(all, massTol, shifts, parameters);
+            //  - ReferenceAnchor: OpenMS-style greedy anchor (approximation — discards non-winning window members).
+            //  - OpenMSConsensus: faithful port of OpenMS TopDownConsensusFeatureGroup (keeps leftovers; all-run only).
+            var groups = parameters.Grouping switch
+            {
+                GroupingMethod.ReferenceAnchor => GroupReferenceAnchor(all, massTol, parameters),
+                GroupingMethod.OpenMSConsensus => GroupOpenMSConsensus(all, parameters, files.Count),
+                _ => GroupUnionFind(all, massTol, parameters),
+            };
 
-            WriteConsensusTsv(groups, labels, parameters.OutputPath);
+            WriteConsensusTsv(groups, labels, parameters.OutputPath, parameters);
             return parameters.OutputPath;
         }
 
         // ---- grouping strategy 1: union-find / connected components (original) -----------------------------
         // Links any two features within mass(+notch)+RT tolerance of EACH OTHER; links are transitive, so a
         // proteoform can span any number of runs (but a long ladder of near-mass features can chain into one blob).
-        private static List<List<Feature>> GroupUnionFind(List<Feature> all, Tolerance massTol, double[] shifts, FeatureAlignParameters p)
+        private static List<List<Feature>> GroupUnionFind(List<Feature> all, Tolerance massTol, FeatureAlignParameters p)
         {
             int n = all.Count;
             var parent = new int[n];
             for (int i = 0; i < n; i++) parent[i] = i;
-            double maxPosShift = p.PositiveNotch * NotchStep;
 
             for (int i = 0; i < n; i++)   // all is sorted by mass, so the inner scan can stop early
             {
                 double mi = all[i].Mass, ri = all[i].Rt;
-                double upper = massTol.GetMaximumValue(mi + maxPosShift);
+                double upper = massTol.GetMaximumValue(mi);   // notch-aware tolerance already widens this to the top notch
                 for (int j = i + 1; j < n; j++)
                 {
                     if (all[j].Mass > upper) break;
-                    if (Math.Abs(all[j].Rt - ri) <= p.RtTolerance && WithinNotch(massTol, all[j].Mass, mi, shifts))
+                    if (Math.Abs(all[j].Rt - ri) <= p.RtTolerance && massTol.Within(all[j].Mass, mi))
                         Union(parent, i, j);
                 }
             }
@@ -125,7 +128,7 @@ namespace EngineLayer.DIA.FeatureAlign
         // feature within mass(+notch)+RT tolerance OF THE ANCHOR, keep one per run (WhenDuplicate), and discard
         // the rest. Because candidates are compared to the anchor (not to each other) the group span is capped at
         // the tolerance width — it cannot chain an unbounded ladder the way union-find can.
-        private static List<List<Feature>> GroupReferenceAnchor(List<Feature> all, Tolerance massTol, double[] shifts, FeatureAlignParameters p)
+        private static List<List<Feature>> GroupReferenceAnchor(List<Feature> all, Tolerance massTol, FeatureAlignParameters p)
         {
             int n = all.Count;
             var used = new bool[n];
@@ -143,7 +146,7 @@ namespace EngineLayer.DIA.FeatureAlign
                 {
                     if (used[j]) continue;
                     var c = all[j];
-                    if (Math.Abs(c.Rt - reference.Rt) <= p.RtTolerance && WithinNotch(massTol, c.Mass, reference.Mass, shifts))
+                    if (Math.Abs(c.Rt - reference.Rt) <= p.RtTolerance && massTol.Within(c.Mass, reference.Mass))
                     {
                         if (!perRun.TryGetValue(c.FileIndex, out var li)) { li = new List<int>(); perRun[c.FileIndex] = li; }
                         li.Add(j);
@@ -165,18 +168,93 @@ namespace EngineLayer.DIA.FeatureAlign
             return groups;
         }
 
-        /// <summary>Convenience overload that builds the parameters from individual values.</summary>
+        // ---- grouping strategy 3: faithful port of OpenMS TopDownConsensusFeatureGroup -----------------------
+        // (the ConsensusFeatureGroupDetector.exe). Equivalent of OpenMS's computeConsensusFeatureGroup:
+        //   * greedy: the most-abundant remaining feature is the reference/anchor;
+        //   * candidates are the still-unused features within an ABSOLUTE ppm/Da window (no notch) and RT of the
+        //     anchor, taken from OTHER runs only (the anchor is its own run's representative);
+        //   * a group is emitted ONLY if candidates cover every other run (present in ALL runs); otherwise just the
+        //     reference is dropped and its candidates stay in the pool;
+        //   * KEY difference from ReferenceAnchor: only the chosen members (reference + one winner per other run) are
+        //     removed — the rest of the window stays in the pool, so two proteoforms sharing a window become two
+        //     groups instead of one merged/discarded group.
+        // repCount = number of input runs (OpenMS's REP_COUNT_).
+        private static List<List<Feature>> GroupOpenMSConsensus(List<Feature> all, FeatureAlignParameters p, int repCount)
+        {
+            var pts = all.OrderBy(f => f.Mass).ToList();                       // mass-sorted working pool
+            bool ppm = p.MassUnit == MassToleranceUnit.Ppm;
+            double tolBase = ppm ? p.MassTolerance * 1e-6 : p.MassTolerance;   // OpenMS MASS_TOL_ (already *1e-6 for ppm)
+            var groups = new List<List<Feature>>();
+
+            while (pts.Count > 0)
+            {
+                // reference = the max-abundance remaining feature (first max on ties, like std::max_element)
+                int refIdx = 0;
+                for (int i = 1; i < pts.Count; i++)
+                    if (pts[i].Quant > pts[refIdx].Quant) refIdx = i;
+                var reference = pts[refIdx];
+                double refMass = reference.Mass;
+                double tol = ppm ? tolBase * refMass : tolBase;
+
+                // candidates within mass+RT of the anchor, from OTHER runs only (scan right then left in mass order)
+                var cand = new List<(Feature f, int idx)>();
+                for (int j = refIdx + 1; j < pts.Count && pts[j].Mass - refMass <= tol; j++)
+                    if (Math.Abs(pts[j].Rt - reference.Rt) <= p.RtTolerance && pts[j].FileIndex != reference.FileIndex)
+                        cand.Add((pts[j], j));
+                for (int j = refIdx - 1; j >= 0 && refMass - pts[j].Mass <= tol; j--)
+                    if (Math.Abs(pts[j].Rt - reference.Rt) <= p.RtTolerance && pts[j].FileIndex != reference.FileIndex)
+                        cand.Add((pts[j], j));
+
+                // OpenMS keeps a group only if it spans every run (reference's run + all repCount-1 others)
+                var repSet = cand.Select(c => c.f.FileIndex).Distinct().ToList();
+                if (repSet.Count < repCount - 1)
+                {
+                    pts.RemoveAt(refIdx);   // drop only the reference; leave its candidates for later anchors
+                    continue;
+                }
+
+                // one winner per other run (max-abundance or nearest-mass), plus the reference
+                var chosenIdx = new List<int> { refIdx };
+                var group = new List<Feature> { reference };
+                foreach (int rep in repSet)
+                {
+                    var inRep = cand.Where(c => c.f.FileIndex == rep);
+                    var pick = p.WhenDuplicate == DuplicateResolution.NearestMass
+                        ? inRep.OrderBy(c => Math.Abs(c.f.Mass - refMass)).First()
+                        : inRep.OrderByDescending(c => c.f.Quant).First();
+                    group.Add(pick.f);
+                    chosenIdx.Add(pick.idx);
+                }
+                groups.Add(group);
+
+                // remove ONLY the chosen features (descending index so earlier removals don't shift later ones)
+                foreach (int idx in chosenIdx.OrderByDescending(x => x)) pts.RemoveAt(idx);
+            }
+            return groups;
+        }
+
+        /// <summary>
+        /// Convenience overload that builds the parameters from individual values.
+        /// <paramref name="minNFiles"/>/<paramref name="maxNFiles"/> and <paramref name="minMass"/>/<paramref name="maxMass"/>
+        /// are OUTPUT filters (inclusive; null = unbounded): a consensus row is written only if its n_files and mean
+        /// mass fall inside those ranges. Leave them null to write every consensus row (the original behaviour).
+        /// </summary>
         public static string Align(IEnumerable<string> inputFiles, string outputPath,
             double massTolerance = 20, MassToleranceUnit massUnit = MassToleranceUnit.Ppm,
             double rtTolerance = 150, string preferredQuantColumn = "FeatureGroupQuantity",
             int positiveNotch = 0, int negativeNotch = 0,
-            GroupingMethod grouping = GroupingMethod.UnionFind, DuplicateResolution whenDuplicate = DuplicateResolution.MaxAbundance)
+            GroupingMethod grouping = GroupingMethod.ReferenceAnchor, DuplicateResolution whenDuplicate = DuplicateResolution.MaxAbundance,
+            int? minNFiles = null, int? maxNFiles = null, double? minMass = null, double? maxMass = null)
         {
             var p = new FeatureAlignParameters(inputFiles, outputPath, massTolerance, massUnit, rtTolerance, preferredQuantColumn);
             p.PositiveNotch = positiveNotch;
             p.NegativeNotch = negativeNotch;
             p.Grouping = grouping;
             p.WhenDuplicate = whenDuplicate;
+            p.MinNFiles = minNFiles;
+            p.MaxNFiles = maxNFiles;
+            p.MinMass = minMass;
+            p.MaxMass = maxMass;
             return Align(p);
         }
 
@@ -215,8 +293,8 @@ namespace EngineLayer.DIA.FeatureAlign
             var dir = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
-            var massTol = MakeTolerance(massTolerance, massUnit);
-            var shifts  = NotchShifts(positiveNotch, negativeNotch);
+            var massTol = MakeTolerance(massTolerance, massUnit, positiveNotch, negativeNotch);   // notch-aware match via massTol.Within
+            var shifts  = NotchShifts(positiveNotch, negativeNotch);                              // only to report the best isotope offset below
 
             using var sw = new StreamWriter(outputPath, append: false);
             sw.WriteLine(string.Join("\t",
@@ -230,7 +308,7 @@ namespace EngineLayer.DIA.FeatureAlign
                 // identified precursor charge must also fall inside the feature's observed charge range.
                 var matches = ids.Where(id =>
                     Math.Abs(f.Rt - id.RtSeconds) <= rtTolerance &&
-                    WithinNotch(massTol, f.Mass, id.Mass, shifts) &&
+                    massTol.Within(f.Mass, id.Mass) &&
                     (!requireChargeInRange || ChargeInRange(f, id))).ToList();
 
                 // Best candidate: the one whose mass is closest after allowing the nearest notch, RT breaks ties.
@@ -318,10 +396,17 @@ namespace EngineLayer.DIA.FeatureAlign
 
         public const double NotchStep = 1.0033548381; // C13 - C12 mass difference (Da)
 
-        // ppm -> PpmTolerance, Da -> AbsoluteTolerance. Notches are only meaningful with ppm.
-        // internal so the sibling ConsensusFeatureAligner reuses the exact same notch/tolerance math.
-        internal static Tolerance MakeTolerance(double value, MassToleranceUnit unit) =>
-            unit == MassToleranceUnit.Ppm ? new PpmTolerance(value) : (Tolerance)new AbsoluteTolerance(value);
+        // ppm -> PpmTolerance, or mzLib's PpmToleranceWithNotch when any monoisotope notch is allowed; Da ->
+        // AbsoluteTolerance. Notches are a ppm/isotope concept, so a Dalton tolerance ignores them. Callers do the
+        // mass match through the returned Tolerance's own Within(), so the notch search is mzLib's
+        // PpmToleranceWithNotch (whose Within loops the same {0,±1..} shifts), not a hand-rolled loop here.
+        // internal so the sibling ConsensusFeatureAligner reuses the exact same tolerance construction.
+        internal static Tolerance MakeTolerance(double value, MassToleranceUnit unit, int positiveNotch = 0, int negativeNotch = 0)
+        {
+            if (unit != MassToleranceUnit.Ppm) return new AbsoluteTolerance(value);
+            if (positiveNotch > 0 || negativeNotch > 0) return new PpmToleranceWithNotch(value, positiveNotch, negativeNotch);
+            return new PpmTolerance(value);
+        }
 
         // The allowed offsets: {0, +1..+pos, -1..-neg} × NotchStep. pos = neg = 0 gives just {0} (exact match).
         internal static double[] NotchShifts(int positiveNotch, int negativeNotch)
@@ -531,7 +616,8 @@ namespace EngineLayer.DIA.FeatureAlign
         //  WRITING THE CONSENSUS (cross-run) TABLE
         // ====================================================================================================
 
-        private static void WriteConsensusTsv(IEnumerable<List<Feature>> clusters, List<string> labels, string outputPath)
+        private static void WriteConsensusTsv(IEnumerable<List<Feature>> clusters, List<string> labels, string outputPath,
+            FeatureAlignParameters parameters)
         {
             int fileCount = labels.Count;
 
@@ -586,6 +672,10 @@ namespace EngineLayer.DIA.FeatureAlign
 
             foreach (var row in rows)
             {
+                // OUTPUT FILTER: skip rows whose n_files / mass_mean fall outside the requested ranges. Grouping is
+                // already done, so this only shrinks the written table (leaving every bound null writes everything).
+                if (!parameters.PassesOutputFilter(row.NumFiles, row.MassMean)) continue;
+
                 var cells = new List<string>
                 {
                     row.MassMean.ToString(Ci),

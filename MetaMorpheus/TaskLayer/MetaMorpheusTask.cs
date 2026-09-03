@@ -248,6 +248,13 @@ namespace TaskLayer
                         precursorSet.Clear();
                         MsDataScan ms2scan = ms2Scans[i];
 
+                        // Initialise the slot up front so the early `continue` paths below (a precursor-refinement
+                        // MzLibException, or precursor deconvolution finding no envelope) leave an EMPTY list rather
+                        // than a null. Every consumer of this array (GetMs2Scans, GetMs2ScansWrapByScanNum) filters
+                        // with `.Any()`, so an empty slot is dropped correctly; a null slot instead throws
+                        // ArgumentNullException in the downstream SelectMany.
+                        scansWithPrecursors[i] = new List<Ms2ScanWithSpecificMass>();
+
                         if (ms2scan.OneBasedPrecursorScanNumber.HasValue)
                         {
                             MsDataScan precursorSpectrum = myMSDataFile.GetOneBasedScan(ms2scan.OneBasedPrecursorScanNumber.Value);
