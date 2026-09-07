@@ -90,16 +90,16 @@ namespace EngineLayer.DIA
                 // additional check, test only
                 //if (fragmentXic.StartScanIndex < precursorXic.StartScanIndex - 2 || fragmentXic.EndScanIndex > precursorXic.EndScanIndex  + 2) continue;
 
-                double overlap = PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursorXic, fragmentXic);
-                if (overlap >= overlapThreshold)
-                {
+                //double overlap = PrecursorFragmentsGroup.CalculateXicOverlapRatio(precursorXic, fragmentXic);
+                //if (overlap >= overlapThreshold)
+                //{
                     double correlation = PrecursorFragmentsGroup.CalculateXicCorrelation(precursorXic, fragmentXic);
                     if (correlation >= correlationThreshold)
                     {
-                        var pfPair = new PrecursorFragmentPair(precursorXic, fragmentXic, correlation, overlap);
+                        var pfPair = new PrecursorFragmentPair(precursorXic, fragmentXic, correlation, 0);
                         pfPairs.Add(pfPair);
                     }
-                }
+                //}
             }
             if (pfPairs.Count > minFragmentCountForGrouping)
             {

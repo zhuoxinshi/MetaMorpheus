@@ -18,7 +18,11 @@ namespace EngineLayer.DIA.FeatureAlign
     ///
     /// A match requires the masses to agree within the mass tolerance (applied around monoisotope "notches",
     /// see <see cref="WithinNotch"/>) AND the apex RTs to agree within the RT tolerance. Column names are
-    /// auto-detected so FLASHQuant, FLASHDeconv and TopFD tables all work. Port of the R script custom_consensus.R.
+    /// auto-detected so FLASHQuant, FLASHDeconv and TopFD tables all work. The reader also recognises this class's
+    /// OWN consensus output (mass_mean / rt_mean, with per-run quant_&lt;run&gt; columns), so a consensus table can
+    /// be fed back in as input: <see cref="Align(FeatureAlignParameters)"/> then aligns already-aligned features
+    /// across two or more result files, using each row's average mass/RT and its summed per-run abundance.
+    /// Port of the R script custom_consensus.R.
     /// </summary>
     public static class FeatureAligner
     {
@@ -27,8 +31,8 @@ namespace EngineLayer.DIA.FeatureAlign
         // ---- column-name dictionaries ----------------------------------------------------------------------
         // For each field we list the header names used by the different tools; the first one present in a given
         // file's header wins. This is what lets the same code read FLASHQuant, FLASHDeconv and TopFD tables.
-        private static readonly string[] MassNames = { "MonoisotopicMass", "Mass" };                                              // FLASH* / TopFD
-        private static readonly string[] RtNames   = { "MedianApexRetentionTime", "ApexRetentionTime", "HighestApexRetentionTime", "Apex_time", "RetentionTime" };
+        private static readonly string[] MassNames = { "MonoisotopicMass", "Mass", "mass_mean" };                                  // FLASH* / TopFD / consensus result
+        private static readonly string[] RtNames   = { "MedianApexRetentionTime", "ApexRetentionTime", "HighestApexRetentionTime", "Apex_time", "RetentionTime", "rt_mean", "rt_apex_mean" };
         private static readonly string[] IdxNames  = { "FeatureGroupIndex", "FeatureIndex", "Feature_ID" };
 
         // RT columns reported in MINUTES (TopFD) instead of seconds. When the chosen RT column is one of these,
@@ -476,15 +480,24 @@ namespace EngineLayer.DIA.FeatureAlign
             int cMinCol  = FindColumn(header, ChargeMinNames);  // -1 -> no charge info (0)
             int cMaxCol  = FindColumn(header, ChargeMaxNames);
 
+            // A FeatureAlign consensus RESULT table (this class's own output) has no single quantity column; it
+            // carries one quant_<run> (or sum_<run>) column per run. When the normal quant column is absent we sum
+            // those per-run columns, so each consensus row reads as ONE feature (mass_mean, rt_mean already the
+            // average mass/RT, total abundance) and the aligner can align already-aligned features straight from
+            // two or more result files.
+            int[] consensusQuantCols = quantCol < 0 ? FindConsensusQuantColumns(header) : Array.Empty<int>();
+
             // Mass, RT and a quantity are required; a clear error naming the file beats a downstream crash.
-            if (massCol < 0 || rtCol < 0 || quantCol < 0)
+            if (massCol < 0 || rtCol < 0 || (quantCol < 0 && consensusQuantCols.Length == 0))
                 throw new FormatException(
-                    $"'{Path.GetFileName(path)}' is not a FLASHQuant/FLASHDeconv/TopFD feature table (missing " +
-                    $"{(massCol < 0 ? "mass " : "")}{(rtCol < 0 ? "rt " : "")}{(quantCol < 0 ? "quant" : "")}). " +
+                    $"'{Path.GetFileName(path)}' is not a FLASHQuant/FLASHDeconv/TopFD or FeatureAlign consensus table (missing " +
+                    $"{(massCol < 0 ? "mass " : "")}{(rtCol < 0 ? "rt " : "")}{(quantCol < 0 && consensusQuantCols.Length == 0 ? "quant" : "")}). " +
                     $"Columns found: {string.Join(", ", header)}");
 
             double rtScale = RtMinuteColumns.Contains(header[rtCol].Trim()) ? 60.0 : 1.0;   // TopFD minutes -> seconds
-            int maxCol = Math.Max(massCol, Math.Max(rtCol, quantCol));                       // guard against short/ragged rows
+            // Guard against short/ragged rows. Include quantCol only when a single quant column is used; the summed
+            // consensus columns are read defensively (missing cells contribute 0), so they need not gate the row.
+            int maxCol = quantCol >= 0 ? Math.Max(massCol, Math.Max(rtCol, quantCol)) : Math.Max(massCol, rtCol);
             var features = new List<Feature>(lines.Length - 1);
             for (int r = 1; r < lines.Length; r++)
             {
@@ -494,7 +507,9 @@ namespace EngineLayer.DIA.FeatureAlign
                 if (!double.TryParse(t[massCol], NumberStyles.Any, Ci, out double mass)) continue;
                 if (!double.TryParse(t[rtCol],   NumberStyles.Any, Ci, out double rt))   continue;
                 rt *= rtScale;
-                double.TryParse(t[quantCol], NumberStyles.Any, Ci, out double quant);      // blank/parse-fail -> 0
+                double quant;
+                if (quantCol >= 0) double.TryParse(t[quantCol], NumberStyles.Any, Ci, out quant);   // blank/parse-fail -> 0
+                else quant = SumColumns(t, consensusQuantCols);                                     // consensus: sum the per-run quant columns
                 string idx = (idxCol >= 0 && idxCol < t.Length) ? t[idxCol] : r.ToString(Ci);
                 features.Add(new Feature { FileIndex = fileIndex, Index = idx, Mass = mass, Rt = rt, Quant = quant,
                     MinCharge = ParseInt(t, cMinCol), MaxCharge = ParseInt(t, cMaxCol) });
@@ -507,6 +522,29 @@ namespace EngineLayer.DIA.FeatureAlign
         {
             var names = new List<string> { preferred, "FeatureGroupQuantity", "FeatureQuantity", "SumIntensity", "Intensity", "Apex_intensity" };
             return names.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToArray();
+        }
+
+        // Per-run quantity columns of a FeatureAlign consensus RESULT table: quant_<run> (FeatureAligner output)
+        // or, if none, sum_<run> (ConsensusFeatureAligner's SummedIntensity block; sumTop3_/apexTop3_ are excluded
+        // because "sum_" does not prefix "sumTop3_"). Empty when the header is not a consensus table.
+        private static int[] FindConsensusQuantColumns(string[] header)
+        {
+            var cols = new List<int>();
+            for (int i = 0; i < header.Length; i++)
+                if (header[i].Trim().StartsWith("quant_", StringComparison.OrdinalIgnoreCase)) cols.Add(i);
+            if (cols.Count == 0)
+                for (int i = 0; i < header.Length; i++)
+                    if (header[i].Trim().StartsWith("sum_", StringComparison.OrdinalIgnoreCase)) cols.Add(i);
+            return cols.ToArray();
+        }
+
+        // Sum the numeric values at the given columns (missing/short/blank cells contribute 0).
+        private static double SumColumns(string[] t, int[] cols)
+        {
+            double sum = 0;
+            foreach (int c in cols)
+                if (c >= 0 && c < t.Length && double.TryParse(t[c], NumberStyles.Any, Ci, out double v)) sum += v;
+            return sum;
         }
 
         // Read all lines with a SHARED handle so a file that is open in Excel/another program can still be read.

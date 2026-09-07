@@ -320,6 +320,63 @@ namespace Test.DIATests
         }
 
         // ================================================================================================
+        //  ALIGN-OF-ALIGN — a consensus result file is itself readable, so aligned features can be re-aligned
+        // ================================================================================================
+
+        [Test]
+        public static void ConsensusResultFiles_CanBeReAligned_AveragingMassRtAndSummingQuant()
+        {
+            // Build two independent consensus tables (each from two runs), then align the two consensus tables to
+            // each other. This exercises reading the aligner's OWN output: mass_mean/rt_mean become the feature's
+            // mass/RT, and the per-run quant_<run> columns are summed into its abundance.
+            string dir = FreshDir();
+
+            // condition A: two runs -> consensusA.tsv (shared feature S + unique UA)
+            string a1 = WriteFlashQuant(dir, "a1",
+                (idx: "1", mass: 10000.00, rtSec: 1000, quant: 100, zMin: 0, zMax: 0),
+                (idx: "2", mass: 12000.00, rtSec: 1500, quant: 10, zMin: 0, zMax: 0));
+            string a2 = WriteFlashQuant(dir, "a2",
+                (idx: "1", mass: 10000.02, rtSec: 1005, quant: 200, zMin: 0, zMax: 0),
+                (idx: "2", mass: 12000.01, rtSec: 1500, quant: 20, zMin: 0, zMax: 0));
+            string consensusA = Path.Combine(dir, "consensusA.tsv");
+            FeatureAligner.Align(new[] { a1, a2 }, consensusA, massTolerance: 20, rtTolerance: 30);
+
+            // condition B: two runs -> consensusB.tsv (same shared feature S + unique UB)
+            string b1 = WriteFlashQuant(dir, "b1",
+                (idx: "1", mass: 10000.05, rtSec: 1010, quant: 1000, zMin: 0, zMax: 0),
+                (idx: "2", mass: 14000.00, rtSec: 2000, quant: 5, zMin: 0, zMax: 0));
+            string b2 = WriteFlashQuant(dir, "b2",
+                (idx: "1", mass: 10000.03, rtSec: 1008, quant: 2000, zMin: 0, zMax: 0),
+                (idx: "2", mass: 14000.01, rtSec: 2000, quant: 6, zMin: 0, zMax: 0));
+            string consensusB = Path.Combine(dir, "consensusB.tsv");
+            FeatureAligner.Align(new[] { b1, b2 }, consensusB, massTolerance: 20, rtTolerance: 30);
+
+            // align the two consensus tables (align aligned features)
+            string outp = Path.Combine(dir, "consensus_of_consensus.tsv");
+            FeatureAligner.Align(new[] { consensusA, consensusB }, outp, massTolerance: 20, rtTolerance: 30);
+
+            var rows = ReadConsensus(outp);
+            Assert.That(rows, Has.Count.EqualTo(3), "shared S + unique UA + unique UB");
+
+            var shared = RowNear(rows, 10000.0);
+            Assert.That(Int(shared, "n_files"), Is.EqualTo(2), "S is present in both consensus tables");
+            Assert.That(Dbl(shared, "mass_mean"), Is.EqualTo(10000.025).Within(0.02), "mass is the average of the two consensus masses");
+            // Each side's abundance is the SUM of that consensus's per-run quant columns: A = 100+200 = 300, B = 1000+2000 = 3000.
+            Assert.That(Dbl(shared, "quant_consensusA"), Is.EqualTo(300).Within(1e-6));
+            Assert.That(Dbl(shared, "quant_consensusB"), Is.EqualTo(3000).Within(1e-6));
+
+            var ua = RowNear(rows, 12000.0);
+            Assert.That(Int(ua, "n_files"), Is.EqualTo(1), "UA is only in consensusA");
+            Assert.That(Dbl(ua, "quant_consensusA"), Is.EqualTo(30).Within(1e-6), "10 + 20 summed");
+            Assert.That(row_blank(ua, "quant_consensusB"), Is.True);
+
+            var ub = RowNear(rows, 14000.0);
+            Assert.That(Int(ub, "n_files"), Is.EqualTo(1), "UB is only in consensusB");
+            Assert.That(Dbl(ub, "quant_consensusB"), Is.EqualTo(11).Within(1e-6), "5 + 6 summed");
+            Assert.That(row_blank(ub, "quant_consensusA"), Is.True);
+        }
+
+        // ================================================================================================
         //  GUARD RAILS — the aligner refuses under-specified input rather than producing a wrong table
         // ================================================================================================
 

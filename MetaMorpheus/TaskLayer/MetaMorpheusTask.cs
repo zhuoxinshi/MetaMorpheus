@@ -301,24 +301,24 @@ namespace TaskLayer
                                             mostAbundantPrecursor = envelope;
                                         }
                                     }
-                                    //var fractionalIntensity = envelope.TotalIntensity /
-                                    //      precursorSpectrum.MassSpectrum.YArray
-                                    //      [
-                                    //          precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
-                                    //      ].Sum();
+                                    var fractionalIntensity = envelope.TotalIntensity /
+                                          precursorSpectrum.MassSpectrum.YArray
+                                          [
+                                              precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
+                                          ].Sum();
 
-                                    //precursorSet.Add(new(envelope, intensity, fractionalIntensity));
+                                    precursorSet.Add(new(envelope, intensity, fractionalIntensity));
                                 }
 
                                 //Turn off chimera
-                                if (mostAbundantPrecursor == null) continue;
-                                var fractionalIntensity = mostAbundantPrecursor.TotalIntensity /
-                                      precursorSpectrum.MassSpectrum.YArray
-                                      [
-                                          precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
-                                      ].Sum();
+                                //if (mostAbundantPrecursor == null) continue;
+                                //var fractionalIntensity = mostAbundantPrecursor.TotalIntensity /
+                                //      precursorSpectrum.MassSpectrum.YArray
+                                //      [
+                                //          precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Minimum)..precursorSpectrum.MassSpectrum.GetClosestPeakIndex(ms2scan.IsolationRange.Maximum)
+                                //      ].Sum();
 
-                                precursorSet.Add(new(mostAbundantPrecursor, mostAbundantPrecursor.TotalIntensity, fractionalIntensity));
+                                //precursorSet.Add(new(mostAbundantPrecursor, mostAbundantPrecursor.TotalIntensity, fractionalIntensity));
                                 //Turn off chimera
                             }
                         }

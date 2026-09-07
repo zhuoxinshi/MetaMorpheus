@@ -4,6 +4,7 @@ using EngineLayer.DatabaseLoading;
 using EngineLayer.DIA;
 using EngineLayer.DIA.FeatureAlign;
 using MassSpectrometry;
+using MathNet.Numerics.Statistics;
 using Microsoft.Win32;
 using MzLibUtil;
 using Nett;
@@ -34,24 +35,25 @@ namespace Test.DIATests.Manuscript
             //    @"E:\ISD Project\071626_ISD\Quant\4proYB\08-02-26_4proYB_1-10_ISD_65min_rep1.raw"
             //};
 
-            var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\ISD_search";
-            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
-            var outFolder = Path.Combine(outDir, "neutralMass10");
-            if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
-
             bool group = true;
             bool write = true;
             bool search = true;
 
+            var apexTolerance = 0.1f; var corrThreshold = 0.75; var fragmentRank = 200;
             var diaParams = new DIAparameters(
                 DIAanalysisType.ISD,
                 //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), traceToleranceDa: 1.5, minMass: 4000, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new ConsensusMassXicConstructor(new PpmTolerance(20), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), traceToleranceDa: 1.5, aggregateCharges: false, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
-                new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
+                new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 5, new ClassicDeconvolutionParameters(1, 60, 4, 3), minMass: 4000, minCharge: 3, xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 new NeutralMassXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3, new ClassicDeconvolutionParameters(1, 20, 4, 3), xicSpline: new XicCubicSpline(0.05, 1, 1, true)),
                 //new XicGroupingEngine(0.2f, 0.3, 0.5, maxThreadsForGrouping: 10),
-                new XicGroupingEngine(0.1f, 0, 0.5, maxThreadsForGrouping: 10, fragmentRankThreshold: 200), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                new XicGroupingEngine(apexTolerance, 0, corrThreshold, maxThreadsForGrouping: 10, fragmentRankThreshold: fragmentRank), PseudoMs2ConstructionType.Mass, combineFragments: true);
             var commonParams = new CommonParameters { DIAparameters = diaParams };
+
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\ISD_search";
+            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+            var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}");
+            if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
 
             if (group)
             {
@@ -105,6 +107,86 @@ namespace Test.DIATests.Manuscript
         }
 
         [Test]
+        public static void SearchAllPseudoScansMsalign_ExternalDecon()
+        {
+            var topFdRoot = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ISD\TopFD_labelCorrected";
+            var dataDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC";
+            var files = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HCD-YBC")).ToList();
+            var fileList = files.Select(f => (f, Path.Combine(topFdRoot, Path.GetFileNameWithoutExtension(f) + "_labelCorrected"))).ToList();
+
+            var apexTolerance = 0.1f; var corrThreshold = 0.5; var fragmentRank = 200;
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\ISD_search_externalDecon";
+            if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+            var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}");
+            if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
+
+            bool group = true;
+            bool write = true; 
+            bool search = false;
+
+            if (group)
+            {
+                foreach (var (spectraFile, topFdBase) in fileList)
+                {
+                    string stem = Path.GetFileNameWithoutExtension(spectraFile);
+                    string precursorFeatureXml = topFdBase + "_feature.xml";
+                    string combinedMs2MsAlign = topFdBase + "_ms2.msalign";
+
+                    // the data file has to be loaded up front here: splitting the combined ms2.msalign into ISD
+                    // channels needs the scan filters, so the constructors depend on the scans
+                    var dataFile = MsDataFileReader.GetDataFile(spectraFile);
+                    dataFile.LoadAllStaticData();
+                    var allScans = dataFile.GetAllScansList().ToArray();
+
+                    var ms1Constructor = new FeatureXmlXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
+                        precursorFeatureXml, minMass: 4000, maxMass: 70000, minEcScore: 0,
+                        xicSpline: new XicCubicSpline(0.05, 1, 1, true));
+
+                    var ms2Constructor = ExternalDeconXicConstructor.FromCombinedMsAlign(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
+                        combinedMs2MsAlign, allScans, maxMass: 70000, xicSpline: new XicCubicSpline(0.05, 1, 1, true));
+
+                    var diaParams = new DIAparameters(
+                        DIAanalysisType.ISD, ms1Constructor, ms2Constructor,
+                        new XicGroupingEngine(apexTolerance, 0, corrThreshold, maxThreadsForGrouping: 10, fragmentRankThreshold: fragmentRank, minFragmentCountForGrouping: 10), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                    var commonParams = new CommonParameters { DIAparameters = diaParams };
+
+                    var pseudoScans = MetaMorpheusTask.GetMs2Scans(dataFile, dataFile.FilePath, commonParams).ToArray();
+
+                    var msAlignOutPath = Path.Combine(outFolder, stem + "_pseudo_ms2.msalign");
+                    if (write)
+                    {
+                        diaParams.WriteSettingsToFile(Path.Combine(outFolder, "DIAparameters.txt"));
+                        ISDEngine.WriteMsAlignFile(msAlignOutPath, pseudoScans);
+                    }
+                }
+            }
+
+            if (search)
+            {
+                string searchTomlCommonFixedVariable = @"E:\ISD Project\ISD_250428\new_topDown_search_toml_commonFixedVariable\Task Settings\Task1-SearchTaskconfig.toml";
+                var searchTask = Toml.ReadFile<SearchTask>(searchTomlCommonFixedVariable, MetaMorpheusTask.tomlConfig);
+                searchTask.CommonParameters.DoPrecursorDeconvolution = false; // already deconvoluted via FromFile
+                searchTask.CommonParameters.UseProvidedPrecursorInfo = true; // FromFile assembly provides the precursor info
+                searchTask.CommonParameters.ProductDeconvolutionParameters = new ClassicDeconvolutionParameters(1, 1, 4, 3);
+                searchTask.CommonParameters.AssumeOrphanPeaksAreZ1Fragments = true;
+
+                var moreGPTMD_toml = @"E:\ISD Project\ISD_250428\moreGPTMD_toml\Task Settings\Task1-GPTMDTaskconfig.toml";
+                var gptmdTask = Toml.ReadFile<GptmdTask>(moreGPTMD_toml, MetaMorpheusTask.tomlConfig);
+                gptmdTask.CommonParameters = searchTask.CommonParameters;
+
+                // YB is yeast; add the human xml back if the data files are switched to the HC_YC mixes
+                string yeast_xml = @"E:\Databases\uniprotkb_taxonomy_id_559292_AND_review_2026_08_05.xml";
+                var human_xml = @"E:\Databases\uniprotkb_taxonomy_id_9606_AND_reviewed_2026_07_23.xml";
+                var databases = new List<DbForTask> { new DbForTask(yeast_xml, false) };
+
+                var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.mgf").ToList();
+                var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) };
+                var engine = new EverythingRunnerEngine(taskList, searchFileList, databases, outFolder);
+                engine.Run();
+            }
+        }
+
+        [Test]
         public static void SearchDDA()
         {
             var dataDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC";
@@ -113,7 +195,7 @@ namespace Test.DIATests.Manuscript
             //{
             //    @"E:\ISD Project\071626_ISD\Quant\4proYB\08-02-26_4proYB_1-10_ISD_65min_rep1.raw"
             //};
-            var outFolder = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\DDA_custom";
+            var outFolder = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\DDA_custom\Normal";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
 
             string calibrationToml = @"E:\ISD Project\071626_ISD\Quant\HC_YC\MM\HC_YC_DDA_xml-cali-xml\Task Settings\Task2-CalibrateTaskconfig.toml";
@@ -257,19 +339,19 @@ namespace Test.DIATests.Manuscript
         [Test]
         public void RunFeatureAligner()
         {
-            // ---------- EDIT: input feature tables (FLASHQuant or FLASHDeconv .tsv) ----------
             var dir = @"E:\ISD Project\071626_ISD\Quant\Manuscript\TopFD\ms1_feature";
-            // filter on the FILE NAME (not the full path, which contains the folder "HC_YC" and would match YC too)
-            var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("HCD-YBC_1-2")).ToList();// & !f.Contains("ISD60-80-100")
+            //var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("ISD60-80-100")).ToList();// f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")
+
+            var files = new List<string> { @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_DDA_8files_20_Ppm_120.tsv", @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_ISD_8files_20_Ppm_120.tsv" };
 
             double massTol = 20;
             var massUnit = MassToleranceUnit.Ppm;   // or MassToleranceUnit.Dalton
-            double rtTol = 120;                      // seconds, +/-
+            double rtTol = 90;                      // seconds, +/-
 
             // ---------- EDIT: OUTPUT FILTERS (write out fewer features) ----------
             // Keep only consensus rows whose n_files and mean mass fall inside these INCLUSIVE ranges. Any bound left
             // null is not enforced, so all four null => write every row (the original behaviour).
-            int?    minNFiles = 1;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
+            int?    minNFiles = 2;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
             int?    maxNFiles = null;   // null = no upper bound
             double? minMass   = 4000;   // Da; null = no lower bound
             double? maxMass   = null;   // Da; null = no upper bound
@@ -277,7 +359,7 @@ namespace Test.DIATests.Manuscript
 
             var outFolder = @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
-            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HCD-YBC_1-2_DDA&ISD_1-6files_{massTol}_{massUnit}_{rtTol}.tsv");
+            string outputPath = Path.Combine(outFolder, $"FeatureAlign2_YBC_DDA&ISD_8files_{massTol}_{massUnit}_{rtTol}.tsv");
 
             string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol,
                 grouping: GroupingMethod.ReferenceAnchor, positiveNotch: 2, negativeNotch: 2,
@@ -289,36 +371,7 @@ namespace Test.DIATests.Manuscript
             TestContext.Out.WriteLine("Rows: " + (File.ReadAllLines(written).Length - 1));
         }
 
-        /// <summary>
-        /// Runs OUR ReferenceAnchor aligner on the same 3 FLASHDeconv mix files that OpenMS
-        /// ConsensusFeatureGroupDetector was run on, with OpenMS-matched tolerances (100 ppm, 180 s, notch 0),
-        /// so the two consensus tables can be diffed. [Explicit].
-        /// </summary>
-        [Test, Explicit("head-to-head vs OpenMS ConsensusFeatureGroupDetector on 3 FLASHDeconv mix files")]
-        public void OursVsOpenMS_ThreeMixFlashDeconv()
-        {
-            var fd = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\FlashDeconv\FeatureFiles";
-            var files = new[]
-            {
-                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1.tsv",
-                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep2.tsv",
-                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep3.tsv",
-            }.Select(f => Path.Combine(fd, f)).ToList();
-
-            string outPath = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\FlashDeconv\_compare\ours_consensus.tsv";
-            FeatureAligner.Align(files, outPath,
-                massTolerance: 100, massUnit: MassToleranceUnit.Ppm, rtTolerance: 90,
-                preferredQuantColumn: "FeatureQuantity",
-                positiveNotch: 0, negativeNotch: 0,
-                grouping: GroupingMethod.ReferenceAnchor, whenDuplicate: DuplicateResolution.MaxAbundance);
-
-            var lines = File.ReadAllLines(outPath);
-            int nf = System.Array.IndexOf(lines[0].Split('\t'), "n_files");
-            var dist = lines.Skip(1).Where(l => l.Length > 0).Select(l => int.Parse(l.Split('\t')[nf]))
-                            .GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}");
-            TestContext.Out.WriteLine($"OURS consensus rows: {lines.Length - 1}");
-            TestContext.Out.WriteLine("n_files: " + string.Join("  ", dist));
-        }
+        
 
     }
 }

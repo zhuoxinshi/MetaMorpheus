@@ -321,6 +321,7 @@ namespace EngineLayer.DIA
                     }
 
                     var xic = new ExtractedIonChromatogram(peaks);
+                    if (xic.EndRT - xic.StartRT > 2) continue;
                     xics.Add(xic);
                     LastFeatureByXic[xic] = feature;
                 }

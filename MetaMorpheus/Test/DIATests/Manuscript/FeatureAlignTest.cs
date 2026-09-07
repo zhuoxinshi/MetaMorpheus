@@ -141,5 +141,77 @@ namespace Test.DIATests.Manuscript
             Assert.That(nFiles.Count, Is.EqualTo(3), "with notch 0 the 1 Da-apart features stay separate");
             Assert.That(nFiles.All(n => n == 1), Is.True, "each is its own singleton at notch 0");
         }
+
+        /// <summary>
+        /// Verifies that <see cref="GroupingMethod.OpenMSConsensus"/> reproduces OpenMS TopDownConsensusFeatureGroup
+        /// (the ConsensusFeatureGroupDetector exe) on the same 3 FLASHDeconv mix files. OpenMS at 100 ppm / 180 s
+        /// produced 151 consensus groups (all present in all 3 runs); the faithful port should match. [Explicit]
+        /// (reads real data on disk).
+        /// </summary>
+        [TestFixture]
+        public class OpenMSConsensusPortTest
+        {
+            [Test, Explicit("checks OpenMSConsensus grouping == OpenMS's 151 groups on the FLASHDeconv mix files")]
+            public void OpenMSConsensus_Matches_OpenMS()
+            {
+                var fd = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\FlashDeconv\FeatureFiles";
+                var files = new[]
+                {
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep2.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep3.tsv",
+            }.Select(f => Path.Combine(fd, f)).ToList();
+                Assert.That(files.All(File.Exists), "FLASHDeconv FeatureFiles must be present");
+
+                string outPath = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\FlashDeconv\_compare\ours_openms_port_consensus.tsv";
+                FeatureAligner.Align(files, outPath,
+                    massTolerance: 100, massUnit: MassToleranceUnit.Ppm, rtTolerance: 180,
+                    preferredQuantColumn: "FeatureQuantity",
+                    grouping: GroupingMethod.OpenMSConsensus,
+                    whenDuplicate: DuplicateResolution.MaxAbundance);
+
+                var lines = File.ReadAllLines(outPath);
+                int nf = System.Array.IndexOf(lines[0].Split('\t'), "n_files");
+                var nFiles = lines.Skip(1).Where(l => l.Length > 0).Select(l => int.Parse(l.Split('\t')[nf])).ToList();
+                int total = nFiles.Count;
+                int all3 = nFiles.Count(n => n == 3);
+
+                TestContext.Out.WriteLine($"OpenMSConsensus rows: {total}   all-3: {all3}   (OpenMS produced 151)");
+                Assert.That(nFiles.All(n => n == 3), Is.True, "OpenMSConsensus must emit only all-run groups");
+                Assert.That(total, Is.EqualTo(151).Within(3),
+                    "should match OpenMS's 151 consensus groups (small slack for tie-breaks)");
+            }
+        }
+
+        /// <summary>
+        /// Runs OUR ReferenceAnchor aligner on the same 3 FLASHDeconv mix files that OpenMS
+        /// ConsensusFeatureGroupDetector was run on, with OpenMS-matched tolerances (100 ppm, 180 s, notch 0),
+        /// so the two consensus tables can be diffed. [Explicit].
+        /// </summary>
+        [Test, Explicit("head-to-head vs OpenMS ConsensusFeatureGroupDetector on 3 FLASHDeconv mix files")]
+        public void OursVsOpenMS_ThreeMixFlashDeconv()
+        {
+            var fd = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\FlashDeconv\FeatureFiles";
+            var files = new[]
+            {
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep1.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep2.tsv",
+                "07-27-26_HCD-YBC_1-1_81min_DDA_3iso_mscan4_rep3.tsv",
+            }.Select(f => Path.Combine(fd, f)).ToList();
+
+            string outPath = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\FlashDeconv\_compare\ours_consensus.tsv";
+            FeatureAligner.Align(files, outPath,
+                massTolerance: 100, massUnit: MassToleranceUnit.Ppm, rtTolerance: 90,
+                preferredQuantColumn: "FeatureQuantity",
+                positiveNotch: 0, negativeNotch: 0,
+                grouping: GroupingMethod.ReferenceAnchor, whenDuplicate: DuplicateResolution.MaxAbundance);
+
+            var lines = File.ReadAllLines(outPath);
+            int nf = System.Array.IndexOf(lines[0].Split('\t'), "n_files");
+            var dist = lines.Skip(1).Where(l => l.Length > 0).Select(l => int.Parse(l.Split('\t')[nf]))
+                            .GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Key}:{g.Count()}");
+            TestContext.Out.WriteLine($"OURS consensus rows: {lines.Length - 1}");
+            TestContext.Out.WriteLine("n_files: " + string.Join("  ", dist));
+        }
     }
 }
