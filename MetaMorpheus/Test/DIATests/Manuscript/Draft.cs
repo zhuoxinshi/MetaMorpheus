@@ -35,8 +35,8 @@ namespace Test.DIATests.Manuscript
             //    @"E:\ISD Project\071626_ISD\Quant\4proYB\08-02-26_4proYB_1-10_ISD_65min_rep1.raw"
             //};
 
-            bool group = true;
-            bool write = true;
+            bool group = false;
+            bool write = false;
             bool search = true;
 
             var apexTolerance = 0.1f; var corrThreshold = 0.75; var fragmentRank = 200;
@@ -52,7 +52,8 @@ namespace Test.DIATests.Manuscript
 
             var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\MM\ISD_search";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
-            var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}");
+            //var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}");
+            var outFolder = Path.Combine(outDir, "neutralMass6");
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
 
             if (group)
@@ -85,6 +86,7 @@ namespace Test.DIATests.Manuscript
                 searchTask.CommonParameters.ProductDeconvolutionParameters = new ClassicDeconvolutionParameters(1, 1, 4, 3);
                 searchTask.CommonParameters.AssumeOrphanPeaksAreZ1Fragments = true;
                 //searchTask.SearchParameters.MinAllowedInternalFragmentLength = 0;
+                searchTask.SearchParameters.WritePrunedDatabase = true;
 
                 var lessGPTMD_noFilter_toml = @"E:\ISD Project\ISD_250428\new_topDown_lessGPTMD_noFilter_toml\Task Settings\Task1-GPTMDTaskconfig.toml";
                 var moreGPTMD_toml = @"E:\ISD Project\ISD_250428\moreGPTMD_toml\Task Settings\Task1-GPTMDTaskconfig.toml";
@@ -99,8 +101,8 @@ namespace Test.DIATests.Manuscript
                 var std4pro_xml = @"E:\ISD Project\Std_4pro.xml";
                 var databases = new List<DbForTask> { new DbForTask(yeast_xml, false), new DbForTask(human_xml, false) };//, new DbForTask(human_xml, false)
 
-                var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.mgf").ToList();
-                var taskList = new List<(string, MetaMorpheusTask)> { ("search", searchTask), ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) }; // ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) 
+                var searchFileList = Directory.GetFiles(outFolder, "*_pseudo_ms2.msalign").ToList();
+                var taskList = new List<(string, MetaMorpheusTask)> { ("search_msalign", searchTask), ("GPTMD_msalign", gptmdTask), ("postGPTMD-search_msalign", searchTask) }; // ("GPTMD", gptmdTask), ("postGPTMD-search", searchTask) 
                 var engine = new EverythingRunnerEngine(taskList, searchFileList, databases, outFolder);
                 engine.Run();
             }
@@ -109,13 +111,12 @@ namespace Test.DIATests.Manuscript
         [Test]
         public static void SearchAllPseudoScansMsalign_ExternalDecon()
         {
-            var topFdRoot = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ISD\TopFD_labelCorrected";
+            var topFdRoot = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ISD\SeparateISD\TopFD";
             var dataDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC";
-            var files = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HCD-YBC")).ToList();
-            var fileList = files.Select(f => (f, Path.Combine(topFdRoot, Path.GetFileNameWithoutExtension(f) + "_labelCorrected"))).ToList();
+            var rawFiles = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HCD-YBC")).ToList();
 
-            var apexTolerance = 0.1f; var corrThreshold = 0.5; var fragmentRank = 200;
-            var outDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC\ISD_search_externalDecon";
+            var apexTolerance = 2f; var corrThreshold = -1; var fragmentRank = 200;
+            var outDir = @"E:\ISD Project\071626_ISD\Quant\Manuscript\ID\ISD_featureXML";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
             var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}");
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
@@ -126,24 +127,37 @@ namespace Test.DIATests.Manuscript
 
             if (group)
             {
-                foreach (var (spectraFile, topFdBase) in fileList)
+                foreach (var file in rawFiles)
                 {
-                    string stem = Path.GetFileNameWithoutExtension(spectraFile);
-                    string precursorFeatureXml = topFdBase + "_feature.xml";
-                    string combinedMs2MsAlign = topFdBase + "_ms2.msalign";
+                    string stem = Path.GetFileNameWithoutExtension(file);
 
-                    // the data file has to be loaded up front here: splitting the combined ms2.msalign into ISD
-                    // channels needs the scan filters, so the constructors depend on the scans
-                    var dataFile = MsDataFileReader.GetDataFile(spectraFile);
+                    // TopFD was run SEPARATELY on each ISD channel, so every run has four *_feature.xml under
+                    // topFdRoot: one for the MS1 (precursor) channel and one per source-fragmentation voltage.
+                    // Build all of them from stem (Path.Combine, not string concat: topFdRoot is a directory).
+                    string precursorFeatureXml = Path.Combine(topFdRoot, stem + "_ms1_feature.xml");
+                    var fragmentFeatureXmlByVoltage = new Dictionary<int, string>
+                    {
+                        [60]  = Path.Combine(topFdRoot, stem + "_isd60_feature.xml"),
+                        [80]  = Path.Combine(topFdRoot, stem + "_isd80_feature.xml"),
+                        [100] = Path.Combine(topFdRoot, stem + "_isd100_feature.xml"),
+                    };
+
+                    var dataFile = MsDataFileReader.GetDataFile(file);
                     dataFile.LoadAllStaticData();
-                    var allScans = dataFile.GetAllScansList().ToArray();
 
+                    // Precursor XICs read straight from the MS1 channel's feature.xml (intact proteoforms, >= 4 kDa).
                     var ms1Constructor = new FeatureXmlXicConstructor(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
                         precursorFeatureXml, minMass: 4000, maxMass: 70000, minEcScore: 0,
                         xicSpline: new XicCubicSpline(0.05, 1, 1, true));
 
-                    var ms2Constructor = ExternalDeconXicConstructor.FromCombinedMsAlign(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
-                        combinedMs2MsAlign, allScans, maxMass: 70000, xicSpline: new XicCubicSpline(0.05, 1, 1, true));
+                    // Fragment XICs built the SAME way, but keyed by source voltage so each channel is read from its
+                    // own feature.xml. ISDEngine hands one voltage's scans at a time and BySourceVoltage dispatches
+                    // on the sid= in the scan filter; the feature.xml scan numbers are the original raw numbers
+                    // (each channel steps by 4), so they join to those scans by scan number. No mass floor on
+                    // fragments.
+                    var ms2Constructor = FeatureXmlXicConstructor.BySourceVoltage(new PpmToleranceWithNotch(20, 1, 1), 2, 1, 3,
+                        fragmentFeatureXmlByVoltage, minMass: 0, maxMass: 70000, minEcScore: 0,
+                        xicSpline: new XicCubicSpline(0.05, 1, 1, true));
 
                     var diaParams = new DIAparameters(
                         DIAanalysisType.ISD, ms1Constructor, ms2Constructor,
@@ -156,6 +170,9 @@ namespace Test.DIATests.Manuscript
                     if (write)
                     {
                         diaParams.WriteSettingsToFile(Path.Combine(outFolder, "DIAparameters.txt"));
+                        // Fragments no longer come from a TopFD msAlign, so the per-peak EnvCNN 4th column is not
+                        // available here; write the standard 3-column msAlign. (To restore EnvCNN, pass the per-
+                        // voltage *_ms2.msalign as the score source.)
                         ISDEngine.WriteMsAlignFile(msAlignOutPath, pseudoScans);
                     }
                 }
@@ -340,18 +357,18 @@ namespace Test.DIATests.Manuscript
         public void RunFeatureAligner()
         {
             var dir = @"E:\ISD Project\071626_ISD\Quant\Manuscript\TopFD\ms1_feature";
-            //var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("ISD60-80-100")).ToList();// f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")
+            var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")).ToList();// f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")
 
-            var files = new List<string> { @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_DDA_8files_20_Ppm_120.tsv", @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_ISD_8files_20_Ppm_120.tsv" };
+            //var files = new List<string> { @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_DDA_8files_20_Ppm_120.tsv", @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_ISD_8files_20_Ppm_120.tsv" };
 
             double massTol = 20;
             var massUnit = MassToleranceUnit.Ppm;   // or MassToleranceUnit.Dalton
-            double rtTol = 90;                      // seconds, +/-
+            double rtTol = 60;                      // seconds, +/-
 
             // ---------- EDIT: OUTPUT FILTERS (write out fewer features) ----------
             // Keep only consensus rows whose n_files and mean mass fall inside these INCLUSIVE ranges. Any bound left
             // null is not enforced, so all four null => write every row (the original behaviour).
-            int?    minNFiles = 2;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
+            int?    minNFiles = 6;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
             int?    maxNFiles = null;   // null = no upper bound
             double? minMass   = 4000;   // Da; null = no lower bound
             double? maxMass   = null;   // Da; null = no upper bound
@@ -359,7 +376,7 @@ namespace Test.DIATests.Manuscript
 
             var outFolder = @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
-            string outputPath = Path.Combine(outFolder, $"FeatureAlign2_YBC_DDA&ISD_8files_{massTol}_{massUnit}_{rtTol}.tsv");
+            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HCD-YBC_DDA_6files_{massTol}_{massUnit}_{rtTol}.tsv");
 
             string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol,
                 grouping: GroupingMethod.ReferenceAnchor, positiveNotch: 2, negativeNotch: 2,
@@ -370,8 +387,5 @@ namespace Test.DIATests.Manuscript
                 $"mass [{minMass?.ToString() ?? "-"}, {maxMass?.ToString() ?? "-"}]");
             TestContext.Out.WriteLine("Rows: " + (File.ReadAllLines(written).Length - 1));
         }
-
-        
-
     }
 }

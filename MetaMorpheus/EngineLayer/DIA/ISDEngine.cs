@@ -125,8 +125,11 @@ namespace EngineLayer.DIA
             return sortedMap;
         }
 
-        public static void WriteMsAlignFile(string filePath, IEnumerable<Ms2ScanWithSpecificMass> ms2ScansWithMass)
+        public static void WriteMsAlignFile(string filePath, IEnumerable<Ms2ScanWithSpecificMass> ms2ScansWithMass, string envCnnMsAlignPath = null)
         {
+            // When an external-decon msAlign (e.g. TopFD *_ms2.msalign) is supplied, look up each fragment's
+            // EnvCNN score from it and write it as a 4th peak column (mass  intensity  charge  EnvCNN).
+            var apexEnvCnn = string.IsNullOrEmpty(envCnnMsAlignPath) ? null : ReadApexEnvCnnScores(envCnnMsAlignPath);
             var sortedScans = ms2ScansWithMass.OrderBy(s => s.OneBasedScanNumber);
             using (var writer = new StreamWriter(filePath))
             {
@@ -155,16 +158,59 @@ namespace EngineLayer.DIA
                     //an unknown id must not be written as 0 - that is what made every exported scan claim feature 0
                     writer.WriteLine($"PRECURSOR_FEATURE_ID={scan.PrecursorFeatureId?.ToString() ?? string.Empty}");
 
-                    // Write peaks: monoMass, intensity, charge 
+                    // Write peaks: monoMass, intensity, charge [, EnvCNN score at the fragment's apex]
                     for (int i = 0; i < scan.ExperimentalFragments.Length; i++)
                     {
-                        writer.WriteLine($"{scan.ExperimentalFragments[i].MonoisotopicMass}\t{scan.ExperimentalFragments[i].TotalIntensity}\t{scan.ExperimentalFragments[i].Charge}");
+                        var frag = scan.ExperimentalFragments[i];
+                        if (apexEnvCnn == null)
+                        {
+                            writer.WriteLine($"{frag.MonoisotopicMass}\t{frag.TotalIntensity}\t{frag.Charge}");
+                        }
+                        else
+                        {
+                            double env = LookupApexEnvCnn(apexEnvCnn, frag.Charge, frag.MonoisotopicMass);
+                            writer.WriteLine($"{frag.MonoisotopicMass}\t{frag.TotalIntensity}\t{frag.Charge}\t{(double.IsNaN(env) ? string.Empty : env.ToString())}");
+                        }
                     }
 
                     writer.WriteLine("END IONS");
                     writer.WriteLine();
                 }
             }
+        }
+
+        // For each (charge, 0.01-Da mass bin), keep the EnvCNN (4th msAlign column) of the most intense peak -
+        // the peak a fragment XIC apexes on. Peak lines are the tab-delimited numeric lines (no '=') in BEGIN/END IONS.
+        private static Dictionary<(int, long), double> ReadApexEnvCnnScores(string ms2MsAlignPath)
+        {
+            var bestIntensity = new Dictionary<(int, long), double>();
+            var scoreAtBest = new Dictionary<(int, long), double>();
+            foreach (var raw in File.ReadLines(ms2MsAlignPath))
+            {
+                if (raw.Length == 0 || raw[0] == '#' || raw.Contains("=") || raw.StartsWith("BEGIN") || raw.StartsWith("END"))
+                    continue;
+                var s = raw.Split('\t');
+                if (s.Length < 4) continue;
+                if (!double.TryParse(s[0], out double mass) || !double.TryParse(s[1], out double intensity)
+                    || !int.TryParse(s[2], out int charge) || !double.TryParse(s[3], out double env))
+                    continue;
+                var key = (charge, (long)Math.Round(mass * 100.0));
+                if (!bestIntensity.TryGetValue(key, out double bi) || intensity > bi)
+                {
+                    bestIntensity[key] = intensity;
+                    scoreAtBest[key] = env;
+                }
+            }
+            return scoreAtBest;
+        }
+
+        private static double LookupApexEnvCnn(Dictionary<(int, long), double> scores, int charge, double mass)
+        {
+            long bin = (long)Math.Round(mass * 100.0);
+            for (long d = -1; d <= 1; d++) // tolerate the 0.01-Da bin boundary (XIC apex mass is stored as float)
+                if (scores.TryGetValue((charge, bin + d), out double v))
+                    return v;
+            return double.NaN;
         }
     }
 }

@@ -53,7 +53,7 @@ namespace EngineLayer.DIA
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursors[i];
-                        var fragmentsInRange = GetXicsInRange(apexSortedFragmentXics, precursor.ApexRT, ApexRTTolerance);
+                        var fragmentsInRange = GetXicsInRange(apexSortedFragmentXics, precursor.ApexScanIndex, ApexRTTolerance);
                         var pfGroup = GroupFragmentsForOnePrecursor(precursor, fragmentsInRange);
                         if (pfGroup != null)
                         {
@@ -109,23 +109,48 @@ namespace EngineLayer.DIA
             return null;
         }
 
-        protected static SortedDictionary<double, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics)
+        //protected static SortedDictionary<double, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics)
+        //{
+        //    var tree = new SortedDictionary<double, List<ExtractedIonChromatogram>>();
+        //    foreach (var xic in xics)
+        //    {
+        //        double roundedApexRt = Math.Round(xic.ApexRT, 2); 
+        //        if (!tree.ContainsKey(roundedApexRt))
+        //            tree[roundedApexRt] = new List<ExtractedIonChromatogram>();
+        //        tree[roundedApexRt].Add(xic);
+        //    }
+        //    return tree;
+        //}
+
+        protected static SortedDictionary<int, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics)
         {
-            var tree = new SortedDictionary<double, List<ExtractedIonChromatogram>>();
+            var tree = new SortedDictionary<int, List<ExtractedIonChromatogram>>();
             foreach (var xic in xics)
             {
-                double roundedApexRt = Math.Round(xic.ApexRT, 2); 
-                if (!tree.ContainsKey(roundedApexRt))
-                    tree[roundedApexRt] = new List<ExtractedIonChromatogram>();
-                tree[roundedApexRt].Add(xic);
+                int apexScanIndex = xic.ApexScanIndex;
+                if (!tree.ContainsKey(apexScanIndex))
+                    tree[apexScanIndex] = new List<ExtractedIonChromatogram>();
+                tree[apexScanIndex].Add(xic);
             }
             return tree;
         }
 
-        protected static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<double, List<ExtractedIonChromatogram>> apexSortedFragmentXics, double targetApexRt, double rtTolerance)
+        //protected static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<double, List<ExtractedIonChromatogram>> apexSortedFragmentXics, int targetApexRt, int rtTolerance)
+        //{
+        //    //double minRt = Math.Round(targetApexRt - rtTolerance, 2);
+        //    //double maxRt = Math.Round(targetApexRt + rtTolerance, 2);
+
+        //    var subset = apexSortedFragmentXics.Where(kvp => kvp.Key >= minRt && kvp.Key <= maxRt).SelectMany(kvp => kvp.Value).ToList();
+        //    return subset;
+        //}
+
+        protected static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<int, List<ExtractedIonChromatogram>> apexSortedFragmentXics, int targetApexRt, float rtTolerance)
         {
-            double minRt = Math.Round(targetApexRt - rtTolerance, 2);
-            double maxRt = Math.Round(targetApexRt + rtTolerance, 2);
+            //double minRt = Math.Round(targetApexRt - rtTolerance, 2);
+            //double maxRt = Math.Round(targetApexRt + rtTolerance, 2);
+
+            float minRt = targetApexRt - rtTolerance;
+            float maxRt = targetApexRt + rtTolerance;
 
             var subset = apexSortedFragmentXics.Where(kvp => kvp.Key >= minRt && kvp.Key <= maxRt).SelectMany(kvp => kvp.Value).ToList();
             return subset;
