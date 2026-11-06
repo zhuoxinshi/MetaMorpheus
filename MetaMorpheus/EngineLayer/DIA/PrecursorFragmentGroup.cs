@@ -349,6 +349,7 @@ namespace EngineLayer.DIA
                 throw new MetaMorpheusException("The PfGroup does not contain any PFpairs.");
             }
             PFpairs.Sort((a, b) => b.Correlation.Value.CompareTo(a.Correlation.Value));
+            //PFpairs.Sort((a, b) => b.FragmentXic.ApexPeak.Intensity.CompareTo(a.FragmentXic.ApexPeak.Intensity));
             for (int i = 0; i < PFpairs.Count; i++)
             {
                 PFpairs[i].FragmentRank = i + 1;

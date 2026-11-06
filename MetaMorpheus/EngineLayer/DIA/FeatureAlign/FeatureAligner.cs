@@ -165,7 +165,8 @@ namespace EngineLayer.DIA.FeatureAlign
                         ? li.OrderBy(j => Math.Abs(all[j].Mass - reference.Mass)).First()
                         : li.OrderByDescending(j => all[j].Quant).First();
                     group.Add(all[chosen]);
-                    foreach (int j in li) used[j] = true;
+                    //foreach (int j in li) used[j] = true;
+                    used[chosen] = true;
                 }
                 groups.Add(group);
             }

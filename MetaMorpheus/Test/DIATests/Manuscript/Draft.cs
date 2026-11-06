@@ -115,10 +115,10 @@ namespace Test.DIATests.Manuscript
             var dataDir = @"E:\ISD Project\071626_ISD\Quant\HCD_YBC";
             var rawFiles = Directory.GetFiles(dataDir, "*ISD60-80-100*").Where(f => f.Contains(".raw") & f.Contains("HCD-YBC")).ToList();
 
-            var apexTolerance = 2f; var corrThreshold = -1; var fragmentRank = 200;
-            var outDir = @"E:\ISD Project\071626_ISD\Quant\Manuscript\ID\ISD_featureXML";
+            var apexTolerance = 2f; var corrThreshold = 0.5; int? fragmentRank = 100; int? precursorRank = null;int minFrags = 10;
+            var outDir = @"E:\Proteomics_software\TopPIC\toppic-windows-1.8.1\Data\ISD_quant\HCD_YBC\ISD";
             if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
-            var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}");
+            var outFolder = Path.Combine(outDir, $"{apexTolerance}_{corrThreshold}_{fragmentRank}_{precursorRank}_{minFrags}");
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
 
             bool group = true;
@@ -161,7 +161,7 @@ namespace Test.DIATests.Manuscript
 
                     var diaParams = new DIAparameters(
                         DIAanalysisType.ISD, ms1Constructor, ms2Constructor,
-                        new XicGroupingEngine(apexTolerance, 0, corrThreshold, maxThreadsForGrouping: 10, fragmentRankThreshold: fragmentRank, minFragmentCountForGrouping: 10), PseudoMs2ConstructionType.Mass, combineFragments: true);
+                        new XicGroupingEngine(apexTolerance, 0, corrThreshold, maxThreadsForGrouping: 10, fragmentRankThreshold: fragmentRank, precursorRankThreshold: precursorRank, minFragmentCountForGrouping: minFrags), PseudoMs2ConstructionType.Mass, combineFragments: true);
                     var commonParams = new CommonParameters { DIAparameters = diaParams };
 
                     var pseudoScans = MetaMorpheusTask.GetMs2Scans(dataFile, dataFile.FilePath, commonParams).ToArray();
@@ -201,6 +201,7 @@ namespace Test.DIATests.Manuscript
                 var engine = new EverythingRunnerEngine(taskList, searchFileList, databases, outFolder);
                 engine.Run();
             }
+        
         }
 
         [Test]
@@ -357,7 +358,7 @@ namespace Test.DIATests.Manuscript
         public void RunFeatureAligner()
         {
             var dir = @"E:\ISD Project\071626_ISD\Quant\Manuscript\TopFD\ms1_feature";
-            var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")).ToList();// f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")
+            var files = Directory.GetFiles(dir, "*ms1.feature").Where(f => f.Contains("HCD-YBC_1-1") & f.Contains("ISD60-80-100")).ToList();// f.Contains("HCD-YBC_1-") & !f.Contains("ISD60-80-100")
 
             //var files = new List<string> { @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_DDA_8files_20_Ppm_120.tsv", @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign\FeatureAlign_YBC_ISD_8files_20_Ppm_120.tsv" };
 
@@ -368,18 +369,19 @@ namespace Test.DIATests.Manuscript
             // ---------- EDIT: OUTPUT FILTERS (write out fewer features) ----------
             // Keep only consensus rows whose n_files and mean mass fall inside these INCLUSIVE ranges. Any bound left
             // null is not enforced, so all four null => write every row (the original behaviour).
-            int?    minNFiles = 6;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
+            int?    minNFiles = 3;      // e.g. 8 keeps only features present in all 8 runs; null = no lower bound
             int?    maxNFiles = null;   // null = no upper bound
             double? minMass   = 4000;   // Da; null = no lower bound
             double? maxMass   = null;   // Da; null = no upper bound
+            int notches = 2;
             // --------------------------------------------------------------------
 
-            var outFolder = @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign";
+            var outFolder = @"E:\ISD Project\071626_ISD\Quant\Manuscript\FeatureAlign_new";
             if (!Directory.Exists(outFolder)) Directory.CreateDirectory(outFolder);
-            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HCD-YBC_DDA_6files_{massTol}_{massUnit}_{rtTol}.tsv");
+            string outputPath = Path.Combine(outFolder, $"FeatureAlign_HCD-YBC_1-1_ISD_3files_{massTol}_{massUnit}_{rtTol}_{notches}.tsv");
 
             string written = FeatureAligner.Align(files, outputPath, massTol, massUnit, rtTol,
-                grouping: GroupingMethod.ReferenceAnchor, positiveNotch: 2, negativeNotch: 2,
+                grouping: GroupingMethod.ReferenceAnchor, positiveNotch: notches, negativeNotch: notches,
                 minNFiles: minNFiles, maxNFiles: maxNFiles, minMass: minMass, maxMass: maxMass);
 
             TestContext.Out.WriteLine("FeatureAligner wrote: " + written);

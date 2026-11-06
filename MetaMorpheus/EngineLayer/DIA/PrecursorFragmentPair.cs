@@ -44,6 +44,7 @@ namespace EngineLayer.DIA
             foreach (var fragmentXic in fragmentPairMap.Keys)
             {
                 fragmentPairMap[fragmentXic].Sort((a, b) => b.Correlation.Value.CompareTo(a.Correlation.Value));
+                //fragmentPairMap[fragmentXic].Sort((a, b) => b.FragmentXic.ApexPeak.Intensity.CompareTo(a.FragmentXic.ApexPeak.Intensity));
                 for (int i = 0; i < fragmentPairMap[fragmentXic].Count; i++)
                 {
                     fragmentPairMap[fragmentXic][i].PrecursorRank = i + 1;
