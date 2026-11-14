@@ -18,18 +18,21 @@ namespace EngineLayer.DIA
         public double CorrelationThreshold { get; set; }
         public int? PrecursorRankThreshold { get; set; } 
         public int? FragmentRankThreshold { get; set; }
+        public ApexToleranceUnit ApexToleranceUnit { get; set; } //unit of ApexRTTolerance: minutes or number of scans
 
         /// <summary>
         /// A generic method of grouping correlated XICs into PrecursorFragmentsGroup objects based on specified criteria.
         /// </summary>
-        /// <param name="apexRTTolerance"> maximum apex RT difference allowed between two XICs </param>
+        /// <param name="apexRTTolerance"> maximum apex difference allowed between two XICs, in the unit given by apexToleranceUnit </param>
         /// <param name="overlapThreshold"> minimum overlap between two XICs </param>
         /// <param name="correlationThreshold"> minimum Pearson's correlation between two XICs </param>
         /// <param name="maxThreadsForGrouping"> the maximum threads for parallelization of grouping </param>
         /// <param name="minFragmentCountForGrouping"> minimun number of fragments needed to construct a PF group </param>
         /// <param name="precursorRankThreshold">  threshold for filtering out PF pairs ranked low for the precursor </param>
         /// <param name="fragmentRankThreshold"> threshold for filtering out PF pairs ranked low for the fragment </param>
-        public XicGroupingEngine(float apexRTTolerance, double overlapThreshold, double correlationThreshold, int maxThreadsForGrouping = 1, int minFragmentCountForGrouping = 0, int? precursorRankThreshold = null, int? fragmentRankThreshold = null)
+        /// <param name="apexToleranceUnit"> whether apexRTTolerance is in minutes of retention time or in scans </param>
+        public XicGroupingEngine(float apexRTTolerance, double overlapThreshold, double correlationThreshold, int maxThreadsForGrouping = 1, int minFragmentCountForGrouping = 0, int? precursorRankThreshold = null, int? fragmentRankThreshold = null,
+            ApexToleranceUnit apexToleranceUnit = ApexToleranceUnit.RetentionTime)
         {
             ApexRTTolerance = apexRTTolerance;
             OverlapThreshold = overlapThreshold;
@@ -38,6 +41,7 @@ namespace EngineLayer.DIA
             MinFragmentCountForPfGroup = minFragmentCountForGrouping;
             PrecursorRankThreshold = precursorRankThreshold;
             FragmentRankThreshold = fragmentRankThreshold;
+            ApexToleranceUnit = apexToleranceUnit;
         }
 
         /// <summary>
@@ -45,7 +49,7 @@ namespace EngineLayer.DIA
         public override IEnumerable<PrecursorFragmentsGroup> PrecursorFragmentGrouping(List<ExtractedIonChromatogram> precursors, List<ExtractedIonChromatogram> fragments)
         {
             var pfGroups = new ConcurrentBag<PrecursorFragmentsGroup>();
-            var apexSortedFragmentXics = BuildApexSortedXics(fragments);
+            var apexSortedFragmentXics = BuildApexSortedXics(fragments, ApexToleranceUnit);
 
             Parallel.ForEach(Partitioner.Create(0, precursors.Count), new ParallelOptions { MaxDegreeOfParallelism = MaxThreadsForGrouping },
                 (partitionRange, loopState) =>
@@ -53,7 +57,8 @@ namespace EngineLayer.DIA
                     for (int i = partitionRange.Item1; i < partitionRange.Item2; i++)
                     {
                         var precursor = precursors[i];
-                        var fragmentsInRange = GetXicsInRange(apexSortedFragmentXics, precursor.ApexRT, ApexRTTolerance);
+                        double precursorApex = ApexToleranceUnit == ApexToleranceUnit.ScanIndex ? precursor.ApexScanIndex : precursor.ApexRT;
+                        var fragmentsInRange = GetXicsInRange(apexSortedFragmentXics, precursorApex, ApexRTTolerance, ApexToleranceUnit);
                         var pfGroup = GroupFragmentsForOnePrecursor(precursor, fragmentsInRange);
                         if (pfGroup != null)
                         {
@@ -106,25 +111,39 @@ namespace EngineLayer.DIA
             return null;
         }
 
-        protected static SortedDictionary<double, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics)
+        /// <summary>
+        /// The key a fragment XIC is sorted under: its apex retention time rounded to 0.01 min, or its apex scan index.
+        /// </summary>
+        protected static double GetApexKey(ExtractedIonChromatogram xic, ApexToleranceUnit apexToleranceUnit = ApexToleranceUnit.RetentionTime)
+        {
+            return apexToleranceUnit == ApexToleranceUnit.ScanIndex ? xic.ApexScanIndex : Math.Round(xic.ApexRT, 2);
+        }
+
+        protected static SortedDictionary<double, List<ExtractedIonChromatogram>> BuildApexSortedXics(IEnumerable<ExtractedIonChromatogram> xics, ApexToleranceUnit apexToleranceUnit = ApexToleranceUnit.RetentionTime)
         {
             var tree = new SortedDictionary<double, List<ExtractedIonChromatogram>>();
             foreach (var xic in xics)
             {
-                double roundedApexRt = Math.Round(xic.ApexRT, 2); 
-                if (!tree.ContainsKey(roundedApexRt))
-                    tree[roundedApexRt] = new List<ExtractedIonChromatogram>();
-                tree[roundedApexRt].Add(xic);
+                double apexKey = GetApexKey(xic, apexToleranceUnit);
+                if (!tree.ContainsKey(apexKey))
+                    tree[apexKey] = new List<ExtractedIonChromatogram>();
+                tree[apexKey].Add(xic);
             }
             return tree;
         }
 
-        protected static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<double, List<ExtractedIonChromatogram>> apexSortedFragmentXics, double targetApexRt, double rtTolerance)
+        protected static List<ExtractedIonChromatogram> GetXicsInRange(SortedDictionary<double, List<ExtractedIonChromatogram>> apexSortedFragmentXics, double targetApex, double tolerance,
+            ApexToleranceUnit apexToleranceUnit = ApexToleranceUnit.RetentionTime)
         {
-            double minRt = Math.Round(targetApexRt - rtTolerance, 2);
-            double maxRt = Math.Round(targetApexRt + rtTolerance, 2);
+            double min = targetApex - tolerance;
+            double max = targetApex + tolerance;
+            if (apexToleranceUnit == ApexToleranceUnit.RetentionTime)
+            {
+                min = Math.Round(min, 2);
+                max = Math.Round(max, 2);
+            }
 
-            var subset = apexSortedFragmentXics.Where(kvp => kvp.Key >= minRt && kvp.Key <= maxRt).SelectMany(kvp => kvp.Value).ToList();
+            var subset = apexSortedFragmentXics.Where(kvp => kvp.Key >= min && kvp.Key <= max).SelectMany(kvp => kvp.Value).ToList();
             return subset;
         }
     }

@@ -75,6 +75,11 @@ namespace EngineLayer
         /// </summary>
         public double PrecursorDeconvolutionScore { get; }
         public string FullFilePath { get; }
+        /// <summary>
+        /// Id of the deconvoluted MS1 feature the precursor came from, or null when unknown. Set for pseudo MS2 scans
+        /// built from a feature file, so the scan can be joined back to that file; 0 is a valid feature id.
+        /// </summary>
+        public int? PrecursorFeatureId { get; set; }
         public IsotopicEnvelope[] ExperimentalFragments { get; private set; }
         public List<Ms2ScanWithSpecificMass> ChildScans { get; set; } // MS2/MS3 scans that are children of this MS2 scan
         private double[] DeconvolutedMonoisotopicMasses;

@@ -19,10 +19,50 @@ namespace EngineLayer.DIA
         public List<PrecursorFragmentPair> PFpairs { get; set; }
         public int PFgroupIndex { get; set; } //an index identifier for each group and also used as the scan number for the pseudo MS2 scan generated from this group
 
+        /// <summary>
+        /// Id of the TopFD feature (<c>feat_id</c>) the precursor XIC was read from, or null when the precursor XIC
+        /// did not come from a feature file. 0 is a valid feature id, so "unknown" is null.
+        /// </summary>
+        public int? PrecursorFeatureId { get; set; }
+
         public PrecursorFragmentsGroup(ExtractedIonChromatogram precursorXic, List<PrecursorFragmentPair> pfPairs)
         {
             PrecursorXic = precursorXic;
             PFpairs = pfPairs;
+        }
+
+        /// <summary>
+        /// Sets <see cref="PrecursorFeatureId"/> of each group whose precursor XIC is in
+        /// <paramref name="featureByPrecursorXic"/> (from <see cref="FeatureXmlXicConstructor.LastFeatureByXic"/>
+        /// of the constructor that built the precursor XICs). Does nothing when the map is null.
+        /// </summary>
+        public static void AssignPrecursorFeatureIds(IEnumerable<PrecursorFragmentsGroup> groups,
+            IReadOnlyDictionary<ExtractedIonChromatogram, TopFdFeature> featureByPrecursorXic)
+        {
+            if (groups == null || featureByPrecursorXic == null)
+                return;
+
+            foreach (var group in groups)
+            {
+                if (featureByPrecursorXic.TryGetValue(group.PrecursorXic, out var feature))
+                    group.PrecursorFeatureId = feature.Id;
+            }
+        }
+
+        /// <summary>
+        /// The intensity an XIC contributes to a pseudo MS2 scan; see <see cref="PseudoMs2IntensityType"/>.
+        /// </summary>
+        public static double GetXicIntensity(ExtractedIonChromatogram xic, PseudoMs2IntensityType intensityType)
+        {
+            switch (intensityType)
+            {
+                case PseudoMs2IntensityType.ApexPeak:
+                    return xic.ApexPeak.Intensity;
+                case PseudoMs2IntensityType.XicSum:
+                    return xic.Peaks.Sum(p => (double)p.Intensity);
+                default:
+                    throw new MetaMorpheusException("Invalid pseudo MS2 intensity type specified.");
+            }
         }
 
         public static double CalculateXicCorrelation(ExtractedIonChromatogram xic1, ExtractedIonChromatogram xic2)
@@ -239,13 +279,14 @@ namespace EngineLayer.DIA
             return overlap;
         }
 
-        public Ms2ScanWithSpecificMass GetPseudoMs2ScanFromPfGroup(PseudoMs2ConstructionType pseudoMs2ConstructionType, CommonParameters commonParameters, string dataFilePath)
+        public Ms2ScanWithSpecificMass GetPseudoMs2ScanFromPfGroup(PseudoMs2ConstructionType pseudoMs2ConstructionType, CommonParameters commonParameters, string dataFilePath,
+            PseudoMs2IntensityType pseudoMs2IntensityType = PseudoMs2IntensityType.ApexPeak)
         {
             //sort all fragment XICs by their m/z value of the apex peak
             PFpairs.Sort((a, b) => a.FragmentXic.ApexPeak.M.CompareTo(b.FragmentXic.ApexPeak.M));
-            //We use the apex peak of each Xic to construct the pseudo MS2 scan (might change if other values work better)
+            //The m/z (or mass) of each peak is that of the XIC apex; the intensity follows pseudoMs2IntensityType
             var mzs = PFpairs.Select(pf => (double)pf.FragmentXic.ApexPeak.M).ToArray();
-            var intensities = PFpairs.Select(pf => (double)pf.FragmentXic.ApexPeak.Intensity).ToArray();
+            var intensities = PFpairs.Select(pf => GetXicIntensity(pf.FragmentXic, pseudoMs2IntensityType)).ToArray();
             var newMs2Scan = new MsDataScan(new MzSpectrum(mzs, intensities, false), PFgroupIndex, 2, true, Polarity.Positive, PrecursorXic.ApexRT, new MzRange(mzs.Min(), mzs.Max()), null, MZAnalyzerType.Unknown, intensities.Sum(), null, null, null, oneBasedPrecursorScanNumber: PFgroupIndex);
 
             // assign neutral experimental fragments for the new MS2 scan
@@ -258,19 +299,35 @@ namespace EngineLayer.DIA
                     break;
                 // If the fragment XIC is mass-based, we create an isotopic envelope as the neutral mass fragment for each fragment XIC
                 case PseudoMs2ConstructionType.Mass:
-                    neutralExperimentalFragments = PFpairs.Select(pf => new IsotopicEnvelope(1,
-                            new List<(double mz, double intensity)> { (1, 1) }, pf.FragmentXic.ApexPeak.M, pf.FragmentXic.Peaks.Cast<IndexedMass>().First().Charge, 1, 0)).ToArray();
+                    //each envelope carries the fragment's mass, charge and intensity (these are what WriteMsAlignFile writes)
+                    neutralExperimentalFragments = PFpairs.Select((pf, i) =>
+                    {
+                        int fragmentCharge = GetFragmentCharge(pf);
+                        return new IsotopicEnvelope(1,
+                            new List<(double mz, double intensity)> { (pf.FragmentXic.ApexPeak.M.ToMz(fragmentCharge), intensities[i]) },
+                            pf.FragmentXic.ApexPeak.M, fragmentCharge, intensities[i], 0);
+                    }).ToArray();
                     break;
                 default:
                     throw new MetaMorpheusException("Invalid pseudo MS2 construction type specified.");
             }
-            // add precursor information
+            // add precursor information; the precursor intensity is on the same scale as the fragment intensities
             var charge = PrecursorXic.ApexPeak is IndexedMass im ? im.Charge : 1;
             var monoMz = PrecursorXic.ApexPeak.M.ToMz(charge);
+            var precursorIntensity = GetXicIntensity(PrecursorXic, pseudoMs2IntensityType);
             Ms2ScanWithSpecificMass scanWithprecursor = new Ms2ScanWithSpecificMass(newMs2Scan, monoMz, charge, dataFilePath,
-                commonParameters, neutralExperimentalFragments);
+                commonParameters, neutralExperimentalFragments, precursorIntensity: precursorIntensity)
+            {
+                PrecursorFeatureId = PrecursorFeatureId
+            };
 
             return scanWithprecursor;
+        }
+
+        /// <summary>Charge of a fragment XIC, taken from its first point; 1 when the point carries no charge.</summary>
+        private static int GetFragmentCharge(PrecursorFragmentPair pf)
+        {
+            return pf.FragmentXic.Peaks.FirstOrDefault() is IndexedMass first && first.Charge != 0 ? first.Charge : 1;
         }
 
         public void SetFragmentRankForPfPairs()
